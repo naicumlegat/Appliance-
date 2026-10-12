@@ -122,10 +122,110 @@
       window.open(url, '_blank', 'noopener,noreferrer');
     };
 
-    const openRetailerLink = (type, brand, modelOrPart, customTag = 'applianceengine-20') => {
-      const q = encodeURIComponent(`${brand} ${modelOrPart}`);
-      let targetUrl = '';
+    // Resilient Caller with 8s Timeout & Search Tool Support
+    async function callGeminiWithFallback(apiKey, prompt, temp = 0.2, timeoutMs = 8000, enableSearch = false) {
+      let lastError = null;
 
+      for (const model of MODEL_CASCADE) {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+          try {
+            if (attempt > 0) {
+              await new Promise((r) => setTimeout(r, 1200));
+            }
+
+            const bodyPayload = {
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: temp },
+            };
+
+            if (enableSearch) {
+              bodyPayload.tools = [{ googleSearch: {} }];
+            }
+
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
+                body: JSON.stringify(bodyPayload),
+              }
+            );
+
+            clearTimeout(timeoutId);
+            const data = await res.json();
+
+            if (data.error) {
+              const code = data.error.code;
+              if (code === 503 || code === 429) {
+                lastError = `Demand spike (${code}). Retrying...`;
+                continue;
+              }
+              throw new Error(`API Error (${code}): ${data.error.message}`);
+            }
+
+            if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+              return {
+                text: data.candidates[0].content.parts[0].text,
+                grounding: data.candidates[0]?.groundingMetadata || null
+              };
+            } else if (data.candidates?.[0]?.finishReason) {
+              throw new Error(`Response stopped: ${data.candidates[0].finishReason}`);
+            }
+          } catch (err) {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') {
+              lastError = 'Request timed out after 8s.';
+            } else {
+              lastError = err.message;
+            }
+          }
+        }
+      }
+
+      throw new Error(lastError || 'Service busy.');
+    }
+
+    // Direct & Grounded Retailer Link Dispatcher
+    const openRetailerLink = async (type, brand, modelOrPart, apiKey = '', onStatusChange = null, customTag = 'applianceengine-20') => {
+      const q = encodeURIComponent(`${brand} ${modelOrPart}`);
+
+      // If user specifically requests Deep Live Sourcing:
+      if (type === 'live_search') {
+        if (onStatusChange) onStatusChange('Scanning certified retailers for in-stock parts...');
+        if (apiKey) {
+          try {
+            const prompt = `Find an active, orderable merchant or authorized supplier link selling replacement part: "${brand} ${modelOrPart}".
+Prioritize authorized stores like AppliancePartsPros, RepairClinic, Encompass, Amazon, or the official manufacturer site.
+Return ONLY valid JSON:
+{
+  "storeName": "Name of Store",
+  "purchaseUrl": "https://..."
+}`;
+            const res = await callGeminiWithFallback(apiKey, prompt, 0.1, 7000, true);
+            const jsonMatch = res.text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0]);
+              if (parsed.purchaseUrl && parsed.purchaseUrl.startsWith('http')) {
+                if (onStatusChange) onStatusChange('');
+                window.open(parsed.purchaseUrl, '_blank', 'noopener,noreferrer');
+                return;
+              }
+            }
+          } catch (e) {
+            console.warn('Live grounding lookup timed out or failed, using multi-retailer fallback:', e);
+          }
+        }
+        if (onStatusChange) onStatusChange('');
+        // Fallback to high-confidence multi-retailer query if search lookup timed out
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(`${brand} ${modelOrPart} buy online in stock replacement`)}`, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      let targetUrl = '';
       switch (type) {
         case 'amazon':
           targetUrl = `https://www.amazon.com/s?k=${q}&tag=${customTag}`;
@@ -148,63 +248,6 @@
 
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
     };
-
-    async function callGeminiWithFallback(apiKey, prompt, temp = 0.2, timeoutMs = 8000) {
-      let lastError = null;
-
-      for (const model of MODEL_CASCADE) {
-        for (let attempt = 0; attempt < 2; attempt++) {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-          try {
-            if (attempt > 0) {
-              await new Promise((r) => setTimeout(r, 1200));
-            }
-
-            const res = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                signal: controller.signal,
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: prompt }] }],
-                  generationConfig: { temperature: temp },
-                }),
-              }
-            );
-
-            clearTimeout(timeoutId);
-            const data = await res.json();
-
-            if (data.error) {
-              const code = data.error.code;
-              if (code === 503 || code === 429) {
-                lastError = `Demand spike (${code}). Retrying...`;
-                continue;
-              }
-              throw new Error(`API Error (${code}): ${data.error.message}`);
-            }
-
-            if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-              return data.candidates[0].content.parts[0].text;
-            } else if (data.candidates?.[0]?.finishReason) {
-              throw new Error(`Response stopped: ${data.candidates[0].finishReason}`);
-            }
-          } catch (err) {
-            clearTimeout(timeoutId);
-            if (err.name === 'AbortError') {
-              lastError = 'Request timed out after 8s.';
-            } else {
-              lastError = err.message;
-            }
-          }
-        }
-      }
-
-      throw new Error(lastError || 'Service busy.');
-    }
 
     function App() {
       const [appliances, setAppliances] = useState([
@@ -283,6 +326,7 @@
       const [apiKey, setApiKey] = useState('');
       const [keyInput, setKeyInput] = useState('');
       const [isPaidUser, setIsPaidUser] = useState(false);
+      const [sourcingStatus, setSourcingStatus] = useState('');
 
       const [selectedAppliance, setSelectedAppliance] = useState(null);
       const [detailTab, setDetailTab] = useState('parts');
@@ -433,9 +477,9 @@ Respond strictly with valid JSON only:
   ]
 }`;
 
-            const rawText = await callGeminiWithFallback(activeKey, prompt, 0.1, 8000);
-            const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-            const cleanJsonString = jsonMatch ? jsonMatch[0] : rawText.trim();
+            const res = await callGeminiWithFallback(activeKey, prompt, 0.1, 8000);
+            const jsonMatch = res.text.match(/\{[\s\S]*\}/);
+            const cleanJsonString = jsonMatch ? jsonMatch[0] : res.text.trim();
             const parsed = JSON.parse(cleanJsonString);
 
             if (parsed.category) detectedCategory = parsed.category;
@@ -601,8 +645,8 @@ Question: "${q}"
 Provide a 2-3 bullet point answer strictly from the owner guide under 90 words. If it is an internal electrical failure not in the owner guide, provide the closest basic check (breaker/indicator) and note that advanced diagnostics require Pro.`;
             }
 
-            const reply = await callGeminiWithFallback(activeKey, prompt, 0.2, 10000);
-            const finalHistory = [...updatedHistory, { id: (Date.now() + 1).toString(), sender: 'assistant', text: reply }];
+            const res = await callGeminiWithFallback(activeKey, prompt, 0.2, 10000);
+            const finalHistory = [...updatedHistory, { id: (Date.now() + 1).toString(), sender: 'assistant', text: res.text }];
             setMessages(finalHistory);
             saveApplianceChat(activeAppliance.id, finalHistory);
           } catch (err) {
@@ -679,6 +723,13 @@ Provide a 2-3 bullet point answer strictly from the owner guide under 90 words. 
             </div>
           </div>
 
+          {/* SOURCING PROGRESS BAR (If actively discovering in-stock links) */}
+          {sourcingStatus && (
+            <div className="bg-indigo-950/80 border-b border-indigo-800/80 px-4 py-2 text-center text-xs text-indigo-300 animate-pulse">
+              {sourcingStatus}
+            </div>
+          )}
+
           {/* MAIN SCREEN */}
           {!selectedAppliance ? (
             <div className="flex-1 p-4 space-y-3">
@@ -697,7 +748,6 @@ Provide a 2-3 bullet point answer strictly from the owner guide under 90 words. 
                     onTouchStart={handleTouchStart}
                     onTouchEnd={(e) => handleTouchEnd(e, item.id)}
                   >
-                    {/* Underlying Swipe Delete Action */}
                     <div className="absolute inset-y-0 right-0 w-24 bg-rose-600 flex items-center justify-center z-0">
                       <button
                         onClick={() => setDeleteTarget(item)}
@@ -710,7 +760,6 @@ Provide a 2-3 bullet point answer strictly from the owner guide under 90 words. 
                       </button>
                     </div>
 
-                    {/* Sliding Card Content */}
                     <div
                       className={`relative z-10 bg-slate-900 border border-slate-800/80 transition-transform duration-200 ${
                         isSwiped ? '-translate-x-24' : 'translate-x-0'
@@ -883,18 +932,26 @@ Provide a 2-3 bullet point answer strictly from the owner guide under 90 words. 
                           </div>
                           <div className="text-right shrink-0">
                             <span className="text-xs font-bold text-emerald-400">{part.priceEst}</span>
-                            <div className="flex gap-1.5 mt-1.5">
+                            <div className="flex flex-col gap-1 mt-1.5">
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => openRetailerLink('amazon', selectedAppliance.brand, part.partNumber, apiKey, setSourcingStatus)}
+                                  className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[10px] font-semibold px-2 py-1 rounded border border-amber-500/30"
+                                >
+                                  Amazon ↗
+                                </button>
+                                <button
+                                  onClick={() => openRetailerLink('official', selectedAppliance.brand, part.partNumber, apiKey, setSourcingStatus)}
+                                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-semibold px-2 py-1 rounded border border-slate-700"
+                                >
+                                  OEM Store ↗
+                                </button>
+                              </div>
                               <button
-                                onClick={() => openRetailerLink('amazon', selectedAppliance.brand, part.partNumber)}
-                                className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[11px] font-semibold px-2 py-1 rounded border border-amber-500/30"
+                                onClick={() => openRetailerLink('live_search', selectedAppliance.brand, `${part.name} ${part.partNumber}`, apiKey, setSourcingStatus)}
+                                className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-[9px] font-semibold px-2 py-0.5 rounded border border-indigo-500/30 text-center"
                               >
-                                Amazon ↗
-                              </button>
-                              <button
-                                onClick={() => openRetailerLink('official', selectedAppliance.brand, part.partNumber)}
-                                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold px-2 py-1 rounded border border-slate-700"
-                              >
-                                OEM Store ↗
+                                🔍 Find In-Stock Sellers
                               </button>
                             </div>
                           </div>
@@ -908,10 +965,9 @@ Provide a 2-3 bullet point answer strictly from the owner guide under 90 words. 
                   </div>
                 )}
 
-                {/* TAB 2: WARRANTY & RECEIPT VAULT (Harmonized Button Pairs) */}
+                {/* TAB 2: WARRANTY & RECEIPT VAULT */}
                 {detailTab === 'docs' && (
                   <div className="space-y-4">
-                    {/* Manufacturer Warranty */}
                     <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                       <div className="flex justify-between items-start mb-2.5">
                         <div className="pr-2">
@@ -966,7 +1022,6 @@ Provide a 2-3 bullet point answer strictly from the owner guide under 90 words. 
                       )}
                     </div>
 
-                    {/* Purchase Receipt */}
                     <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                       <div className="flex justify-between items-start mb-2.5">
                         <div className="pr-2">
@@ -1017,7 +1072,7 @@ Provide a 2-3 bullet point answer strictly from the owner guide under 90 words. 
             </div>
           )}
 
-          {/* DEDICATED CONSUMABLE ACTION MODAL */}
+          {/* DEDICATED CONSUMABLE ACTION MODAL (With Live Sourcing Fallback) */}
           {activeConsumableModal && (
             <div className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
               <div className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-2xl sm:rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-xl">
@@ -1073,27 +1128,36 @@ Provide a 2-3 bullet point answer strictly from the owner guide under 90 words. 
                   </p>
                   <div className="grid grid-cols-3 gap-2">
                     <button
-                      onClick={() => openRetailerLink('amazon', activeConsumableModal.appliance.brand, activeConsumableModal.consumable.partNumber)}
+                      onClick={() => openRetailerLink('amazon', activeConsumableModal.appliance.brand, activeConsumableModal.consumable.partNumber, apiKey, setSourcingStatus)}
                       className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold text-xs py-2 px-1.5 rounded-lg text-center flex flex-col items-center justify-center gap-0.5"
                     >
                       <span className="font-bold">Amazon</span>
                       <span className="text-[9px] text-amber-400/80">Prime ↗</span>
                     </button>
                     <button
-                      onClick={() => openRetailerLink('homedepot', activeConsumableModal.appliance.brand, activeConsumableModal.consumable.partNumber)}
+                      onClick={() => openRetailerLink('homedepot', activeConsumableModal.appliance.brand, activeConsumableModal.consumable.partNumber, apiKey, setSourcingStatus)}
                       className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 border border-orange-500/30 font-semibold text-xs py-2 px-1.5 rounded-lg text-center flex flex-col items-center justify-center gap-0.5"
                     >
                       <span className="font-bold">Home Depot</span>
                       <span className="text-[9px] text-orange-400/80">Store ↗</span>
                     </button>
                     <button
-                      onClick={() => openRetailerLink('official', activeConsumableModal.appliance.brand, activeConsumableModal.consumable.partNumber)}
+                      onClick={() => openRetailerLink('official', activeConsumableModal.appliance.brand, activeConsumableModal.consumable.partNumber, apiKey, setSourcingStatus)}
                       className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs py-2 px-1.5 rounded-lg text-center flex flex-col items-center justify-center gap-0.5"
                     >
                       <span className="font-bold">Official Store</span>
                       <span className="text-[9px] text-slate-400">OEM Direct ↗</span>
                     </button>
                   </div>
+
+                  {/* Guaranteed In-Stock Search Fallback Button */}
+                  <button
+                    onClick={() => openRetailerLink('live_search', activeConsumableModal.appliance.brand, `${activeConsumableModal.consumable.name} ${activeConsumableModal.consumable.partNumber}`, apiKey, setSourcingStatus)}
+                    className="w-full bg-slate-950 border border-indigo-500/40 hover:border-indigo-400 text-indigo-300 text-xs py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors mt-1.5 font-medium"
+                  >
+                    <span>🔍 Find In-Stock Sellers</span>
+                    <span className="text-[10px] text-slate-400">(Searches all verified stores)</span>
+                  </button>
                 </div>
 
                 <div className="pt-2 border-t border-slate-800 flex justify-end gap-2">
