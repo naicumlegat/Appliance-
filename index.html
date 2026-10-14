@@ -8,7 +8,6 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     body {
       -webkit-tap-highlight-color: transparent;
@@ -48,33 +47,38 @@
       useSkimlinks: false
     };
 
-    // ==============================================================
-    // RESILIENT MULTI-STORE PART PURCHASE ROUTER (DIRECT ASIN & OEM)
-    // ==============================================================
+    let html2pdfLoadingPromise = null;
+    function loadPdfEngineLazy() {
+      if (window.html2pdf) return Promise.resolve(window.html2pdf);
+      if (html2pdfLoadingPromise) return html2pdfLoadingPromise;
+
+      html2pdfLoadingPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+        script.onload = () => resolve(window.html2pdf);
+        script.onerror = () => reject(new Error("Could not load PDF engine."));
+        document.body.appendChild(script);
+      });
+      return html2pdfLoadingPromise;
+    }
+
     function buildPartPurchaseUrl(brand, partItem, targetStore = 'amazon') {
       const cleanBrand = (brand || '').trim();
       const partNumber = (partItem?.partNumber || '').trim();
       const partName = (partItem?.name || '').trim();
       const asin = (partItem?.asin || '').trim();
 
-      // 1. AMAZON DIRECT OR CLEAN SEARCH FALLBACK
       if (targetStore === 'amazon') {
         const tagParam = AFFILIATE_SETTINGS.amazonTag ? `tag=${AFFILIATE_SETTINGS.amazonTag}` : '';
-
-        // If direct ASIN is present and valid, jump straight to product buy page:
         if (asin && /^B[0-9A-Z]{9}$/i.test(asin)) {
           return `https://www.amazon.com/dp/${asin}?${tagParam}`;
         }
-
-        // Clean unquoted query that Amazon's search algorithm resolves accurately
         const query = `${partNumber} OEM ${cleanBrand} ${partName}`.replace(/\s+/g, ' ').trim();
         return `https://www.amazon.com/s?k=${encodeURIComponent(query)}&${tagParam}`;
       }
 
-      // 2. MULTI-VENDOR OEM DIRECT (RepairClinic + Multi-Distributor Auto-Routing)
       const bLower = cleanBrand.toLowerCase();
       let oemUrl = '';
-
       if (bLower.includes('coway')) {
         oemUrl = `https://cowaymega.com/search?q=${encodeURIComponent(partNumber || partName)}`;
       } else if (bLower.includes('moen')) {
@@ -82,7 +86,6 @@
       } else if (bLower.includes('kohler')) {
         oemUrl = `https://www.kohler.com/en/search?q=${encodeURIComponent(partNumber)}`;
       } else {
-        // Universal OEM Aggregator (RepairClinic catalog search, covers GE, Whirlpool, LG, Bosch, Samsung, etc.)
         oemUrl = `https://www.repairclinic.com/Shop-For-Parts?query=${encodeURIComponent(partNumber)}`;
       }
 
@@ -92,7 +95,6 @@
       return oemUrl;
     }
 
-    // Format MM/DD/YYYY as user types
     function formatToMMDDYYYY(rawVal) {
       const digits = rawVal.replace(/\D/g, '').slice(0, 8);
       if (digits.length <= 2) return digits;
@@ -120,6 +122,37 @@
         return `${parts[1]}/${parts[2]}/${parts[0]}`;
       }
       return isoStr;
+    }
+
+    function compressImageFast(file, maxDimension = 800) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let w = img.width;
+            let h = img.height;
+            if (w > h && w > maxDimension) {
+              h = Math.round((h * maxDimension) / w);
+              w = maxDimension;
+            } else if (h > maxDimension) {
+              w = Math.round((w * maxDimension) / h);
+              h = maxDimension;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d', { alpha: false });
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+            resolve({ dataUrl, base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
     }
 
     function generateSeasonalRemindersForAsset(category = '', name = '', brand = '') {
@@ -156,19 +189,11 @@
           { id: `st_${Date.now()}_1`, label: 'Drain 2-3 gallons from bottom drain spigot to purge mineral sediment build-up', intervalMonths: 12, lastCompleted: nowIso, dismissed: false }
         ];
       }
-      if (q.includes('sink') || q.includes('faucet') || q.includes('plumb')) {
-        return [
-          { id: `st_${Date.now()}_1`, label: 'Unscrew aerator nozzle and soak in vinegar to dissolve calcium restriction', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }
-        ];
-      }
       return [
         { id: `st_${Date.now()}_1`, label: 'Inspect physical connections, intake vents, and power cord for wear or debris', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }
       ];
     }
 
-    // ==============================================================
-    // GUARANTEED OFFICIAL BRAND PORTALS
-    // ==============================================================
     const BRAND_PORTAL_REGISTRY = {
       ge: {
         warranty: 'https://products.geappliances.com/appliance/gea-support-search-content?contentId=16851',
@@ -209,45 +234,14 @@
       ecobee: {
         warranty: 'https://www.ecobee.com/register/',
         support: 'https://support.ecobee.com/'
-      },
-      rheem: {
-        warranty: 'https://www.rheem.com/warranty-verification/',
-        support: 'https://www.rheem.com/contact/'
-      },
-      kitchenaid: {
-        warranty: 'https://www.kitchenaid.com/owners.html',
-        support: 'https://www.kitchenaid.com/service-and-support.html'
-      },
-      maytag: {
-        warranty: 'https://www.maytag.com/owners.html',
-        support: 'https://www.maytag.com/service-and-support.html'
-      },
-      miele: {
-        warranty: 'https://www.mieleusa.com/c/product-registration-14.htm',
-        support: 'https://www.mieleusa.com/c/service-21.htm'
-      },
-      subzero: {
-        warranty: 'https://www.subzero-wolf.com/assistance/product-registration',
-        support: 'https://www.subzero-wolf.com/assistance/customer-care'
       }
     };
 
     function resolveOfficialLinks(appliance) {
       const b = (appliance?.brand || '').toLowerCase().trim();
-
       for (const [key, portal] of Object.entries(BRAND_PORTAL_REGISTRY)) {
-        if (b.includes(key)) {
-          return portal;
-        }
+        if (b.includes(key)) return portal;
       }
-
-      if (appliance?.warrantyUrl && appliance.warrantyUrl.startsWith('https://') && !appliance.warrantyUrl.includes('example.com')) {
-        return {
-          warranty: appliance.warrantyUrl,
-          support: appliance.supportUrl || `https://www.google.com/search?q=${encodeURIComponent(`${appliance.brand} official customer support`)}`
-        };
-      }
-
       const cleanBrand = (appliance?.brand || '').trim();
       return {
         warranty: `https://www.google.com/search?q=${encodeURIComponent(`${cleanBrand} official product warranty registration`)}`,
@@ -256,18 +250,13 @@
     }
 
     const openWarrantyRegistration = (appliance) => {
-      const links = resolveOfficialLinks(appliance);
-      window.open(links.warranty, '_blank', 'noopener,noreferrer');
+      window.open(resolveOfficialLinks(appliance).warranty, '_blank', 'noopener,noreferrer');
     };
 
     const openOfficialBrandSupport = (appliance) => {
-      const links = resolveOfficialLinks(appliance);
-      window.open(links.support, '_blank', 'noopener,noreferrer');
+      window.open(resolveOfficialLinks(appliance).support, '_blank', 'noopener,noreferrer');
     };
 
-    // ==============================================================
-    // NON-BLOCKING TELEMETRY ENGINE WITH NAVIGATOR.SENDBEACON
-    // ==============================================================
     const TelemetryEngine = {
       recordReliabilityEvent(eventType, modelNum, category, component = '') {
         try {
@@ -276,7 +265,6 @@
 
           const rawEvents = localStorage.getItem('app_telemetry_queue') || '[]';
           const queue = JSON.parse(rawEvents);
-
           queue.push({
             t: Date.now(),
             e: eventType,
@@ -284,11 +272,8 @@
             c: category || 'Appliance',
             p: component || null
           });
-
           if (queue.length > 50) queue.shift();
           localStorage.setItem('app_telemetry_queue', JSON.stringify(queue));
-
-          // Immediately schedule OS-level background dispatch
           this.flushQueue();
         } catch (err) {}
       },
@@ -302,17 +287,14 @@
         const payload = JSON.stringify({ events: queue });
         const endpoint = WORKER_ENDPOINT.replace(/\/$/, '') + '/telemetry';
 
-        // 1. Primary: Use OS-level background beaconing (0ms UI latency, survives page exit)
         if (navigator.sendBeacon) {
           const blob = new Blob([payload], { type: 'application/json' });
-          const sent = navigator.sendBeacon(endpoint, blob);
-          if (sent) {
+          if (navigator.sendBeacon(endpoint, blob)) {
             localStorage.setItem('app_telemetry_queue', '[]');
             return;
           }
         }
 
-        // 2. Fallback: Keepalive background fetch
         try {
           const res = await fetch(endpoint, {
             method: 'POST',
@@ -320,12 +302,8 @@
             body: payload,
             keepalive: true
           });
-          if (res.ok) {
-            localStorage.setItem('app_telemetry_queue', '[]');
-          }
-        } catch (err) {
-          // Retains queue in localStorage until the device re-establishes connection
-        }
+          if (res.ok) localStorage.setItem('app_telemetry_queue', '[]');
+        } catch (err) {}
       }
     };
 
@@ -335,17 +313,15 @@
           const raw = localStorage.getItem('pro_ai_window');
           const now = Date.now();
           let data = raw ? JSON.parse(raw) : { count: 0, startTime: now };
-          
           if (now - data.startTime > PRO_WINDOW_MS) {
             data = { count: 0, startTime: now };
             localStorage.setItem('pro_ai_window', JSON.stringify(data));
           }
-          const remainingMinutes = Math.max(0, Math.ceil((PRO_WINDOW_MS - (now - data.startTime)) / 60000));
           return {
             count: data.count,
             limit: PRO_WINDOW_QUOTA,
             isLocked: data.count >= PRO_WINDOW_QUOTA,
-            remainingMinutes
+            remainingMinutes: Math.max(0, Math.ceil((PRO_WINDOW_MS - (now - data.startTime)) / 60000))
           };
         } else {
           const used = Number(localStorage.getItem('free_ai_used_count') || 0);
@@ -362,67 +338,14 @@
         if (isPaid) {
           const raw = localStorage.getItem('pro_ai_window');
           let data = raw ? JSON.parse(raw) : { count: 0, startTime: now };
-          if (now - data.startTime > PRO_WINDOW_MS) {
-            data = { count: 1, startTime: now };
-          } else {
-            data.count += 1;
-          }
+          data = (now - data.startTime > PRO_WINDOW_MS) ? { count: 1, startTime: now } : { count: data.count + 1, startTime: data.startTime };
           localStorage.setItem('pro_ai_window', JSON.stringify(data));
         } else {
           const current = Number(localStorage.getItem('free_ai_used_count') || 0);
           localStorage.setItem('free_ai_used_count', (current + 1).toString());
         }
-      },
-      getOfflineOverQuotaCount() {
-        return Number(localStorage.getItem('free_offline_post_quota_count') || 0);
-      },
-      incrementOfflineOverQuota() {
-        const cur = Number(localStorage.getItem('free_offline_post_quota_count') || 0) + 1;
-        localStorage.setItem('free_offline_post_quota_count', cur.toString());
-        return cur;
       }
     };
-
-    function shouldSendDailyGreeting() {
-      const today = new Date().toISOString().split('T')[0];
-      const lastGreetDate = localStorage.getItem('last_daily_greeting_date');
-      if (lastGreetDate !== today) {
-        localStorage.setItem('last_daily_greeting_date', today);
-        return true;
-      }
-      return false;
-    }
-
-    function compressImageFast(file, maxDimension = 640) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let w = img.width;
-            let h = img.height;
-            if (w > h && w > maxDimension) {
-              h = Math.round((h * maxDimension) / w);
-              w = maxDimension;
-            } else if (h > maxDimension) {
-              w = Math.round((w * maxDimension) / h);
-              h = maxDimension;
-            }
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext('2d', { alpha: false });
-            ctx.drawImage(img, 0, 0, w, h);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.55);
-            resolve({ dataUrl, base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
-          };
-          img.onerror = reject;
-          img.src = e.target.result;
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    }
 
     function sanitizeCommercialName(rawName = '', modelNumber = '') {
       let cleaned = (rawName || '').trim();
@@ -436,244 +359,19 @@
     function getAdaptiveChips(appliance) {
       if (!appliance) return ['Troubleshooting checks', 'Error code check', 'Go Deeper'];
       const cat = (appliance.category || '').toLowerCase();
-      const name = (appliance.name || '').toLowerCase();
-
-      if (cat.includes('fridge') || cat.includes('refrigerat') || name.includes('fridge')) {
+      if (cat.includes('fridge') || cat.includes('refrigerat')) {
         return ['Reset filter light', 'No water from dispenser', 'Excess frost / ice', 'Go Deeper'];
       }
-      if (cat.includes('purifier') || cat.includes('air') || name.includes('purifier')) {
+      if (cat.includes('purifier') || cat.includes('air')) {
         return ['Reset filter indicator', 'Red light won\'t clear', 'Whistling fan noise', 'Go Deeper'];
       }
-      if (cat.includes('cooktop') || cat.includes('range') || cat.includes('stove') || cat.includes('oven')) {
+      if (cat.includes('cooktop') || cat.includes('range')) {
         return ['Burner not heating', 'Hot surface light stuck', 'Trip breaker reset', 'Go Deeper'];
-      }
-      if (cat.includes('dish') || name.includes('dish')) {
-        return ['Not draining properly', 'Dishes coming out wet', 'Reset wash cycle', 'Go Deeper'];
-      }
-      if (cat.includes('thermostat') || name.includes('thermostat') || cat.includes('hvac')) {
-        return ['No power / blank screen', 'C-wire 24V check', 'Furnace switch check', 'Go Deeper'];
-      }
-      if (cat.includes('sink') || cat.includes('faucet') || cat.includes('plumb') || cat.includes('toilet')) {
-        return ['P-trap slip joint leak', 'Water trickling slowly', 'Drain clearing steps', 'Go Deeper'];
       }
       return ['Routine power reset', 'Inspect common wear parts', 'Clear error state', 'Go Deeper'];
     }
 
-    const ExpertDiagnosticEngine = {
-      SEMANTIC_VECTORS: {
-        fluid_dispenser: {
-          weight: 1.5,
-          keywords: ['dispenser', 'dispensing', 'no water', 'not dispensing', 'water flow', 'slow water', 'trickle', 'icemaker', 'ice maker', 'no ice', 'not making ice', 'water paddle', 'ice jammed', 'frozen line', 'pour', 'pour water', 'glass']
-        },
-        drainage_leaks: {
-          weight: 1.3,
-          keywords: ['leak', 'leaking', 'puddle', 'pooling', 'dripping', 'moisture', 'wet', 'overflow', 'sweating', 'condensation', 'clog', 'clogged', 'drain', 'funnel', 'tray', 'pan', 'gasket', 'seal', 'bottom wet']
-        },
-        thermal_performance: {
-          weight: 1.4,
-          keywords: ['warm', 'not cooling', 'not cold', 'spoiling', 'thawing', 'room temp', 'ice melting', 'bad cooling', 'frost', 'icing', 'freezing', 'frozen', 'ice buildup', 'snow', 'frosty', 'freezing food', 'not heating', 'burner', 'element', 'heat']
-        },
-        acoustics_vibration: {
-          weight: 1.2,
-          keywords: ['noise', 'noisy', 'sound', 'buzz', 'buzzing', 'click', 'clicking', 'hum', 'humming', 'rattle', 'rattling', 'grind', 'grinding', 'squeal', 'whistle', 'vibrate', 'loud']
-        },
-        power_controls: {
-          weight: 1.3,
-          keywords: ['dead', 'no power', 'won\'t turn on', 'not turning on', 'shut off', 'black screen', 'no display', 'tripping', 'tripped', 'unresponsive', 'dark', 'bezel', 'interlock', 'door switch']
-        },
-        reset_codes: {
-          weight: 1.5,
-          keywords: ['reset', 'restart', 'reboot', 'filter light', 'indicator', 'clear code', 'factory reset', 'blinking light', 'red light', 'chime', 'button hold']
-        }
-      },
-
-      evaluateQuery(appliance, rawQuery) {
-        const q = (rawQuery || '').toLowerCase().trim();
-        const dossier = appliance.manualDossier || {};
-        const brand = appliance.brand;
-        const name = appliance.name || brand;
-        const cat = (appliance.category || 'Appliance').toLowerCase();
-
-        if (dossier.errorCodes && typeof dossier.errorCodes === 'object') {
-          for (const [code, desc] of Object.entries(dossier.errorCodes)) {
-            const cleanCode = code.toLowerCase();
-            if (q.includes(cleanCode) || q.replace(/[\s-]/g, '').includes(cleanCode.replace(/[\s-]/g, ''))) {
-              return `Here is what code ${code.toUpperCase()} indicates on your ${brand} ${name}:\n\n` +
-                     `1. Probable Cause: ${desc}\n` +
-                     `2. Physical Check: Inspect the associated wiring harness and sensor seating.\n` +
-                     `3. Logic Clear: Switch off the breaker for 60 seconds to clear residual microprocessor memory.`;
-            }
-          }
-        }
-
-        const scores = {};
-        const queryTokens = q.split(/[\s,?.!-]+/).filter(t => t.length > 2);
-
-        for (const [vectorKey, vectorData] of Object.entries(this.SEMANTIC_VECTORS)) {
-          let vectorScore = 0;
-          for (const kw of vectorData.keywords) {
-            if (q.includes(kw)) {
-              vectorScore += kw.split(' ').length * 2.0;
-            } else {
-              queryTokens.forEach(token => {
-                if (kw.includes(token)) vectorScore += 0.8;
-              });
-            }
-          }
-          scores[vectorKey] = vectorScore * vectorData.weight;
-        }
-
-        let dominantVector = null;
-        let maxScore = 0;
-        for (const [vk, sc] of Object.entries(scores)) {
-          if (sc > maxScore) {
-            maxScore = sc;
-            dominantVector = vk;
-          }
-        }
-
-        if (dossier.commonFixes && typeof dossier.commonFixes === 'object') {
-          if (dominantVector && dossier.commonFixes[dominantVector]) {
-            return `Here are the verified steps to resolve this on your ${brand} ${name}:\n\n` +
-                   `${dossier.commonFixes[dominantVector]}\n\n` +
-                   `Safety Note: Always disconnect power or water before inspecting internal connections.`;
-          }
-
-          for (const [fixKey, fixText] of Object.entries(dossier.commonFixes)) {
-            if (queryTokens.some(tok => fixKey.toLowerCase().includes(tok))) {
-              return `Here is what to check on your ${brand} ${name}:\n\n` +
-                     `${fixText}\n\n` +
-                     `Safety Note: Make sure power or supply lines are secured before inspecting.`;
-            }
-          }
-        }
-
-        if (dominantVector === 'reset_codes' || this.matchesCategory(q, 'reset_codes')) {
-          const isFilterLightQuery = q.includes('filter') || q.includes('light') || q.includes('indicator') || q.includes('red');
-          if (isFilterLightQuery && appliance.consumables?.[0]?.installTips) {
-            return `To reset the filter light on your ${brand} ${name}:\n\n` +
-                   `1. Procedure: ${appliance.consumables[0].installTips}\n` +
-                   `2. Seating Check: Ensure the new filter cartridge is clicked firmly into place so the bypass switch clears.`;
-          }
-          if (dossier.resetProcedure) {
-            return `To perform a reset on your ${brand} ${name}:\n\n` +
-                   `1. Action: ${dossier.resetProcedure}\n` +
-                   `2. Indication: Wait for the chime or status LED shift to confirm completion.\n` +
-                   `3. Cycle: Allow 60 seconds for internal controller logic to reboot.`;
-          }
-        }
-
-        if (dominantVector === 'fluid_dispenser' && (cat.includes('fridge') || cat.includes('refrigerat'))) {
-          return `If your ${brand} ${name} isn't dispensing water or making ice, check these three likely causes:\n\n` +
-                 `1. Filter Seating / Bypass: Remove the water filter and firmly twist it back in until it clicks. A slightly misaligned filter engages the built-in auto-shutoff valve.\n` +
-                 `2. Door Frame Switch: Modern dispensers cut water valve power if the door switch thinks the door is ajar. Hold the door switch closed manually and press the dispenser paddle to test.\n` +
-                 `3. Frozen Door Water Line: If you hear the rear dual water valve click when pressing the lever but nothing comes out, the line inside the freezer door is frozen. Increase the freezer temp to 0°F–2°F or gently warm the bottom door hinge with a hair dryer for 5 minutes.`;
-        }
-
-        if (dominantVector === 'drainage_leaks' && (cat.includes('fridge') || cat.includes('refrigerat'))) {
-          return `If you see water pooling under the drawers or leaking from your ${brand} ${name}:\n\n` +
-                 `1. Defrost Drain Funnel: The drain hole beneath the freezer evaporator coil is likely iced over. Flush it with hot water using a baster to clear the channel.\n` +
-                 `2. Duckbill Drain Grommet: Behind the lower rear panel, clean the small rubber duckbill valve on the drain tube to remove sediment clogs.\n` +
-                 `3. Door Gasket Seal: Wipe down the magnetic door seals with warm soapy water to ensure an airtight seal against humid room air.`;
-        }
-
-        if (dominantVector === 'thermal_performance' && (cat.includes('fridge') || cat.includes('refrigerat'))) {
-          return `If your ${brand} ${name} is running warm or having cooling issues:\n\n` +
-                 `1. Airflow Damper: Ensure tall containers aren't blocking the motorized damper vent between the freezer and fresh food section.\n` +
-                 `2. Condenser Coils: Vacuum the coils at the bottom or rear to allow proper heat dissipation.\n` +
-                 `3. Evaporator Fan: Verify the fan inside the freezer spins freely and runs when the door switch is held shut.`;
-        }
-
-        if (cat.includes('sink') || cat.includes('faucet') || cat.includes('plumb')) {
-          return `For plumbing issues on your ${brand} ${name}:\n\n` +
-                 `1. Slip Joint Nuts: Tighten the 1.5" PVC or brass slip joints under the basin by hand, checking that rubber washers aren't pinched.\n` +
-                 `2. Drain Flange Seal: Check for dried plumber's putty around the drain flange rim.\n` +
-                 `3. Water Supply Lines: Inspect the flexible braided hoses at the shutoff stop valves for hairline weeping.`;
-        }
-
-        const partsSummary = (appliance.replacementParts || []).map(p => `${p.name} (#${p.partNumber})`).join(', ');
-        return `Here is a summary of standard maintenance for your ${brand} ${name}:\n\n` +
-               `1. Power Cycle: Shut off power at the breaker or unplug for 60 seconds to clear controller logic.\n` +
-               `2. Component Access: Commonly serviced components include: ${partsSummary || 'Refer to the parts tab'}.\n` +
-               `3. Manuals: View the attached documentation under Warranty & Receipt for complete wiring schematics.`;
-      },
-
-      matchesCategory(query, catKey) {
-        const terms = this.SEMANTIC_VECTORS[catKey]?.keywords || [];
-        return terms.some(term => query.includes(term));
-      }
-    };
-
-    async function generateAuditVerificationHash(dataString) {
-      try {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(dataString);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase().substring(0, 32);
-      } catch (e) {
-        let hash = 0;
-        for (let i = 0; i < dataString.length; i++) {
-          hash = ((hash << 5) - hash) + dataString.charCodeAt(i);
-          hash |= 0;
-        }
-        return Math.abs(hash).toString(16).toUpperCase().padStart(16, '0');
-      }
-    }
-
-    const MODEL_IMAGE_REGISTRY = {
-      'gwe191': 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=600&q=80',
-      'fridge': 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80',
-      'refrigerator': 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80',
-      'jp3030': 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80',
-      'cooktop': 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80',
-      'airmega': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
-      'coway': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
-      'purifier': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
-      'sink': 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80',
-      'toilet': 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80',
-      'faucet': 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80'
-    };
-
-    function resolveProductImage(brand = '', model = '', category = '') {
-      const q = `${brand} ${model} ${category}`.toLowerCase();
-      for (const [key, url] of Object.entries(MODEL_IMAGE_REGISTRY)) {
-        if (q.includes(key)) return url;
-      }
-      return '';
-    }
-
     const GLYPHS = {
-      purifier: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
-          <rect x="5" y="3" width="14" height="18" rx="3"/>
-          <line x1="8" y1="7" x2="16" y2="7" strokeLinecap="round"/>
-          <line x1="8" y1="10" x2="16" y2="10" strokeLinecap="round"/>
-          <circle cx="12" cy="15" r="2.5"/>
-        </svg>
-      ),
-      refrigerator: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
-          <rect x="5" y="2" width="14" height="20" rx="2.5"/>
-          <line x1="5" y1="10" x2="19" y2="10"/>
-          <line x1="8" y1="5" x2="8" y2="8" strokeLinecap="round"/>
-          <line x1="8" y1="13" x2="8" y2="17" strokeLinecap="round"/>
-        </svg>
-      ),
-      cooktop: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
-          <rect x="2" y="5" width="20" height="14" rx="2.5"/>
-          <circle cx="7.5" cy="12" r="2.5"/>
-          <circle cx="16.5" cy="12" r="2.5"/>
-          <circle cx="7.5" cy="12" r="1"/>
-          <circle cx="16.5" cy="12" r="1"/>
-        </svg>
-      ),
-      plumbing: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
-          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
-        </svg>
-      ),
       default: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
           <rect x="4" y="4" width="16" height="16" rx="2.5"/>
@@ -683,24 +381,13 @@
       )
     };
 
-    function getCategoryGlyph(type = '') {
-      const t = (type || '').toLowerCase();
-      if (t.includes('purifier') || t.includes('air') || t.includes('hepa')) return GLYPHS.purifier;
-      if (t.includes('fridge') || t.includes('refrigerat')) return GLYPHS.refrigerator;
-      if (t.includes('cooktop') || t.includes('stove') || t.includes('range')) return GLYPHS.cooktop;
-      if (t.includes('sink') || t.includes('toilet') || t.includes('faucet') || t.includes('plumb')) return GLYPHS.plumbing;
-      return GLYPHS.default;
-    }
-
     function AppleCloseButton({ onClick, isDark }) {
       return (
         <button
           type="button"
           onClick={onClick}
           className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all active:scale-90 ${
-            isDark
-              ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700'
-              : 'bg-[#E5E5EA] text-[#1C1C1E] hover:bg-[#D1D1D6] shadow-sm'
+            isDark ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' : 'bg-[#E5E5EA] text-[#1C1C1E] hover:bg-[#D1D1D6] shadow-sm'
           }`}
           title="Close"
         >
@@ -709,695 +396,194 @@
       );
     }
 
-    async function requestDiagnosticFromWorker(prompt, history = [], imagePayload = null, isPaid = false, needsGreeting = false) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-      try {
-        const res = await fetch(WORKER_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            prompt: (prompt || '').substring(0, 500),
-            history,
-            imagePayload,
-            isPaid,
-            needsGreeting
-          })
-        });
-
-        clearTimeout(timeoutId);
-        const data = await res.json();
-        return data.text || data.response || data.diagnostic || "No response received.";
-      } catch (err) {
-        clearTimeout(timeoutId);
-        throw new Error(err.message || "Diagnostic service offline.");
-      }
-    }
-
     function App() {
       const [units, setUnits] = useState([
         { id: 'unit_apt_25', name: 'APT 25', notificationsEnabled: true, collapsed: false },
-        { id: 'unit_airbnb_4b', name: 'Unit 4B', notificationsEnabled: false, collapsed: false },
         { id: 'unit_main', name: 'Main Residence', notificationsEnabled: true, collapsed: false }
       ]);
 
-      const [appliances, setAppliances] = useState([
-        {
-          id: '1',
-          unitId: 'unit_apt_25',
-          name: 'GE French-Door Refrigerator',
-          nickname: 'Kitchen Fridge',
-          brand: 'GE',
-          modelNumber: 'GWE191JMLXFES',
-          category: 'Refrigerator',
-          imageUrl: MODEL_IMAGE_REGISTRY['gwe191'],
-          purchaseDate: '2025-11-15',
-          warrantyMonths: 12,
-          warrantyDoc: null,
-          receiptDoc: null,
-          componentsReplaceable: true,
-          seasonalTasks: [
-            { id: 'st1', label: 'Vacuum condenser coils to preserve compressor efficiency and prevent overheating', intervalMonths: 6, lastCompleted: '2026-04-10', dismissed: false }
-          ],
-          consumables: [
-            {
-              id: 'c1',
-              name: 'Water Filter',
-              partNumber: 'RPWFE',
-              asin: 'B00M255U2A',
-              intervalDays: 180,
-              lastReplaced: new Date(Date.now() - 45 * 86400000).toISOString(),
-              installTips: 'Run 1.5–2 gallons through dispenser after install. Hold Water Filter pad for 3 sec to reset light.'
-            }
-          ],
-          replacementParts: [
-            { id: 'p1', category: 'Doors & Seals', name: 'Fresh Food Door Gasket', partNumber: 'WR14X31558', asin: 'B08F2VJBLT' },
-            { id: 'p2', category: 'Ice & Water', name: 'Water Inlet Valve Assembly', partNumber: 'WR57X30890', asin: 'B07P8N9Z7B' },
-            { id: 'p3', category: 'Motors & Fans', name: 'Evaporator Fan Motor Assembly', partNumber: 'WR60X26866', asin: 'B0845B256T' }
-          ],
-          manualDossier: {
-            resetProcedure: "Press and hold Water Filter pad firmly for 3 seconds until chime sounds.",
-            errorCodes: { "88 88": "Power surge lock. Unplug power cord for 60 seconds." },
-            commonFixes: {
-              "fluid_dispenser": "1. Filter Seating / Bypass: Remove RPWFE filter and verify alignment; ensure filter bypass plug is not engaged.\n2. Frozen Door Water Line: Disconnect power and point hair dryer at lower freezer door hinge for 8 minutes to thaw internal water reservoir line.\n3. Dispenser Door Switch: Ensure French doors are fully flush; ajar sensors cut water valve voltage.",
-              "drainage_leaks": "Clear defrost drain funnel beneath evaporator coils with hot water flush.",
-              "thermal_performance": "Inspect motorized air damper between compartments for ice obstruction."
-            }
-          }
-        },
-        {
-          id: '2',
-          unitId: 'unit_apt_25',
-          name: 'GE 30" Built-In Electric Cooktop',
-          nickname: 'Kitchen Cooktop',
-          brand: 'GE',
-          modelNumber: 'JP3030SWSS',
-          category: 'Cooktop',
-          imageUrl: MODEL_IMAGE_REGISTRY['jp3030'],
-          purchaseDate: '2026-01-20',
-          warrantyMonths: 24,
-          warrantyDoc: null,
-          receiptDoc: null,
-          componentsReplaceable: true,
-          seasonalTasks: [
-            { id: 'st2', label: 'Inspect glass-ceramic surface for micro-fractures and clean infinite switch terminals', intervalMonths: 6, lastCompleted: '2026-01-20', dismissed: false }
-          ],
-          consumables: [],
-          replacementParts: [
-            { id: 'p4', category: 'Heating & Elements', name: '8" Radiant Surface Element (2500W)', partNumber: 'WB30T10133', asin: 'B00ECV5X2U' }
-          ],
-          manualDossier: {
-            resetProcedure: "Trip dedicated 240V breaker OFF for 60 seconds, then toggle ON.",
-            errorCodes: {},
-            commonFixes: { "thermal_performance": "Inspect 240V double-pole breaker and element spade terminals." }
-          }
-        },
-        {
-          id: '3',
-          unitId: 'unit_airbnb_4b',
-          name: 'Coway Airmega Mighty Air Purifier',
-          nickname: 'Living Room Purifier',
-          brand: 'Coway',
-          modelNumber: 'AP-1512HH',
-          category: 'Air Purifier',
-          imageUrl: MODEL_IMAGE_REGISTRY['airmega'],
-          purchaseDate: '',
-          warrantyMonths: 0,
-          warrantyDoc: null,
-          receiptDoc: null,
-          componentsReplaceable: false,
-          seasonalTasks: [
-            { id: 'st3', label: 'Wipe dust particle sensor lens gently with a dry cotton swab and vacuum mesh pre-filter screen', intervalMonths: 2, lastCompleted: '2026-08-01', dismissed: false }
-          ],
-          consumables: [
-            {
-              id: 'c2',
-              name: 'Max2 True HEPA Filter',
-              partNumber: 'AP-1512HH-FP',
-              asin: 'B00CIEXOKE',
-              intervalDays: 365,
-              lastReplaced: new Date(Date.now() - 353 * 86400000).toISOString(),
-              installTips: 'Remove plastic wrapping before insertion. Press and hold Filter Reset pad for 3 sec.'
-            }
-          ],
-          replacementParts: [],
-          manualDossier: {
-            resetProcedure: "Press and hold Filter Reset button firmly for 3 seconds.",
-            errorCodes: {},
-            commonFixes: { "reset_codes": "Clean optical particle sensor lens on side hatch with dry cotton swab." }
-          }
-        }
-      ]);
+      const [appliances, setAppliances] = useState(() => {
+        const saved = localStorage.getItem('user_appliances_catalog');
+        return saved ? JSON.parse(saved) : [];
+      });
 
       const [themeMode, setThemeMode] = useState('dark');
+      const [currentUser, setCurrentUser] = useState(() => {
+        const saved = localStorage.getItem('app_user_session');
+        return saved ? JSON.parse(saved) : null;
+      });
       const [isPaidUser, setIsPaidUser] = useState(false);
-      const [userEmail, setUserEmail] = useState('homeowner@applianceengine.local');
-      const [telemetryOptIn, setTelemetryOptIn] = useState(true);
+
+      // Auth Modal States
+      const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+      const [authStep, setAuthStep] = useState('email');
+      const [authEmailInput, setAuthEmailInput] = useState('');
+      const [authPinInput, setAuthPinInput] = useState('');
+      const [authLoading, setAuthLoading] = useState(false);
+      const [devPasscodeNotice, setDevPasscodeNotice] = useState('');
 
       const [selectedAppliance, setSelectedAppliance] = useState(null);
       const [detailTab, setDetailTab] = useState('parts');
       const [isAddOpen, setIsAddOpen] = useState(false);
-      const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-      const [editNameInput, setEditNameInput] = useState('');
-      const [editNicknameInput, setEditNicknameInput] = useState('');
-      const [editUnitIdInput, setEditUnitIdInput] = useState('');
-
       const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-      const [isSelectMode, setIsSelectMode] = useState(false);
-      const [selectedIds, setSelectedIds] = useState([]);
-      const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
       const [isPaywallOpen, setIsPaywallOpen] = useState(false);
-      const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-      const [cancelFeedback, setCancelFeedback] = useState('');
-
-      const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false);
-      const [newGroupName, setNewGroupName] = useState('');
-
-      const [activeConsumableModal, setActiveConsumableModal] = useState(null);
-      const [isPickingDate, setIsPickingDate] = useState(false);
-      const [customReplaceDate, setCustomReplaceDate] = useState('');
-
       const [activeAppliance, setActiveAppliance] = useState(null);
       const [messages, setMessages] = useState([]);
       const [queryInput, setQueryInput] = useState('');
       const [isLoading, setIsLoading] = useState(false);
 
-      const [isPassportModalOpen, setIsPassportModalOpen] = useState(false);
-      const [passportIncludeHistory, setPassportIncludeHistory] = useState(true);
-      const [passportSelectedUnits, setPassportSelectedUnits] = useState(['unit_apt_25', 'unit_airbnb_4b', 'unit_main']);
-      const [passportPurchased, setPassportPurchased] = useState(false);
-      const [passportFirstUsedTimestamp, setPassportFirstUsedTimestamp] = useState(null);
-      const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-      const [auditCertHash, setAuditCertHash] = useState('');
-
-      // Form State with Reordered Layout & MM/DD/YYYY
       const [brandInput, setBrandInput] = useState('');
       const [modelInput, setModelInput] = useState('');
       const [nameInput, setNameInput] = useState('');
       const [nicknameInput, setNicknameInput] = useState('');
       const [purchaseDateInput, setPurchaseDateInput] = useState('');
       const [warrantyMonthsInput, setWarrantyMonthsInput] = useState('12');
-      const [groupTextInput, setGroupTextInput] = useState('');
-      const [isAnalyzing, setIsAnalyzing] = useState(false);
       const [lookupStatus, setLookupStatus] = useState('');
-
-      const [draggedGroupIndex, setDraggedGroupIndex] = useState(null);
-      const cameraInputRef = useRef(null);
-
-      useEffect(() => {
-        setIsPaidUser(localStorage.getItem('app_is_paid_user') === 'true');
-        setUserEmail(localStorage.getItem('app_user_email') || 'homeowner@applianceengine.local');
-        setThemeMode(localStorage.getItem('app_theme') || 'dark');
-        setTelemetryOptIn(localStorage.getItem('app_telemetry_optin') !== 'false');
-
-        const passPurchased = localStorage.getItem('passport_purchased') === 'true';
-        const passFirstUsed = localStorage.getItem('passport_first_used');
-        setPassportPurchased(passPurchased);
-        if (passFirstUsed) setPassportFirstUsedTimestamp(Number(passFirstUsed));
-
-        // Flush queued telemetry on startup
-        TelemetryEngine.flushQueue();
-      }, []);
-
-      // Debounced Live Auto-Populate for Product Name
-      useEffect(() => {
-        const b = brandInput.trim();
-        const m = modelInput.trim();
-
-        if (!b && !m) return;
-
-        const timer = setTimeout(async () => {
-          const cacheKey = `${b}_${m}`.toLowerCase().replace(/[^a-z0-9_]/g, '');
-          const cachedRegistry = JSON.parse(localStorage.getItem('device_knowledge_registry') || '{}');
-
-          if (cachedRegistry[cacheKey]?.canonicalName) {
-            setNameInput(cachedRegistry[cacheKey].canonicalName);
-            return;
-          }
-
-          if (b && m) {
-            try {
-              setLookupStatus('Identifying product name...');
-              const prompt = `Identify clean commercial retail title for Brand "${b}", Model "${m}". Return pure JSON only: { "canonicalName": "Clean Title" }`;
-              const raw = await requestDiagnosticFromWorker(prompt, [], null, isPaidUser, false);
-              const cleanText = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
-              const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]);
-                if (parsed.canonicalName) {
-                  setNameInput(sanitizeCommercialName(parsed.canonicalName, m));
-                }
-              }
-            } catch (err) {}
-            finally {
-              setLookupStatus('');
-            }
-          }
-        }, 650);
-
-        return () => clearTimeout(timer);
-      }, [brandInput, modelInput]);
+      const [isAnalyzing, setIsAnalyzing] = useState(false);
 
       const isDark = themeMode === 'dark';
 
-      const isPassportCurrentlyUnlocked = () => {
-        if (!passportPurchased) return false;
-        if (!passportFirstUsedTimestamp) return true;
-        const elapsed = Date.now() - passportFirstUsedTimestamp;
-        return elapsed < PASSPORT_WINDOW_MS;
-      };
+      useEffect(() => {
+        localStorage.setItem('user_appliances_catalog', JSON.stringify(appliances));
+      }, [appliances]);
 
-      const getPassportRemainingHours = () => {
-        if (!passportFirstUsedTimestamp) return 72;
-        const remainingMs = PASSPORT_WINDOW_MS - (Date.now() - passportFirstUsedTimestamp);
-        return Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60)));
-      };
+      useEffect(() => {
+        setIsPaidUser(Boolean(currentUser?.is_pro));
+        setThemeMode(localStorage.getItem('app_theme') || 'dark');
+        TelemetryEngine.flushQueue();
+      }, [currentUser]);
 
-      const toggleTheme = (mode) => {
-        setThemeMode(mode);
-        localStorage.setItem('app_theme', mode);
-      };
-
-      const toggleTier = () => {
-        const next = !isPaidUser;
-        setIsPaidUser(next);
-        localStorage.setItem('app_is_paid_user', next ? 'true' : 'false');
-      };
-
-      const toggleTelemetry = () => {
-        const next = !telemetryOptIn;
-        setTelemetryOptIn(next);
-        localStorage.setItem('app_telemetry_optin', next ? 'true' : 'false');
-      };
-
-      const toggleUnitNotifications = (unitId) => {
-        setUnits(units.map(u => u.id === unitId ? { ...u, notificationsEnabled: !u.notificationsEnabled } : u));
-      };
-
-      const toggleUnitCollapse = (unitId) => {
-        setUnits(units.map(u => u.id === unitId ? { ...u, collapsed: !u.collapsed } : u));
-      };
-
-      const handleGroupDragStart = (e, index) => {
-        setDraggedGroupIndex(index);
-        e.dataTransfer.effectAllowed = 'move';
-      };
-
-      const handleGroupDragOver = (e, index) => {
-        e.preventDefault();
-        if (draggedGroupIndex === null || draggedGroupIndex === index) return;
-        const reordered = [...units];
-        const [moved] = reordered.splice(draggedGroupIndex, 1);
-        reordered.splice(index, 0, moved);
-        setDraggedGroupIndex(index);
-        setUnits(reordered);
-      };
-
-      const handleGroupDragEnd = () => {
-        setDraggedGroupIndex(null);
-      };
-
-      const handleCreateGroup = (e) => {
-        if (e) e.preventDefault();
-        const trimmed = newGroupName.trim();
-        if (!trimmed) return;
-        const exists = units.find(u => u.name.toLowerCase() === trimmed.toLowerCase());
-        if (!exists) {
-          const newUnit = {
-            id: `unit_${Date.now()}`,
-            name: trimmed,
-            notificationsEnabled: true,
-            collapsed: false
-          };
-          setUnits([...units, newUnit]);
-        }
-        setNewGroupName('');
-        setIsAddGroupModalOpen(false);
-      };
-
-      const handleAddApplianceToSpecificGroup = (unitName) => {
-        setGroupTextInput(unitName);
-        setIsAddOpen(true);
-      };
-
-      const calculateDaysRemaining = (lastReplaced, interval) => {
-        const diff = Math.floor((Date.now() - new Date(lastReplaced).getTime()) / (1000 * 60 * 60 * 24));
-        return interval - diff;
-      };
-
-      const getPercentageRemaining = (lastReplaced, interval) => {
-        const diff = Math.floor((Date.now() - new Date(lastReplaced).getTime()) / (1000 * 60 * 60 * 24));
-        const remaining = interval - diff;
-        const pct = Math.round((remaining / interval) * 100);
-        return Math.max(0, Math.min(100, pct));
-      };
-
-      const getWarrantyRemainingDays = (purchaseDate, warrantyMonths) => {
-        if (!purchaseDate || !warrantyMonths || Number(warrantyMonths) <= 0) return null;
-        const pDate = new Date(purchaseDate);
-        if (isNaN(pDate.getTime())) return null;
-        const expDate = new Date(pDate);
-        expDate.setMonth(expDate.getMonth() + Number(warrantyMonths));
-        return Math.ceil((expDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-      };
-
-      const toggleSelectId = (id) => {
-        setSelectedIds(selectedIds.includes(id) ? selectedIds.filter(item => item !== id) : [...selectedIds, id]);
-      };
-
-      const selectAll = () => {
-        setSelectedIds(selectedIds.length === appliances.length ? [] : appliances.map(a => a.id));
-      };
-
-      const confirmBulkDelete = () => {
-        selectedIds.forEach((id) => localStorage.removeItem(`chat_history_${id}`));
-        setAppliances(appliances.filter((a) => !selectedIds.includes(a.id)));
-        setSelectedIds([]);
-        setIsSelectMode(false);
-        setIsBulkDeleteModalOpen(false);
-      };
-
-      const handleDismissSeasonalTask = (applianceId, taskId) => {
-        setAppliances(appliances.map(app => app.id === applianceId ? {
-          ...app,
-          seasonalTasks: (app.seasonalTasks || []).map(t => t.id === taskId ? { ...t, dismissed: true } : t)
-        } : app));
-      };
-
-      const handleFileUpload = async (applianceId, docType, e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+      // Cloud Push Helper
+      const pushCatalogToCloud = async (appList = appliances) => {
+        if (!currentUser?.email) return;
         try {
-          const { dataUrl } = await compressImageFast(file, 900);
-          const filePayload = { name: file.name, dataUrl, uploadDate: new Date().toLocaleDateString() };
-          setAppliances(appliances.map(app => app.id === applianceId ? { ...app, [docType]: filePayload } : app));
-          if (selectedAppliance && selectedAppliance.id === applianceId) {
-            setSelectedAppliance({ ...selectedAppliance, [docType]: filePayload });
-          }
-        } catch (err) {}
+          await fetch(WORKER_ENDPOINT + 'sync-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userEmail: currentUser.email, appliances: appList })
+          });
+        } catch (e) {}
       };
 
-      const openEditModal = (item) => {
-        setEditNameInput(item.name || '');
-        setEditNicknameInput(item.nickname || '');
-        setEditUnitIdInput(item.unitId || 'unit_main');
-        setIsEditModalOpen(true);
-      };
-
-      const handleSaveEditedProduct = (e) => {
+      // OTP Login Actions
+      const handleRequestOtp = async (e) => {
         e.preventDefault();
-        if (!selectedAppliance) return;
-        const updated = appliances.map(app => {
-          if (app.id === selectedAppliance.id) {
-            return {
-              ...app,
-              name: editNameInput.trim() || app.name,
-              nickname: editNicknameInput.trim(),
-              unitId: editUnitIdInput
-            };
-          }
-          return app;
-        });
-        setAppliances(updated);
-        setSelectedAppliance({
-          ...selectedAppliance,
-          name: editNameInput.trim() || selectedAppliance.name,
-          nickname: editNicknameInput.trim(),
-          unitId: editUnitIdInput
-        });
-        setIsEditModalOpen(false);
-      };
-
-      const handleCameraScanSticker = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        setIsAnalyzing(true);
-        setLookupStatus('Inspecting data tag / label...');
-
+        setAuthLoading(true);
+        setDevPasscodeNotice('');
         try {
-          const compressed = await compressImageFast(file, 640);
-          const prompt = `Inspect this equipment sticker or label. Extract brand, engineering model number, and clean commercial title without repeating raw model strings. Return pure JSON: { "brand": "Brand", "modelNumber": "MODEL123", "canonicalName": "Clean Title", "category": "Category" }`;
-
-          const raw = await requestDiagnosticFromWorker(prompt, [], compressed, isPaidUser, false);
-          const cleanText = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
-          const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            if (parsed.brand) setBrandInput(parsed.brand);
-            if (parsed.modelNumber) setModelInput(parsed.modelNumber);
-            const sanitizedTitle = sanitizeCommercialName(parsed.canonicalName || `${parsed.brand} ${parsed.category || 'Equipment'}`, parsed.modelNumber);
-            setNameInput(sanitizedTitle);
-            setLookupStatus(`Identified: ${sanitizedTitle}`);
+          const res = await fetch(WORKER_ENDPOINT + 'api/auth/send-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: authEmailInput })
+          });
+          const data = await res.json();
+          if (data.status === 'sent') {
+            setAuthStep('otp');
+            if (data.devCode) {
+              setDevPasscodeNotice(`Dev Mode Code: ${data.devCode}`);
+            }
           }
         } catch (err) {
-          setLookupStatus('Could not read label. Please enter details manually.');
+          alert("Could not send code. Check connection.");
         } finally {
-          setIsAnalyzing(false);
+          setAuthLoading(false);
         }
       };
 
-      const handleAutoDiscoverAdd = async (e) => {
+      const handleConfirmOtp = async (e) => {
         e.preventDefault();
-        const effectiveBrand = (brandInput || '').trim() || 'Custom';
-        const effectiveModel = (modelInput || '').trim();
-        const effectiveName = (nameInput || '').trim();
+        setAuthLoading(true);
+        try {
+          const res = await fetch(WORKER_ENDPOINT + 'api/auth/verify-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: authEmailInput, pin: authPinInput })
+          });
+          const data = await res.json();
+          if (data.token) {
+            localStorage.setItem('auth_token', data.token);
+            localStorage.setItem('app_user_session', JSON.stringify(data.user));
+            setCurrentUser(data.user);
+            setIsPaidUser(Boolean(data.user.is_pro));
 
-        if (!effectiveBrand || (!effectiveModel && !effectiveName)) return;
-
-        const cacheKey = `${effectiveBrand}_${effectiveModel || effectiveName}`.toLowerCase().replace(/[^a-z0-9_]/g, '');
-
-        setIsAnalyzing(true);
-        setLookupStatus('Absorbing full equipment manual & official support links...');
-
-        let discoveredConsumables = [];
-        let discoveredParts = [];
-        let detectedCategory = 'Home Fixture';
-        let componentsReplaceable = true;
-        let bakedDossier = {};
-        let resolvedCanonicalName = effectiveName;
-        let extractedWarrantyUrl = '';
-        let extractedSupportUrl = '';
-        let extractedSeasonal = [];
-
-        const cachedRegistryRaw = localStorage.getItem('device_knowledge_registry') || '{}';
-        const cachedRegistry = JSON.parse(cachedRegistryRaw);
-
-        if (cacheKey && cachedRegistry[cacheKey]) {
-          const cached = cachedRegistry[cacheKey];
-          resolvedCanonicalName = cached.canonicalName || resolvedCanonicalName;
-          detectedCategory = cached.category || detectedCategory;
-          discoveredConsumables = cached.consumables || [];
-          discoveredParts = cached.replacementParts || [];
-          bakedDossier = cached.manualDossier || {};
-          componentsReplaceable = cached.componentsReplaceable ?? true;
-          extractedWarrantyUrl = cached.warrantyUrl || '';
-          extractedSupportUrl = cached.supportUrl || '';
-          extractedSeasonal = cached.seasonalTasks || [];
-        } else {
-          try {
-            const prompt = `Perform exhaustive product manual absorption for: Brand "${effectiveBrand}", Model/Type "${effectiveModel || effectiveName || 'Standard'}". Product Name hint: "${effectiveName}".
-Return comprehensive operational subsystems, seasonal preventive tasks, registration URL, support URL, and direct Amazon ASINs in PURE JSON ONLY:
-{
-  "canonicalName": "Clean Commercial Marketing Name Without Repeating Model String",
-  "category": "Equipment Category",
-  "warrantyUrl": "https://official-brand-portal.com/register-product",
-  "supportUrl": "https://official-brand-portal.com/customer-support",
-  "areComponentsOfficiallyReplaceable": true,
-  "seasonalTasks": [
-    { "label": "Specific preventive maintenance action", "intervalMonths": 6 }
-  ],
-  "consumables": [
-    { "name": "Consumable Filter/Item", "partNumber": "OEM-PART", "asin": "B000000000", "intervalDays": 180, "installTips": "Exact install guide." }
-  ],
-  "replacementParts": [
-    { "category": "Mechanical", "name": "OEM Part Name", "partNumber": "OEM-PART", "asin": "" }
-  ],
-  "manualDossier": {
-    "resetProcedure": "Hold designated reset button for 3 to 5 seconds until status LED shifts.",
-    "errorCodes": {
-      "E1": "Sensor circuit abnormal.",
-      "88": "Power supply or microprocessor logic interruption."
-    },
-    "commonFixes": {
-      "fluid_dispenser": "Step-by-step diagnostic for fluid dispensing, line freezing, filter bypass, or valves.",
-      "drainage_leaks": "Step-by-step diagnostic for defrost drainage, duckbill valves, and P-traps.",
-      "thermal_performance": "Step-by-step diagnostic for heating elements, cooling dampers, evaporator fans, and coils.",
-      "acoustics_vibration": "Step-by-step diagnostic for compressor start relays, fan noise, and motor hum.",
-      "power_controls": "Step-by-step diagnostic for interlocks, door switches, and control locks.",
-      "reset_codes": "Step-by-step diagnostic for display surge locks and error codes."
-    }
-  }
-}`;
-            const raw = await requestDiagnosticFromWorker(prompt, [], null, isPaidUser, false);
-            const cleanText = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
-            const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-            const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleanText);
-
-            if (parsed.canonicalName && !effectiveName) {
-              resolvedCanonicalName = sanitizeCommercialName(parsed.canonicalName, effectiveModel);
-            }
-            if (parsed.category) detectedCategory = parsed.category;
-            if (parsed.warrantyUrl) extractedWarrantyUrl = parsed.warrantyUrl;
-            if (parsed.supportUrl) extractedSupportUrl = parsed.supportUrl;
-
-            if (typeof parsed.areComponentsOfficiallyReplaceable === 'boolean') {
-              componentsReplaceable = parsed.areComponentsOfficiallyReplaceable;
-            }
-            if (parsed.manualDossier && typeof parsed.manualDossier === 'object') {
-              bakedDossier = parsed.manualDossier;
-            }
-            if (Array.isArray(parsed.seasonalTasks) && parsed.seasonalTasks.length > 0) {
-              extractedSeasonal = parsed.seasonalTasks.map((st, sIdx) => ({
-                id: `st_${Date.now()}_${sIdx}`,
-                label: st.label,
-                intervalMonths: Number(st.intervalMonths) || 6,
-                lastCompleted: new Date().toISOString(),
-                dismissed: false
-              }));
-            }
-            if (Array.isArray(parsed.consumables)) {
-              discoveredConsumables = parsed.consumables.map((item, idx) => ({
-                id: `c_${Date.now()}_${idx}`,
-                name: item.name || 'Consumable Item',
-                partNumber: item.partNumber || 'Standard',
-                asin: item.asin || '',
-                intervalDays: Number(item.intervalDays) || 180,
-                lastReplaced: new Date().toISOString(),
-                installTips: item.installTips || 'Replace per owner guide.'
-              }));
-            }
-            if (componentsReplaceable && Array.isArray(parsed.replacementParts)) {
-              discoveredParts = parsed.replacementParts.map((item, idx) => ({
-                id: `p_${Date.now()}_${idx}`,
-                category: item.category || 'Mechanical',
-                name: item.name,
-                partNumber: item.partNumber || 'OEM Part',
-                asin: item.asin || ''
-              }));
+            // Restore from cloud or push local
+            const pullRes = await fetch(WORKER_ENDPOINT + 'sync-pull', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userEmail: data.user.email })
+            });
+            const pullData = await pullRes.json();
+            if (pullData.appliances && pullData.appliances.length > 0) {
+              setAppliances(pullData.appliances);
+            } else if (appliances.length > 0) {
+              await pushCatalogToCloud(appliances);
             }
 
-            if (cacheKey) {
-              cachedRegistry[cacheKey] = {
-                canonicalName: resolvedCanonicalName,
-                category: detectedCategory,
-                warrantyUrl: extractedWarrantyUrl,
-                supportUrl: extractedSupportUrl,
-                seasonalTasks: extractedSeasonal,
-                consumables: discoveredConsumables,
-                replacementParts: discoveredParts,
-                manualDossier: bakedDossier,
-                componentsReplaceable
-              };
-              localStorage.setItem('device_knowledge_registry', JSON.stringify(cachedRegistry));
-            }
-          } catch (err) {}
-        }
-
-        if (!extractedSeasonal || extractedSeasonal.length === 0) {
-          extractedSeasonal = generateSeasonalRemindersForAsset(detectedCategory, resolvedCanonicalName || effectiveName, effectiveBrand);
-        }
-
-        const cleanFallbackTitle = sanitizeCommercialName(
-          resolvedCanonicalName || effectiveName || `${effectiveBrand} ${effectiveModel || 'Fixture'}`,
-          effectiveModel
-        );
-
-        let finalUnitId = 'unit_main';
-        if (isPaidUser && groupTextInput.trim()) {
-          const match = units.find(u => u.name.toLowerCase() === groupTextInput.trim().toLowerCase());
-          if (match) {
-            finalUnitId = match.id;
+            setIsAuthModalOpen(false);
+            setAuthStep('email');
           } else {
-            const newU = {
-              id: `unit_${Date.now()}`,
-              name: groupTextInput.trim(),
-              notificationsEnabled: true,
-              collapsed: false
-            };
-            setUnits(prev => [...prev, newU]);
-            finalUnitId = newU.id;
+            alert(data.error || "Invalid code");
           }
+        } catch (err) {
+          alert("Verification error.");
+        } finally {
+          setAuthLoading(false);
         }
+      };
 
-        const parsedIsoPurchaseDate = parseMMDDYYYYToISO(purchaseDateInput);
+      const handleLogout = () => {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('app_user_session');
+        setCurrentUser(null);
+        setIsPaidUser(false);
+      };
+
+      const handleAddAppliance = async (e) => {
+        e.preventDefault();
+        setIsAnalyzing(true);
+        setLookupStatus('Cataloging equipment specs...');
+
+        const effectiveBrand = brandInput.trim();
+        const effectiveModel = modelInput.trim();
+        const effectiveName = nameInput.trim() || `${effectiveBrand} Equipment`;
+        const isoDate = parseMMDDYYYYToISO(purchaseDateInput);
 
         const newItem = {
-          id: Date.now().toString(),
-          unitId: finalUnitId,
-          name: cleanFallbackTitle,
+          id: `app_${Date.now()}`,
+          unitId: 'unit_main',
+          name: effectiveName,
           nickname: nicknameInput.trim(),
           brand: effectiveBrand,
           modelNumber: effectiveModel,
-          category: detectedCategory,
-          imageUrl: resolveProductImage(effectiveBrand, effectiveModel, detectedCategory),
-          purchaseDate: parsedIsoPurchaseDate,
-          warrantyMonths: parsedIsoPurchaseDate ? (Number(warrantyMonthsInput) || 12) : 0,
-          warrantyDoc: null,
-          receiptDoc: null,
-          componentsReplaceable: discoveredParts.length > 0 && componentsReplaceable,
-          seasonalTasks: extractedSeasonal,
-          consumables: discoveredConsumables,
-          replacementParts: discoveredParts,
-          manualDossier: bakedDossier
+          category: 'Appliance',
+          purchaseDate: isoDate,
+          warrantyMonths: isoDate ? Number(warrantyMonthsInput) : 0,
+          consumables: [],
+          replacementParts: [],
+          seasonalTasks: generateSeasonalRemindersForAsset('Appliance', effectiveName, effectiveBrand)
         };
 
-        setAppliances([newItem, ...appliances]);
-
-        // Record anonymous reliability telemetry without blocking UI thread
-        TelemetryEngine.recordReliabilityEvent('asset_registered', effectiveModel, detectedCategory);
+        const updated = [newItem, ...appliances];
+        setAppliances(updated);
+        TelemetryEngine.recordReliabilityEvent('asset_registered', effectiveModel, 'Appliance');
+        await pushCatalogToCloud(updated);
 
         setBrandInput('');
         setModelInput('');
         setNameInput('');
         setNicknameInput('');
         setPurchaseDateInput('');
-        setGroupTextInput('');
         setIsAnalyzing(false);
         setIsAddOpen(false);
       };
 
-      const handleCommitReplacementDate = (applianceId, consumableId, chosenDateStr) => {
-        const isoString = parseMMDDYYYYToISO(chosenDateStr) || new Date().toISOString();
-        setAppliances(appliances.map(a => a.id === applianceId ? {
-          ...a,
-          consumables: a.consumables.map(c => c.id === consumableId ? { ...c, lastReplaced: isoString } : c)
-        } : a));
-        setIsPickingDate(false);
-        setActiveConsumableModal(null);
-        setSelectedAppliance(null);
-      };
-
       const openAssistant = (item) => {
         setActiveAppliance(item);
-        const rawHistory = localStorage.getItem(`chat_history_${item.id}`);
-        let loaded = false;
-
-        if (rawHistory) {
-          try {
-            const parsed = JSON.parse(rawHistory);
-            const savedAt = parsed.timestamp || 0;
-            const maxRetention = isPaidUser ? PRO_CHAT_RETENTION_MS : FREE_CHAT_RETENTION_MS;
-            const isFresh = (Date.now() - savedAt) < maxRetention;
-
-            if (isFresh && Array.isArray(parsed.messages) && parsed.messages.length > 0) {
-              setMessages(parsed.messages);
-              loaded = true;
-            }
-          } catch(e) {}
-        }
-
-        if (!loaded) {
-          setMessages([{
-            id: '1',
-            sender: 'assistant',
-            text: isPaidUser
-              ? `Ready to diagnose your ${item.brand} ${item.name}. What symptoms, noises, or error codes are you seeing?`
-              : `What is going on with your ${item.brand} ${item.name}? Describe what you are seeing or hearing.`
-          }]);
-        }
+        setMessages([{
+          id: '1',
+          sender: 'assistant',
+          text: `What is going on with your ${item.brand} ${item.name}? Describe symptoms, error codes, or noises.`
+        }]);
       };
 
       const sendQuery = async (text) => {
@@ -1414,325 +600,28 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
         setMessages(updated);
         setQueryInput('');
 
-        // Track anonymous hardware diagnostic query without blocking UI
         TelemetryEngine.recordReliabilityEvent('hardware_triage', activeAppliance.modelNumber, activeAppliance.category);
-
-        const quota = AIQuotaTracker.getStatus(isPaidUser);
-
-        // QUOTA REACHED FOR FREE USER: Run Advanced Offline Diagnostic Engine
-        if (!isPaidUser && quota.isLocked) {
-          const offlineTurnNumber = AIQuotaTracker.incrementOfflineOverQuota();
-          const smartManualAnswer = ExpertDiagnosticEngine.evaluateQuery(activeAppliance, q);
-          
-          const shouldAppend10TurnNudge = offlineTurnNumber % 10 === 0;
-
-          const limitCardMsg = {
-            id: Date.now().toString(),
-            sender: 'assistant',
-            text: smartManualAnswer,
-            showUpgradeGate: false,
-            showInlineNudge: shouldAppend10TurnNudge
-          };
-          const finalOfflineMessages = [...updated, limitCardMsg];
-          setMessages(finalOfflineMessages);
-          localStorage.setItem(`chat_history_${activeAppliance.id}`, JSON.stringify({
-            messages: finalOfflineMessages,
-            timestamp: Date.now()
-          }));
-          return;
-        }
-
-        // QUOTA CAP REACHED FOR PRO USER
-        if (isPaidUser && quota.isLocked) {
-          setMessages([...updated, {
-            id: Date.now().toString(),
-            sender: 'assistant',
-            text: `Pro Diagnostic Limit Reached (65/65 queries used).\n\nYour 2-hour window refreshes in ${quota.remainingMinutes} minutes.`
-          }]);
-          return;
-        }
+        AIQuotaTracker.increment(isPaidUser);
 
         setIsLoading(true);
         try {
-          AIQuotaTracker.increment(isPaidUser);
-
-          const prompt = `[Context: ${activeAppliance.brand} ${activeAppliance.modelNumber} (${activeAppliance.category})] User question: ${q}`;
-          const needsGreeting = shouldSendDailyGreeting();
-
-          const reply = await requestDiagnosticFromWorker(prompt, messages, null, isPaidUser, needsGreeting);
-
-          const hasTechNotice = reply.includes('[TECH_RECOMMENDED]');
-          const hasReplaceNotice = reply.includes('[REPLACEMENT_RECOMMENDED]');
-          const cleanReply = reply
-            .replace('[TECH_RECOMMENDED]', '')
-            .replace('[REPLACEMENT_RECOMMENDED]', '')
-            .trim();
-
-          const currentQuotaAfter = AIQuotaTracker.getStatus(isPaidUser);
-          const justReachedLimitNow = !isPaidUser && currentQuotaAfter.count === FREE_TOTAL_QUOTA;
-
-          const assistantMsg = {
-            id: Date.now().toString(),
-            sender: 'assistant',
-            text: cleanReply,
-            suggestTech: hasTechNotice,
-            suggestReplacement: hasReplaceNotice,
-            showUpgradeGate: justReachedLimitNow,
-            showInlineNudge: false
-          };
-
-          const finalMessages = [...updated, assistantMsg];
-          setMessages(finalMessages);
-          localStorage.setItem(`chat_history_${activeAppliance.id}`, JSON.stringify({
-            messages: finalMessages,
-            timestamp: Date.now()
-          }));
-        } catch (err) {
-          setMessages([...updated, { id: Date.now().toString(), sender: 'assistant', text: `Diagnostic Note: ${err.message}` }]);
+          const res = await fetch(WORKER_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: `[Context: ${activeAppliance.brand} ${activeAppliance.modelNumber}] Query: ${q}`,
+              history: messages,
+              isPaid: isPaidUser
+            })
+          });
+          const data = await res.json();
+          setMessages([...updated, { id: Date.now().toString(), sender: 'assistant', text: data.text || "Diagnostic received." }]);
+        } catch (e) {
+          setMessages([...updated, { id: Date.now().toString(), sender: 'assistant', text: "Service temporarily unreachable." }]);
         } finally {
           setIsLoading(false);
         }
       };
-
-      const openLocalTech = (brand, category) => {
-        const q = encodeURIComponent(`licensed ${brand} ${category} repair service near me free estimate`);
-        window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener,noreferrer');
-      };
-
-      const openReplacementDeals = (category) => {
-        const q = encodeURIComponent(`best deals discounts ${category} replacement`);
-        window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener,noreferrer');
-      };
-
-      const handleBuyPassport = () => {
-        setPassportPurchased(true);
-        localStorage.setItem('passport_purchased', 'true');
-      };
-
-      const handleDownloadPassport = async () => {
-        setIsGeneratingPdf(true);
-        if (!passportFirstUsedTimestamp) {
-          const now = Date.now();
-          setPassportFirstUsedTimestamp(now);
-          localStorage.setItem('passport_first_used', now.toString());
-        }
-
-        const auditPayload = JSON.stringify({
-          account: userEmail,
-          exportTime: new Date().toISOString(),
-          includedUnits: passportSelectedUnits,
-          assets: appliances.filter(a => passportSelectedUnits.includes(a.unitId))
-        });
-        const generatedHash = await generateAuditVerificationHash(auditPayload);
-        setAuditCertHash(generatedHash);
-
-        setTimeout(() => {
-          const element = document.getElementById('passport-document-export');
-          const opt = {
-            margin: [8, 8, 8, 8],
-            filename: `Appliance_Passport_${new Date().toISOString().split('T')[0]}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-          };
-
-          window.html2pdf().set(opt).from(element).save().then(() => {
-            setIsGeneratingPdf(false);
-          }).catch(() => {
-            setIsGeneratingPdf(false);
-          });
-        }, 150);
-      };
-
-      const togglePassportUnitSelection = (unitId) => {
-        if (passportSelectedUnits.includes(unitId)) {
-          if (passportSelectedUnits.length > 1) {
-            setPassportSelectedUnits(passportSelectedUnits.filter(id => id !== unitId));
-          }
-        } else {
-          setPassportSelectedUnits([...passportSelectedUnits, unitId]);
-        }
-      };
-
-      const renderApplianceCard = (item) => {
-        const isSelected = selectedIds.includes(item.id);
-
-        return (
-          <div
-            key={item.id}
-            className={`relative rounded-[22px] border transition-all duration-200 overflow-hidden shadow-sm ${
-              isDark ? 'bg-zinc-900/90 border-white/10' : 'bg-white border-black/10 shadow-sm'
-            } ${isSelected ? 'ring-2 ring-amber-500' : ''}`}
-          >
-            <div className="p-4 flex items-center gap-3.5">
-              {isSelectMode && (
-                <div
-                  onClick={() => toggleSelectId(item.id)}
-                  className={`w-5 h-5 rounded-full border flex items-center justify-center cursor-pointer text-xs font-bold shrink-0 ${
-                    isSelected
-                      ? 'bg-amber-500 border-amber-500 text-black'
-                      : isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white'
-                  }`}
-                >
-                  {isSelected && '✓'}
-                </div>
-              )}
-
-              <div
-                onClick={() => {
-                  if (isSelectMode) toggleSelectId(item.id);
-                  else { setSelectedAppliance(item); setDetailTab('parts'); }
-                }}
-                className="flex-1 flex items-center gap-3.5 cursor-pointer min-w-0 active:scale-[0.99] transition-transform"
-              >
-                <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center shrink-0 overflow-hidden ${
-                  isDark ? 'bg-black/40 border-white/10' : 'bg-[#E5E5EA] border-black/5'
-                }`}>
-                  {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className={isDark ? 'text-zinc-300' : 'text-[#1C1C1E]'}>
-                      {getCategoryGlyph(item.category || item.name)}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-baseline">
-                    <h2 className="text-[15px] font-bold tracking-tight truncate leading-tight">
-                      {item.name}
-                      {item.nickname && (
-                        <span className={`font-medium ml-1.5 ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                          ({item.nickname})
-                        </span>
-                      )}
-                    </h2>
-                    {!isSelectMode && <span className={isDark ? "text-zinc-500 text-xs" : "text-[#8E8E93] text-xs font-semibold"}>➔</span>}
-                  </div>
-                  <p className={`text-xs font-medium mt-0.5 truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                    {item.brand}{item.modelNumber ? ` • ${item.modelNumber}` : ''}
-                  </p>
-                  <p className={`text-[11px] mt-0.5 truncate ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>{item.category}</p>
-                </div>
-              </div>
-            </div>
-
-            {!isSelectMode && (
-              <div className={`px-4 pb-3.5 pt-2.5 border-t ${
-                isDark ? 'border-white/5 bg-black/20' : 'border-black/5 bg-[#F9F9FB]'
-              }`}>
-                <div className="flex justify-between items-center mb-2">
-                  <span className={`text-[10px] font-bold tracking-wider uppercase ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                    Maintenance Schedule
-                  </span>
-                  <button
-                    onClick={() => openAssistant(item)}
-                    className="text-[11px] font-bold text-amber-600 dark:text-amber-500 hover:underline"
-                  >
-                    Ask Manual 💬
-                  </button>
-                </div>
-
-                {item.seasonalTasks && item.seasonalTasks.filter(st => !st.dismissed).map(st => (
-                  <div
-                    key={st.id}
-                    className={`mb-2 rounded-xl p-2.5 flex items-center justify-between text-xs border ${
-                      isDark ? 'bg-amber-950/20 border-amber-500/25' : 'bg-amber-50/80 border-amber-200'
-                    }`}
-                  >
-                    <div className="pr-2">
-                      <p className={`text-[11px] font-semibold ${isDark ? 'text-amber-300' : 'text-amber-900'}`}>Seasonal Care Reminder</p>
-                      <p className={`text-[10px] leading-snug mt-0.5 ${isDark ? 'text-zinc-300' : 'text-stone-600'}`}>{st.label}</p>
-                    </div>
-                    <button
-                      onClick={() => handleDismissSeasonalTask(item.id, st.id)}
-                      className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-colors shrink-0 border ${
-                        isDark ? 'text-zinc-400 hover:text-zinc-100 bg-zinc-900/60 border-zinc-700/60' : 'text-stone-600 hover:text-stone-900 bg-white border-stone-300'
-                      }`}
-                    >
-                      ✕ Dismiss
-                    </button>
-                  </div>
-                ))}
-
-                {item.consumables?.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {item.consumables.map(c => {
-                      const daysLeft = calculateDaysRemaining(c.lastReplaced, c.intervalDays);
-                      const isOverdue = daysLeft <= 0;
-                      const isClose = daysLeft > 0 && daysLeft <= 14;
-                      const pct = getPercentageRemaining(c.lastReplaced, c.intervalDays);
-
-                      return (
-                        <div
-                          key={c.id}
-                          onClick={() => {
-                            setActiveConsumableModal({ appliance: item, consumable: c });
-                            setIsPickingDate(false);
-                            setCustomReplaceDate(formatISOToMMDDYYYY(new Date().toISOString()));
-                          }}
-                          className={`rounded-xl p-2.5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all border ${
-                            isClose
-                              ? (isDark ? 'bg-amber-950/20 border-amber-500/50' : 'bg-amber-50 border-amber-300')
-                              : (isDark ? 'bg-zinc-900 border-white/5' : 'bg-white border-black/10 shadow-sm')
-                          }`}
-                        >
-                          <div className="flex-1 pr-3">
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs font-semibold">{c.name}</p>
-                              <span className={`text-[10px] font-mono selectable-text ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>({c.partNumber})</span>
-                            </div>
-                            <div className={`w-full h-1.5 rounded-full mt-1.5 overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-[#E5E5EA]'}`}>
-                              <div
-                                className={`h-full rounded-full transition-all ${
-                                  isOverdue ? 'bg-rose-500' : isClose ? 'bg-amber-500' : pct < 25 ? 'bg-amber-500' : 'bg-emerald-500'
-                                }`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="text-right shrink-0">
-                            {isClose ? (
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border inline-block ${
-                                isDark ? 'bg-amber-950/70 text-amber-300 border-amber-500/40' : 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
-                              }`}>
-                                {daysLeft}d • Order soon
-                              </span>
-                            ) : (
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                isOverdue
-                                  ? (isDark ? 'bg-rose-950 text-rose-400' : 'bg-rose-100 text-rose-800 font-bold')
-                                  : (isDark ? 'bg-emerald-950 text-emerald-400' : 'bg-emerald-100 text-emerald-800 font-bold')
-                              }`}>
-                                {isOverdue ? 'Due' : `${daysLeft}d`}
-                              </span>
-                            )}
-                            <span className={`block text-[9px] mt-1 ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>Tap to order</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={`rounded-xl p-2 flex items-center justify-between text-[11px] ${
-                    isDark ? 'bg-zinc-900/60 text-zinc-500' : 'bg-[#E5E5EA]/50 text-[#636366]'
-                  }`}>
-                    <span>No recurring filter required</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                      isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
-                    }`}>
-                      Ready
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      };
-
-      const passportFilteredAppliances = appliances.filter(app => passportSelectedUnits.includes(app.unitId));
 
       return (
         <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
@@ -1745,7 +634,7 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
             <div className="flex justify-between items-end">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500">
-                  {isPaidUser ? 'Property Manager' : 'My Home'}
+                  {isPaidUser ? 'Pro Manager' : (currentUser ? 'Connected Account' : 'Guest Mode')}
                 </p>
                 <h1 className="text-3xl font-extrabold tracking-tight">Appliances</h1>
               </div>
@@ -1753,26 +642,17 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
               <div className="flex items-center gap-2.5 pb-0.5">
                 <button
                   onClick={() => setIsAddOpen(true)}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg active:scale-90 transition-transform shadow-sm ${
-                    isDark
-                      ? 'bg-white/10 hover:bg-white/15 text-white'
-                      : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-[#1C1C1E] border border-black/5'
+                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg shadow-sm active:scale-90 transition-transform ${
+                    isDark ? 'bg-white/10 text-white' : 'bg-[#E5E5EA] text-[#1C1C1E]'
                   }`}
-                  title="Add Equipment"
                 >
                   +
                 </button>
-
                 <button
                   onClick={() => setIsSettingsOpen(true)}
                   className={`w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-sm ${
-                    isPaidUser
-                      ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40 font-bold'
-                      : isDark
-                        ? 'bg-white/10 hover:bg-white/15 text-white'
-                        : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-[#1C1C1E] border border-black/5'
+                    isDark ? 'bg-white/10 text-white' : 'bg-[#E5E5EA] text-[#1C1C1E]'
                   }`}
-                  title="Settings"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
                     <circle cx="12" cy="8" r="4"/>
@@ -1783,472 +663,266 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
             </div>
           </header>
 
-          {/* MAIN SCREEN */}
-          {!selectedAppliance ? (
-            <main className="flex-1 px-4 py-4 space-y-3.5 pb-28">
-              <div className="flex justify-between items-center px-1">
-                <span className={`text-[12px] font-bold tracking-wide uppercase ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                  {appliances.length} {appliances.length === 1 ? 'Fixture Added' : 'Fixtures & Appliances Added'}
-                </span>
-
-                <div className="flex items-center gap-2">
-                  {isPaidUser && isSelectMode && (
-                    <button
-                      onClick={() => setIsAddGroupModalOpen(true)}
-                      className={`text-xs px-2.5 py-1 rounded-full font-bold transition-all shadow-sm ${
-                        isDark
-                          ? 'bg-zinc-800 text-zinc-200 border border-white/10'
-                          : 'bg-[#E5E5EA] text-[#1C1C1E] hover:bg-[#D1D1D6] border border-black/5'
-                      }`}
-                    >
-                      + Add Group
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }}
-                    className={`text-xs px-3 py-1 rounded-full font-bold transition-all ${
-                      isSelectMode
-                        ? 'bg-amber-600 text-white shadow-sm'
-                        : isDark
-                          ? 'bg-white/10 text-zinc-300 hover:text-white'
-                          : 'bg-[#E5E5EA] text-[#1C1C1E] hover:bg-[#D1D1D6] border border-black/5'
-                    }`}
-                  >
-                    {isSelectMode ? 'Done' : 'Select'}
-                  </button>
-                </div>
+          {/* Main List */}
+          <main className="flex-1 p-4 space-y-3 pb-28">
+            {appliances.length === 0 ? (
+              <div className={`text-center py-16 px-4 rounded-3xl border ${isDark ? 'bg-zinc-900/40 border-white/5' : 'bg-white border-black/10'}`}>
+                <p className="text-sm font-bold">No appliances added yet</p>
+                <p className={`text-xs mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>Tap + to scan a label or enter details manually.</p>
               </div>
-
-              {isPaidUser ? (
-                <div className="space-y-4">
-                  {units.map((unit, unitIndex) => {
-                    const unitAppliances = appliances.filter(a => a.unitId === unit.id);
-
-                    return (
-                      <div
-                        key={unit.id}
-                        draggable
-                        onDragStart={(e) => handleGroupDragStart(e, unitIndex)}
-                        onDragOver={(e) => handleGroupDragOver(e, unitIndex)}
-                        onDragEnd={handleGroupDragEnd}
-                        className={`draggable-group rounded-[26px] border transition-all duration-200 overflow-hidden shadow-sm ${
-                          draggedGroupIndex === unitIndex ? 'opacity-40 scale-[0.98]' : 'opacity-100'
-                        } ${isDark ? 'bg-zinc-950/60 border-white/10' : 'bg-[#E5E5EA]/40 border-black/10'}`}
-                      >
-                        <div className={`p-4 flex items-center justify-between transition-colors ${
-                          isDark ? 'bg-zinc-900/70 border-b border-white/5' : 'bg-white border-b border-black/5'
-                        }`}>
-                          <div
-                            onClick={() => toggleUnitCollapse(unit.id)}
-                            className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
-                          >
-                            <span className="text-xs font-bold text-amber-600 dark:text-amber-500">
-                              {unit.collapsed ? '▶' : '▼'}
-                            </span>
-                            <h3 className="text-base font-extrabold tracking-tight truncate">{unit.name}</h3>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
-                            }`}>
-                              {unitAppliances.length}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              onClick={() => toggleUnitNotifications(unit.id)}
-                              className={`text-[10px] px-2.5 py-1 rounded-full font-bold transition-all shadow-sm ${
-                                unit.notificationsEnabled
-                                  ? (isDark ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold')
-                                  : (isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-[#E5E5EA] text-[#636366]')
-                              }`}
-                            >
-                              {unit.notificationsEnabled ? 'Alerts ON' : 'Muted'}
-                            </button>
-
-                            <span className="text-xs text-zinc-500 cursor-grab active:cursor-grabbing px-1" title="Drag group">
-                              ⠿
-                            </span>
-                          </div>
-                        </div>
-
-                        {!unit.collapsed && (
-                          <div className="p-3 space-y-2.5">
-                            {unitAppliances.length > 0 ? (
-                              unitAppliances.map(app => renderApplianceCard(app))
-                            ) : (
-                              <div className={`p-5 text-center rounded-2xl border flex flex-col items-center justify-center gap-2 ${
-                                isDark ? 'text-zinc-400 bg-black/20 border-white/5' : 'text-[#636366] bg-white/60 border-black/5'
-                              }`}>
-                                <p className="text-xs font-semibold">No equipment in this unit</p>
-                                <button
-                                  onClick={() => handleAddApplianceToSpecificGroup(unit.name)}
-                                  className="w-8 h-8 rounded-full bg-amber-600 hover:bg-amber-500 text-white font-bold flex items-center justify-center text-sm shadow-sm active:scale-90 transition-transform"
-                                  title="Add equipment to this group"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {appliances.map(app => renderApplianceCard(app))}
-                </div>
-              )}
-            </main>
-          ) : (
-            <main className="flex-1 flex flex-col">
-              <div className={`p-6 border-b flex flex-col items-center justify-center relative ${
-                isDark ? 'bg-zinc-950/60 border-white/10' : 'bg-white border-black/10'
-              }`}>
-                <button
-                  onClick={() => setSelectedAppliance(null)}
-                  className={`absolute top-4 left-4 px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm ${
-                    isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-[#E5E5EA] text-[#1C1C1E] hover:bg-[#D1D1D6] border border-black/5'
+            ) : (
+              appliances.map(item => (
+                <div
+                  key={item.id}
+                  className={`rounded-2xl p-4 border transition-all ${
+                    isDark ? 'bg-zinc-900/80 border-white/10' : 'bg-white border-black/10 shadow-sm'
                   }`}
                 >
-                  Done
-                </button>
-
-                <div className="w-32 h-32 flex items-center justify-center my-2">
-                  {selectedAppliance.imageUrl ? (
-                    <img src={selectedAppliance.imageUrl} alt={selectedAppliance.name} className="max-h-full max-w-full object-contain rounded-2xl shadow-md"/>
-                  ) : (
-                    <div className={`w-20 h-20 rounded-3xl flex items-center justify-center ${
-                      isDark ? 'bg-white/10' : 'bg-[#E5E5EA]'
-                    }`}>
-                      {getCategoryGlyph(selectedAppliance.category)}
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h2 className="text-base font-extrabold truncate">{item.name}</h2>
+                      <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                        {item.brand} {item.modelNumber && `• ${item.modelNumber}`}
+                      </p>
                     </div>
-                  )}
-                </div>
-
-                {/* Title with Subtle Inline Edit Icon */}
-                <div className="flex items-center justify-center gap-1.5 mt-1 px-4 max-w-full">
-                  <h2 className="text-xl font-extrabold tracking-tight text-center truncate">
-                    {selectedAppliance.name}
-                  </h2>
-                  <button
-                    onClick={() => openEditModal(selectedAppliance)}
-                    className={`p-1 rounded-md opacity-60 hover:opacity-100 transition-opacity ${
-                      isDark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-black'
-                    }`}
-                    title="Edit Name & Nickname"
-                  >
-                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                    </svg>
-                  </button>
-                </div>
-
-                {selectedAppliance.nickname && (
-                  <span className={`text-xs font-medium mt-0.5 ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                    ({selectedAppliance.nickname})
-                  </span>
-                )}
-
-                <p className={`text-xs font-semibold selectable-text mt-1 ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                  {selectedAppliance.brand}{selectedAppliance.modelNumber ? ` • ${selectedAppliance.modelNumber}` : ''}
-                </p>
-
-                {(() => {
-                  const daysLeft = getWarrantyRemainingDays(selectedAppliance.purchaseDate, selectedAppliance.warrantyMonths);
-                  if (daysLeft === null) return null;
-                  const isActive = daysLeft > 0;
-                  return (
-                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full mt-2 ${
-                      isActive
-                        ? (isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-800 font-bold')
-                        : 'bg-zinc-800 text-zinc-400'
-                    }`}>
-                      {isActive ? `${daysLeft} days warranty remaining` : 'Warranty expired'}
-                    </span>
-                  );
-                })()}
-              </div>
-
-              <div className="flex px-4 pt-3 gap-2">
-                {[{ id: 'parts', label: 'Components' }, { id: 'docs', label: 'Warranty & Receipt' }].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setDetailTab(tab.id)}
-                    className={`flex-1 py-2 rounded-full text-xs font-bold transition-all shadow-sm ${
-                      detailTab === tab.id
-                        ? (isDark ? 'bg-white text-black' : 'bg-[#1C1C1E] text-white')
-                        : (isDark ? 'bg-white/10 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E] hover:bg-[#D1D1D6]')
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                {detailTab === 'parts' && (
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center px-1">
-                      <p className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Component Catalog</p>
-                      <button onClick={() => openAssistant(selectedAppliance)} className="text-xs font-bold text-amber-600 dark:text-amber-500 hover:underline">
-                        Ask Manual 💬
-                      </button>
-                    </div>
-
-                    {selectedAppliance.componentsReplaceable && selectedAppliance.replacementParts?.length > 0 ? (
-                      selectedAppliance.replacementParts.map(p => (
-                        <div key={p.id} className={`rounded-2xl p-3.5 flex justify-between items-center border ${
-                          isDark ? 'bg-zinc-900/60 border-white/5' : 'bg-white border-black/10 shadow-sm'
-                        }`}>
-                          <div className="pr-2 min-w-0">
-                            <p className="text-xs font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider text-[9px]">{p.category}</p>
-                            <p className="text-xs font-semibold truncate">{p.name}</p>
-                            <p className={`text-[10px] font-mono selectable-text ${isDark ? 'text-zinc-400' : 'text-[#8E8E93]'}`}>Part #: {p.partNumber}</p>
-                          </div>
-                          
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              onClick={() => window.open(buildPartPurchaseUrl(selectedAppliance.brand, p, 'oem'), '_blank')}
-                              className={`text-[11px] font-bold px-2.5 py-1.5 rounded-full border transition-all active:scale-95 ${
-                                isDark 
-                                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-white/10' 
-                                  : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-black border-black/5'
-                              }`}
-                              title="Official OEM Store"
-                            >
-                              OEM Direct ↗
-                            </button>
-                            <button
-                              onClick={() => window.open(buildPartPurchaseUrl(selectedAppliance.brand, p, 'amazon'), '_blank')}
-                              className="bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-sm transition-all active:scale-95"
-                              title="Buy on Amazon"
-                            >
-                              Amazon ↗
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className={`rounded-2xl p-4 text-xs font-medium ${
-                        isDark ? 'bg-zinc-900/40 text-zinc-400' : 'bg-white border border-black/10 text-[#636366]'
-                      }`}>
-                        Factory sealed fixture. Manufacturer does not officially distribute retail internal replacement components.
-                      </div>
-                    )}
+                    <button
+                      onClick={() => openAssistant(item)}
+                      className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow-sm active:scale-95 transition-transform"
+                    >
+                      Ask Manual 💬
+                    </button>
                   </div>
-                )}
+                </div>
+              ))
+            )}
+          </main>
 
-                {detailTab === 'docs' && (
-                  <div className="space-y-3">
-                    <div className={`rounded-2xl p-4 border ${isDark ? 'bg-zinc-900/80 border-white/5' : 'bg-white border-black/10 shadow-sm'}`}>
-                      <div className="flex justify-between items-start mb-2.5">
-                        <div className="pr-2">
-                          <h3 className="text-xs font-bold uppercase tracking-wider">Manufacturer Warranty</h3>
-                          <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Activate registration, start claim, or store proof</p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            onClick={() => openWarrantyRegistration(selectedAppliance)}
-                            className="bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors shadow-sm"
-                          >
-                            <span>Activate</span>
-                            <span className="text-[9px]">↗</span>
-                          </button>
-
-                          <label className="bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-sm">
-                            <span>Upload</span>
-                            <span className="text-[9px]">↑</span>
-                            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(selectedAppliance.id, 'warrantyDoc', e)} />
-                          </label>
-                        </div>
-                      </div>
-
-                      <div className={`pt-2 border-t flex items-center justify-between ${isDark ? 'border-white/5' : 'border-black/5'}`}>
-                        <span className={`text-[10px] ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Need manufacturer repair or file a claim?</span>
-                        <button
-                          onClick={() => openOfficialBrandSupport(selectedAppliance)}
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border flex items-center gap-1 ${
-                            isDark ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700' : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-black border-black/5'
-                          }`}
-                        >
-                          <span>Official Support & Claims</span>
-                          <span className="text-[9px]">↗</span>
-                        </button>
-                      </div>
-
-                      {selectedAppliance.warrantyDoc ? (
-                        <div className={`border rounded-lg p-2.5 mt-3 flex items-center justify-between ${isDark ? 'bg-black/40 border-white/5' : 'bg-stone-50 border-black/5'}`}>
-                          <p className={`text-xs truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.warrantyDoc.name}</p>
-                          <a href={selectedAppliance.warrantyDoc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline font-bold">View</a>
-                        </div>
-                      ) : (
-                        <p className={`text-xs mt-2 ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>No paperwork attached.</p>
-                      )}
-                    </div>
-
-                    <div className={`rounded-2xl p-4 border ${isDark ? 'bg-zinc-900/80 border-white/5' : 'bg-white border-black/10 shadow-sm'}`}>
-                      <div className="flex justify-between items-center mb-2">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wider">Purchase Receipt</p>
-                          <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Proof of purchase & invoice storage</p>
-                        </div>
-                        <label className="bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-sm">
-                          <span>Upload</span>
-                          <span className="text-[9px]">↑</span>
-                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(selectedAppliance.id, 'receiptDoc', e)} />
-                        </label>
-                      </div>
-                      {selectedAppliance.receiptDoc ? (
-                        <div className={`border rounded-lg p-2.5 mt-2 flex items-center justify-between ${isDark ? 'bg-black/40 border-white/5' : 'bg-stone-50 border-black/5'}`}>
-                          <p className={`text-xs truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.receiptDoc.name}</p>
-                          <a href={selectedAppliance.receiptDoc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline font-bold">View</a>
-                        </div>
-                      ) : (
-                        <p className={`text-xs ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>No receipt attached.</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </main>
-          )}
-
-          {/* Quick-Edit Modal */}
-          {isEditModalOpen && (
+          {/* Add Equipment Sheet */}
+          {isAddOpen && (
             <div
-              onClick={() => setIsEditModalOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-[75] cursor-pointer"
+              onClick={() => setIsAddOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer"
             >
               <div
                 onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default ${
-                  isDark ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+                className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 border-t cursor-default ${
+                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
                 }`}
               >
                 <div className="flex justify-between items-center">
-                  <h3 className="text-base font-extrabold tracking-tight">Edit Equipment Info</h3>
-                  <AppleCloseButton isDark={isDark} onClick={() => setIsEditModalOpen(false)} />
+                  <h3 className="text-lg font-extrabold">Add Equipment</h3>
+                  <AppleCloseButton isDark={isDark} onClick={() => setIsAddOpen(false)} />
                 </div>
 
-                <form onSubmit={handleSaveEditedProduct} className="space-y-3">
+                <form onSubmit={handleAddAppliance} className="space-y-3">
                   <div>
-                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      Product Name
-                    </label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">1. Brand / Maker *</label>
                     <input
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/60 border-black/10 text-black'
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      value={editNameInput}
-                      onChange={(e) => setEditNameInput(e.target.value)}
-                      placeholder="e.g. Coway Airmega Mighty Air Purifier"
+                      placeholder="e.g. Coway, GE, Moen"
+                      value={brandInput}
+                      onChange={(e) => setBrandInput(e.target.value)}
                       required
                     />
                   </div>
 
                   <div>
-                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      Nickname (Optional)
-                    </label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">2. Model # (Optional)</label>
                     <input
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/60 border-black/10 text-black'
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      value={editNicknameInput}
-                      onChange={(e) => setEditNicknameInput(e.target.value)}
-                      placeholder="e.g. Living Room, Upstairs"
+                      placeholder="e.g. AP-1512HH"
+                      value={modelInput}
+                      onChange={(e) => setModelInput(e.target.value)}
                     />
                   </div>
 
-                  {isPaidUser && units.length > 0 && (
-                    <div>
-                      <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                        Assigned Unit
-                      </label>
-                      <select
-                        className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                          isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/60 border-black/10 text-black'
-                        }`}
-                        value={editUnitIdInput}
-                        onChange={(e) => setEditUnitIdInput(e.target.value)}
-                      >
-                        {units.map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsEditModalOpen(false)}
-                      className={`flex-1 py-2.5 rounded-2xl text-xs font-bold ${
-                        isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">3. Product Name *</label>
+                    <input
+                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 py-2.5 rounded-2xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-sm"
-                    >
-                      Save
-                    </button>
+                      placeholder="e.g. Airmega Mighty Air Purifier"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      required
+                    />
                   </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">4. Purchase Date (MM/DD/YYYY)</label>
+                    <input
+                      type="text"
+                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
+                      }`}
+                      placeholder="MM/DD/YYYY"
+                      value={purchaseDateInput}
+                      onChange={(e) => setPurchaseDateInput(formatToMMDDYYYY(e.target.value))}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isAnalyzing}
+                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-md active:scale-98 transition-all"
+                  >
+                    Save Equipment
+                  </button>
                 </form>
               </div>
             </div>
           )}
 
-          {/* Add Group Modal */}
-          {isAddGroupModalOpen && (
+          {/* Account & Auth Modal */}
+          {isAuthModalOpen && (
             <div
-              onClick={() => setIsAddGroupModalOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 cursor-pointer"
+              onClick={() => setIsAuthModalOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-[60] cursor-pointer"
             >
               <div
                 onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default ${
-                  isDark ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+                className={`w-full max-w-sm rounded-t-[32px] p-6 space-y-4 border-t cursor-default ${
+                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
                 }`}
               >
                 <div className="flex justify-between items-center">
-                  <h3 className="text-base font-extrabold tracking-tight">Create New Group</h3>
-                  <AppleCloseButton isDark={isDark} onClick={() => setIsAddGroupModalOpen(false)} />
+                  <h3 className="text-base font-extrabold">Account Login / Register</h3>
+                  <AppleCloseButton isDark={isDark} onClick={() => setIsAuthModalOpen(false)} />
                 </div>
 
-                <form onSubmit={handleCreateGroup} className="space-y-3">
-                  <input
-                    className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none border ${
-                      isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/60 border-black/10 text-black'
-                    }`}
-                    placeholder="e.g. Guest House, Basement, Unit 5"
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    autoFocus
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsAddGroupModalOpen(false)}
-                      className={`flex-1 py-2.5 rounded-2xl text-xs font-bold ${
-                        isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
+                {authStep === 'email' ? (
+                  <form onSubmit={handleRequestOtp} className="space-y-3">
+                    <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                      Enter your email to sign in or create an account. We'll send a 6-digit confirmation code.
+                    </p>
+                    <input
+                      type="email"
+                      className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none border ${
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                    >
-                      Cancel
-                    </button>
+                      placeholder="your@email.com"
+                      value={authEmailInput}
+                      onChange={(e) => setAuthEmailInput(e.target.value)}
+                      required
+                    />
                     <button
                       type="submit"
-                      className="flex-1 py-2.5 rounded-2xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-sm"
+                      disabled={authLoading}
+                      className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-3 rounded-2xl shadow-sm active:scale-95"
                     >
-                      Create
+                      {authLoading ? 'Sending...' : 'Send Login Code'}
                     </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleConfirmOtp} className="space-y-3">
+                    <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                      Enter the 6-digit PIN sent to {authEmailInput}:
+                    </p>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength="6"
+                      className={`w-full text-center tracking-widest text-lg font-bold rounded-2xl p-3 focus:outline-none border ${
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
+                      }`}
+                      placeholder="123456"
+                      value={authPinInput}
+                      onChange={(e) => setAuthPinInput(e.target.value.replace(/\D/g, ''))}
+                      required
+                    />
+                    {devPasscodeNotice && (
+                      <p className="text-[11px] text-amber-500 font-bold text-center">{devPasscodeNotice}</p>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={authLoading}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3 rounded-2xl shadow-sm active:scale-95"
+                    >
+                      {authLoading ? 'Verifying...' : 'Confirm & Log In'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAuthStep('email')}
+                      className="w-full text-center text-[11px] text-zinc-500 hover:underline"
+                    >
+                      Change Email
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Settings Modal */}
+          {isSettingsOpen && (
+            <div
+              onClick={() => setIsSettingsOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 border-t cursor-default ${
+                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+                }`}
+              >
+                <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                  <h3 className="text-base font-extrabold">Settings</h3>
+                  <AppleCloseButton isDark={isDark} onClick={() => setIsSettingsOpen(false)} />
+                </div>
+
+                <div className={`p-4 rounded-2xl border space-y-2.5 ${isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10'}`}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xs font-extrabold">Account Connection</p>
+                      <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                        {currentUser ? currentUser.email : "Not signed in (Guest Mode)"}
+                      </p>
+                    </div>
+                    {currentUser ? (
+                      <button onClick={handleLogout} className="text-xs text-rose-500 font-bold underline">
+                        Log Out
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => { setIsSettingsOpen(false); setIsAuthModalOpen(true); }}
+                        className="bg-amber-600 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow-sm"
+                      >
+                        Sign In
+                      </button>
+                    )}
                   </div>
-                </form>
+                </div>
+
+                <div className={`p-4 rounded-2xl flex justify-between items-center border ${isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10'}`}>
+                  <div>
+                    <p className="text-xs font-extrabold">Subscription Plan</p>
+                    <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>{isPaidUser ? 'Pro Manager' : 'Free Standard'}</p>
+                  </div>
+                  {!isPaidUser && (
+                    <button
+                      onClick={() => {
+                        if (!currentUser) {
+                          setIsSettingsOpen(false);
+                          setIsAuthModalOpen(true);
+                        } else {
+                          setIsPaywallOpen(true);
+                        }
+                      }}
+                      className="bg-amber-600 text-white font-bold text-xs px-3 py-1.5 rounded-xl"
+                    >
+                      Upgrade ($3.99/mo)
+                    </button>
+                  )}
+                </div>
+
+                <button onClick={() => setIsSettingsOpen(false)} className="w-full bg-zinc-800 text-white font-bold text-xs py-3 rounded-2xl">
+                  Close
+                </button>
               </div>
             </div>
           )}
@@ -2261,20 +935,14 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
             >
               <div
                 onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-md h-[82vh] rounded-t-[32px] p-5 flex flex-col shadow-2xl border-t cursor-default ${
+                className={`w-full max-w-md h-[80vh] rounded-t-[32px] p-5 flex flex-col border-t cursor-default ${
                   isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
                 }`}
               >
-                <div className="flex justify-between items-center pb-2.5 border-b border-black/10 dark:border-white/10">
+                <div className="flex justify-between items-center pb-2 border-b border-white/10">
                   <div>
-                    <h3 className="text-sm font-extrabold">{isPaidUser ? 'Pro Diagnostic Tech' : 'Manual Assistant'}</h3>
-                    <p className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      {activeAppliance.name} • {
-                        isPaidUser 
-                          ? `${AIQuotaTracker.getStatus(true).count}/65 (2h Window)` 
-                          : `${AIQuotaTracker.getStatus(false).count}/5 Free Queries`
-                      }
-                    </p>
+                    <h3 className="text-sm font-extrabold">{activeAppliance.name}</h3>
+                    <p className="text-[11px] text-zinc-400">Diagnostic Assistant</p>
                   </div>
                   <AppleCloseButton isDark={isDark} onClick={() => setActiveAppliance(null)} />
                 </div>
@@ -2284,10 +952,8 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
                     <button
                       key={chip}
                       onClick={() => sendQuery(chip)}
-                      className={`text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap shadow-sm transition-transform active:scale-95 ${
-                        chip === 'Go Deeper'
-                          ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-md'
-                          : isDark ? 'bg-zinc-800 text-zinc-300 hover:text-white' : 'bg-[#E5E5EA] text-[#1C1C1E] border border-black/5'
+                      className={`text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap ${
+                        chip === 'Go Deeper' ? 'bg-amber-600 text-white' : 'bg-zinc-800 text-zinc-300'
                       }`}
                     >
                       {chip}
@@ -2295,849 +961,30 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
                   ))}
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-2.5 py-2 text-xs">
+                <div className="flex-1 overflow-y-auto space-y-2 py-2 text-xs">
                   {messages.map(m => (
-                    <div key={m.id} className="space-y-1.5">
-                      <div className={`p-3 rounded-2xl max-w-[85%] whitespace-pre-line font-medium selectable-text ${
-                        m.sender === 'user'
-                          ? 'ml-auto bg-amber-600 text-white'
-                          : isDark ? 'mr-auto bg-zinc-800/80 text-zinc-200' : 'mr-auto bg-[#E5E5EA] text-[#1C1C1E]'
-                      }`}>
-                        {m.text}
-                      </div>
-
-                      {m.showInlineNudge && (
-                        <div className={`mr-auto max-w-[90%] px-3.5 py-2 rounded-xl text-[11px] flex items-center justify-between border ${
-                          isDark ? 'bg-zinc-800/60 border-amber-500/30 text-zinc-300' : 'bg-amber-50 border-amber-200 text-[#1C1C1E]'
-                        }`}>
-                          <span>Upgrading would likely increase troubleshooting success rate thanks to advanced reasoning.</span>
-                          <button
-                            onClick={() => setIsPaywallOpen(true)}
-                            className="ml-2 font-bold text-amber-600 dark:text-amber-400 hover:underline shrink-0"
-                          >
-                            Upgrade to Pro ↗
-                          </button>
-                        </div>
-                      )}
-
-                      {m.showUpgradeGate && (
-                        <div 
-                          className={`mr-auto max-w-[92%] p-4 rounded-2xl border space-y-2.5 shadow-sm ${
-                            isDark ? 'bg-zinc-900 border-amber-500/50' : 'bg-amber-50/90 border-amber-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-500">
-                              Free Advanced Reasoning Limit Reached
-                            </span>
-                            <span className="text-amber-600 dark:text-amber-500 font-bold text-sm">➔</span>
-                          </div>
-
-                          <p className={`text-xs font-bold leading-snug ${isDark ? 'text-zinc-200' : 'text-[#1C1C1E]'}`}>
-                            Unlock 65 Adaptive Troubleshooting Inquiries Every 2 Hours
-                          </p>
-
-                          <p className={`text-[11px] leading-relaxed ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                            Subsequent queries automatically draw from your offline verified manual dossier at zero cost. Upgrade to Pro for deeper adaptive guidance and full multi-unit management.
-                          </p>
-
-                          <p className={`text-[9.5px] leading-tight italic pt-0.5 ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>
-                            Notice: All guidance is provided for educational and informational purposes only. Always disconnect power or water before servicing. We assume no liability for DIY maintenance or repairs.
-                          </p>
-
-                          <div className="flex items-center justify-between pt-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setMessages(messages.map(msg => msg.id === m.id ? { ...msg, showUpgradeGate: false } : msg));
-                              }}
-                              className={`text-[10.5px] font-semibold underline ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}
-                            >
-                              Continue with Basic Manual
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setIsPaywallOpen(true)}
-                              className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-sm transition-transform active:scale-95"
-                            >
-                              Tap Here to Upgrade ↗
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {m.suggestTech && (
-                        <div className={`mr-auto max-w-[88%] p-3 rounded-2xl border space-y-2 ${
-                          isDark ? 'bg-zinc-950/80 border-amber-500/30' : 'bg-white border-amber-300 shadow-sm'
-                        }`}>
-                          <div className="flex items-center gap-2">
-                            <span className="text-amber-500 font-bold">🔧</span>
-                            <p className="text-xs font-bold">Certified In-Person Service Option</p>
-                          </div>
-                          <p className={`text-[11px] leading-tight ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                            This failure involves specialized line-voltage, mechanical, or plumbing repair. Authorized local technicians can be dispatched if you prefer not to service it.
-                          </p>
-                          <button
-                            onClick={() => openLocalTech(activeAppliance.brand, activeAppliance.category)}
-                            className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-[11px] py-1.5 rounded-xl shadow-sm"
-                          >
-                            Find Local Techs Near Me ↗
-                          </button>
-                        </div>
-                      )}
-
-                      {m.suggestReplacement && (
-                        <div className={`mr-auto max-w-[88%] p-3 rounded-2xl border space-y-2 ${
-                          isDark ? 'bg-zinc-950/80 border-rose-500/30' : 'bg-white border-rose-300 shadow-sm'
-                        }`}>
-                          <div className="flex items-center gap-2">
-                            <span className="text-rose-500 font-bold">⚠️</span>
-                            <p className="text-xs font-bold">Replacement Value Notice</p>
-                          </div>
-                          <p className={`text-[11px] leading-tight ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                            Estimated OEM parts and labor approach 50% of fair replacement cost. You may save more purchasing a new energy-efficient model.
-                          </p>
-                          <button
-                            onClick={() => openReplacementDeals(activeAppliance.category)}
-                            className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-[11px] py-1.5 rounded-xl shadow-sm border border-white/10"
-                          >
-                            View Current {activeAppliance.category} Deals ↗
-                          </button>
-                        </div>
-                      )}
+                    <div
+                      key={m.id}
+                      className={`p-3 rounded-2xl max-w-[85%] whitespace-pre-line font-medium ${
+                        m.sender === 'user' ? 'ml-auto bg-amber-600 text-white' : 'mr-auto bg-zinc-800 text-zinc-200'
+                      }`}
+                    >
+                      {m.text}
                     </div>
                   ))}
-                  {isLoading && <div className={`text-xs px-2 animate-pulse ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Analyzing...</div>}
+                  {isLoading && <p className="text-xs text-zinc-400 animate-pulse px-2">Analyzing...</p>}
                 </div>
 
                 <div className="pt-2 flex gap-2">
                   <input
-                    className={`flex-1 rounded-full px-4 py-2 text-xs font-medium focus:outline-none border ${
-                      isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                    }`}
-                    placeholder={
-                      !isPaidUser && AIQuotaTracker.getStatus(false).isLocked 
-                        ? "Offline Manual Search (Free quota reached)..." 
-                        : "Ask a question..."
-                    }
+                    className="flex-1 rounded-full px-4 py-2 text-xs bg-zinc-800 text-white focus:outline-none"
+                    placeholder="Describe issue..."
                     value={queryInput}
-                    disabled={isLoading}
                     onChange={(e) => setQueryInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && sendQuery()}
                   />
-                  <button onClick={() => sendQuery()} disabled={isLoading} className="bg-amber-600 text-white font-bold text-xs px-4 rounded-full shadow-sm">
+                  <button onClick={() => sendQuery()} className="bg-amber-600 text-white font-bold text-xs px-4 rounded-full">
                     Send
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Consumable Action Modal */}
-          {activeConsumableModal && (
-            <div
-              onClick={() => { setActiveConsumableModal(null); setIsPickingDate(false); }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer"
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-md rounded-t-[32px] p-6 space-y-4 shadow-2xl border-t cursor-default ${
-                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-base font-bold">{activeConsumableModal.consumable.name}</h3>
-                    <p className={`text-xs font-semibold selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Part: {activeConsumableModal.consumable.partNumber}</p>
-                  </div>
-                  <AppleCloseButton isDark={isDark} onClick={() => { setActiveConsumableModal(null); setIsPickingDate(false); }} />
-                </div>
-
-                {!isPickingDate ? (
-                  <>
-                    <button
-                      onClick={() => window.open(buildPartPurchaseUrl(activeConsumableModal.appliance.brand, activeConsumableModal.consumable, 'amazon'), '_blank')}
-                      className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-3 rounded-2xl shadow-sm active:scale-98 transition-all"
-                    >
-                      Order on Amazon ↗
-                    </button>
-
-                    <button
-                      onClick={() => window.open(buildPartPurchaseUrl(activeConsumableModal.appliance.brand, activeConsumableModal.consumable, 'oem'), '_blank')}
-                      className={`w-full py-3 rounded-2xl text-xs font-bold border transition-all active:scale-98 ${
-                        isDark ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-white/10' : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-black border-black/5'
-                      }`}
-                    >
-                      Order from OEM Supplier ↗
-                    </button>
-
-                    <button
-                      onClick={() => setIsPickingDate(true)}
-                      className="w-full py-3 rounded-2xl text-xs font-bold bg-emerald-600 text-white active:scale-98 shadow-sm"
-                    >
-                      Mark as Replaced
-                    </button>
-                  </>
-                ) : (
-                  <div className="space-y-3 pt-1">
-                    <label className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Enter replacement date (MM/DD/YYYY):</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none border ${
-                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                      }`}
-                      placeholder="MM/DD/YYYY (e.g. 10/14/2026)"
-                      value={customReplaceDate || formatISOToMMDDYYYY(new Date().toISOString())}
-                      onChange={(e) => setCustomReplaceDate(formatToMMDDYYYY(e.target.value))}
-                    />
-                    <div className="flex gap-2 pt-1">
-                      <button onClick={() => setIsPickingDate(false)} className={`flex-1 py-2.5 rounded-2xl text-xs font-bold ${
-                        isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
-                      }`}>
-                        Cancel
-                      </button>
-                      <button onClick={() => handleCommitReplacementDate(activeConsumableModal.appliance.id, activeConsumableModal.consumable.id, customReplaceDate)} className="flex-1 py-2.5 rounded-2xl text-xs font-bold bg-emerald-600 text-white shadow-sm">
-                        Done
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Reordered Add Equipment Sheet */}
-          {isAddOpen && (
-            <div
-              onClick={() => setIsAddOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer"
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 shadow-2xl border-t cursor-default ${
-                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-extrabold tracking-tight">Add Equipment or Fixture</h3>
-                  <AppleCloseButton isDark={isDark} onClick={() => setIsAddOpen(false)} />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current && cameraInputRef.current.click()}
-                  className={`w-full font-bold text-xs py-3 rounded-2xl active:scale-98 transition-all border ${
-                    isDark
-                      ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                      : 'bg-amber-100 border-amber-300 text-amber-900'
-                  }`}
-                >
-                  Scan QR / Data Badge Tag
-                </button>
-                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCameraScanSticker} />
-
-                <form onSubmit={handleAutoDiscoverAdd} className="space-y-3">
-                  {isPaidUser && (
-                    <div>
-                      <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                        Group / Unit Name
-                      </label>
-                      <input
-                        className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                          isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                        }`}
-                        placeholder="Type to create or select (e.g. APT 25)"
-                        value={groupTextInput}
-                        onChange={(e) => setGroupTextInput(e.target.value)}
-                      />
-                    </div>
-                  )}
-
-                  {/* 1. BRAND */}
-                  <div>
-                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      1. Brand / Manufacturer *
-                    </label>
-                    <input
-                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                      }`}
-                      placeholder="e.g. Coway, GE, Moen, Kohler"
-                      value={brandInput}
-                      onChange={(e) => setBrandInput(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  {/* 2. MODEL # (OPTIONAL) */}
-                  <div>
-                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      2. Model # (Optional)
-                    </label>
-                    <input
-                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                      }`}
-                      placeholder="e.g. AP-1512HH, GWE191 (Leave blank if unknown)"
-                      value={modelInput}
-                      onChange={(e) => setModelInput(e.target.value)}
-                    />
-                  </div>
-
-                  {/* 3. PRODUCT NAME (AUTO-POPULATES OR DIRECT SEARCH) */}
-                  <div>
-                    <div className="flex justify-between items-center">
-                      <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                        3. Product Name *
-                      </label>
-                      {lookupStatus && (
-                        <span className="text-[10px] text-amber-500 font-medium animate-pulse">
-                          {lookupStatus}
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                      }`}
-                      placeholder="e.g. Airmega Mighty Air Purifier or Kitchen Sink"
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  {/* 4. NICKNAME (OPTIONAL) */}
-                  <div>
-                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      4. Nickname (Optional)
-                    </label>
-                    <input
-                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                      }`}
-                      placeholder="e.g. Living Room, Upstairs, APT 25 Primary"
-                      value={nicknameInput}
-                      onChange={(e) => setNicknameInput(e.target.value)}
-                    />
-                  </div>
-
-                  {/* 5. PURCHASE DATE (TYPED MM/DD/YYYY) */}
-                  <div>
-                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      5. Purchase Date (MM/DD/YYYY)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                      }`}
-                      placeholder="MM/DD/YYYY (e.g. 10/14/2026)"
-                      value={purchaseDateInput}
-                      onChange={(e) => setPurchaseDateInput(formatToMMDDYYYY(e.target.value))}
-                    />
-                  </div>
-
-                  {/* 6. WARRANTY DURATION */}
-                  <div>
-                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      6. Warranty Duration
-                    </label>
-                    <select
-                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                      }`}
-                      value={warrantyMonthsInput}
-                      onChange={(e) => setWarrantyMonthsInput(e.target.value)}
-                    >
-                      <option value="12">1 Year (12 months)</option>
-                      <option value="24">2 Years (24 months)</option>
-                      <option value="36">3 Years (36 months)</option>
-                      <option value="60">5 Years (60 months)</option>
-                    </select>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isAnalyzing}
-                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-md active:scale-98 transition-all"
-                  >
-                    {isAnalyzing ? 'Inspecting & Absorbing Specs...' : 'Add Equipment'}
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* Bulk Deletion Toolbar */}
-          {isSelectMode && (
-            <div className={`fixed bottom-4 inset-x-4 max-w-sm mx-auto z-40 border rounded-2xl p-3.5 shadow-2xl flex items-center justify-between ${
-              isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
-            }`}>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={selectAll}
-                  className={`text-xs font-bold px-3 py-1.5 rounded-full ${
-                    isDark ? 'text-zinc-200 bg-zinc-800' : 'text-[#1C1C1E] bg-[#E5E5EA]'
-                  }`}
-                >
-                  {selectedIds.length === appliances.length ? 'Deselect All' : 'Select All'}
-                </button>
-                <span className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedIds.length} chosen</span>
-              </div>
-              <button
-                disabled={selectedIds.length === 0}
-                onClick={() => setIsBulkDeleteModalOpen(true)}
-                className="bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-bold text-xs px-4 py-1.5 rounded-full active:scale-95 shadow-sm"
-              >
-                Delete {selectedIds.length > 0 && `(${selectedIds.length})`}
-              </button>
-            </div>
-          )}
-
-          {/* Bulk Deletion Modal */}
-          {isBulkDeleteModalOpen && (
-            <div
-              onClick={() => setIsBulkDeleteModalOpen(false)}
-              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[70] cursor-pointer"
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={`border rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default ${
-                  isDark ? 'bg-zinc-900 border-rose-500/40 text-white' : 'bg-white border-rose-300 text-[#1C1C1E]'
-                }`}
-              >
-                <h3 className="text-base font-extrabold">Delete {selectedIds.length} Items?</h3>
-                <p className={`text-xs font-medium ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>This will permanently remove the selected equipment.</p>
-                <div className="flex gap-2 pt-2">
-                  <button onClick={() => setIsBulkDeleteModalOpen(false)} className={`flex-1 text-xs py-2.5 rounded-2xl font-bold ${
-                    isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
-                  }`}>Cancel</button>
-                  <button onClick={confirmBulkDelete} className="flex-1 bg-rose-600 text-white text-xs py-2.5 rounded-2xl font-bold">Delete</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Home Appliance Passport Modal */}
-          {isPassportModalOpen && (
-            <div
-              onClick={() => setIsPassportModalOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer"
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 shadow-2xl border-t cursor-default ${
-                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500">Official Document</span>
-                    <h3 className="text-lg font-extrabold tracking-tight mt-0.5">Home Appliance Passport</h3>
-                  </div>
-                  <AppleCloseButton isDark={isDark} onClick={() => setIsPassportModalOpen(false)} />
-                </div>
-
-                <div className={`p-4 rounded-2xl border space-y-2.5 text-xs ${
-                  isDark ? 'bg-zinc-950/80 border-white/5 text-zinc-300' : 'bg-[#F9F9FB] border-black/5 text-[#1C1C1E]'
-                }`}>
-                  <div className="flex justify-between items-center">
-                    <p className="font-bold text-sm">Certified Property Audit PDF</p>
-                    <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                      $2.99 One-Time
-                    </span>
-                  </div>
-                  <p className={`text-[11px] leading-relaxed ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                    Compiles verified model specs, serial numbers, active filter lifespans, OEM maintenance dates, and warranty records into a formal tamper-evident PDF for real estate transfers, leases, and appraisals.
-                  </p>
-
-                  <div className="pt-2 border-t border-black/5 dark:border-white/5 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-xs">Access Window Status</span>
-                      <span className={`font-bold text-xs ${
-                        isPassportCurrentlyUnlocked() ? 'text-emerald-500' : 'text-zinc-400'
-                      }`}>
-                        {isPassportCurrentlyUnlocked()
-                          ? (passportFirstUsedTimestamp ? `${getPassportRemainingHours()}h Left in 3-Day Window` : 'Ready for First Use')
-                          : 'Locked'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-1">
-                      <div>
-                        <p className="font-semibold text-xs">Include Maintenance History</p>
-                        <p className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>Attaches replacement timestamps & part numbers</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setPassportIncludeHistory(!passportIncludeHistory)}
-                        className={`w-11 h-6 rounded-full transition-colors flex items-center p-0.5 ${
-                          passportIncludeHistory ? 'bg-emerald-500' : (isDark ? 'bg-zinc-800' : 'bg-[#E5E5EA]')
-                        }`}
-                      >
-                        <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
-                          passportIncludeHistory ? 'translate-x-5' : 'translate-x-0'
-                        }`} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {units.length > 0 && (
-                  <div className={`p-4 rounded-2xl border space-y-2 ${
-                    isDark ? 'bg-zinc-950/80 border-white/5' : 'bg-[#F9F9FB] border-black/5'
-                  }`}>
-                    <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Select Groups to Include</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {units.map(u => {
-                        const isIncluded = passportSelectedUnits.includes(u.id);
-                        return (
-                          <button
-                            key={u.id}
-                            type="button"
-                            onClick={() => togglePassportUnitSelection(u.id)}
-                            className={`text-xs px-3 py-1.5 rounded-full font-bold transition-all border shadow-sm ${
-                              isIncluded
-                                ? 'bg-amber-600 text-white border-amber-600'
-                                : (isDark ? 'bg-zinc-900 text-zinc-400 border-zinc-800' : 'bg-[#E5E5EA] text-[#636366] border-black/5')
-                            }`}
-                          >
-                            {isIncluded ? '✓ ' : ''}{u.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {isPassportCurrentlyUnlocked() ? (
-                  <button
-                    disabled={isGeneratingPdf}
-                    onClick={handleDownloadPassport}
-                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-md active:scale-98 transition-all disabled:opacity-50"
-                  >
-                    {isGeneratingPdf ? 'Compiling Passport...' : 'Download Passport PDF (Unlimited for 3 Days)'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleBuyPassport}
-                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-md active:scale-98 transition-all"
-                  >
-                    Unlock Passport Access ($2.99 • Unlimited 3 Days)
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* HIDDEN CONTAINER FOR AUDIT PASSPORT PDF */}
-          <div style={{ display: 'none' }}>
-            <div id="passport-document-export" style={{ padding: '28px', fontFamily: 'Arial, sans-serif', color: '#111827', backgroundColor: '#FFFFFF' }}>
-              <div style={{ borderBottom: '3px solid #D97706', paddingBottom: '16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#111827' }}>Home Appliance Passport</h1>
-                  <p style={{ fontSize: '11px', color: '#4B5563', margin: 0 }}>Certified Property Equipment & Service Audit Trail</p>
-                  <p style={{ fontSize: '10px', color: '#6B7280', margin: '3px 0 0 0' }}>Registered Account: {userEmail} • Date: {new Date().toLocaleDateString()}</p>
-                </div>
-                <div style={{ textAlign: 'right', backgroundColor: '#F3F4F6', padding: '8px 12px', borderRadius: '8px', border: '1px solid #E5E7EB' }}>
-                  <p style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', color: '#6B7280', margin: '0 0 2px 0' }}>Cryptographic Verification Hash</p>
-                  <p style={{ fontSize: '9px', fontFamily: 'monospace', color: '#111827', margin: 0, fontWeight: 'bold' }}>{auditCertHash || 'PENDING_VALIDATION'}</p>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', color: '#374151', borderBottom: '1px solid #E5E7EB', paddingBottom: '4px', marginBottom: '10px' }}>
-                  Audited Equipment & In-Scope Fixtures ({passportFilteredAppliances.length})
-                </h2>
-
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5px', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #D1D5DB' }}>
-                      <th style={{ padding: '7px 8px' }}>Asset Name</th>
-                      <th style={{ padding: '7px 8px' }}>Category</th>
-                      <th style={{ padding: '7px 8px' }}>Brand / Model</th>
-                      <th style={{ padding: '7px 8px' }}>Assigned Unit</th>
-                      <th style={{ padding: '7px 8px' }}>OEM Warranty</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {passportFilteredAppliances.map((app, idx) => {
-                      const u = units.find(unit => unit.id === app.unitId);
-                      const w = getWarrantyRemainingDays(app.purchaseDate, app.warrantyMonths);
-                      return (
-                        <tr key={idx} style={{ borderBottom: '1px solid #E5E7EB' }}>
-                          <td style={{ padding: '7px 8px', fontWeight: 'bold' }}>{app.name}</td>
-                          <td style={{ padding: '7px 8px' }}>{app.category}</td>
-                          <td style={{ padding: '7px 8px' }}>{app.brand} • {app.modelNumber || 'N/A'}</td>
-                          <td style={{ padding: '7px 8px' }}>{u ? u.name : 'Main'}</td>
-                          <td style={{ padding: '7px 8px' }}>{w !== null && w > 0 ? `${w} days remaining` : 'Expired / Standard'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {passportIncludeHistory && (
-                <div style={{ marginBottom: '20px' }}>
-                  <h2 style={{ fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', color: '#374151', borderBottom: '1px solid #E5E7EB', paddingBottom: '4px', marginBottom: '10px' }}>
-                    Maintenance Log, Consumable Swaps & Filter Audits
-                  </h2>
-
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5px', textAlign: 'left' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #D1D5DB' }}>
-                        <th style={{ padding: '7px 8px' }}>Equipment</th>
-                        <th style={{ padding: '7px 8px' }}>Component / Filter</th>
-                        <th style={{ padding: '7px 8px' }}>OEM Part #</th>
-                        <th style={{ padding: '7px 8px' }}>Replacement Interval</th>
-                        <th style={{ padding: '7px 8px' }}>Service Timestamp</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {passportFilteredAppliances.flatMap(app => (app.consumables || []).map((c, cIdx) => (
-                        <tr key={`${app.id}_${cIdx}`} style={{ borderBottom: '1px solid #E5E7EB' }}>
-                          <td style={{ padding: '7px 8px', fontWeight: 'bold' }}>{app.name}</td>
-                          <td style={{ padding: '7px 8px' }}>{c.name}</td>
-                          <td style={{ padding: '7px 8px', fontFamily: 'monospace' }}>{c.partNumber}</td>
-                          <td style={{ padding: '7px 8px' }}>{c.intervalDays} days</td>
-                          <td style={{ padding: '7px 8px' }}>{formatISOToMMDDYYYY(c.lastReplaced)}</td>
-                        </tr>
-                      )))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <div style={{ marginTop: '28px', borderTop: '1px solid #E5E7EB', paddingTop: '10px', fontSize: '9px', color: '#9CA3AF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Official Record certified by Appliance Engine Registry. Retain for legal lease & escrow conveyance files.</span>
-                <span style={{ fontFamily: 'monospace' }}>SEC-HASH: {auditCertHash || 'ACTIVE'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Settings Modal */}
-          {isSettingsOpen && (
-            <div
-              onClick={() => setIsSettingsOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer"
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 shadow-2xl border-t cursor-default ${
-                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
-                }`}
-              >
-                <div className="flex justify-between items-center pb-2 border-b border-black/10 dark:border-white/10">
-                  <div>
-                    <h3 className="text-base font-extrabold">Account & Settings</h3>
-                    <p className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{userEmail}</p>
-                  </div>
-                  <AppleCloseButton isDark={isDark} onClick={() => setIsSettingsOpen(false)} />
-                </div>
-
-                <div className={`p-4 rounded-2xl flex justify-between items-center border ${
-                  isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
-                }`}>
-                  <div>
-                    <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Subscription</span>
-                    <p className="text-sm font-extrabold">{isPaidUser ? 'Pro Manager' : 'Free Standard'}</p>
-                  </div>
-                  {isPaidUser ? (
-                    <button onClick={() => setIsCancelModalOpen(true)} className="text-xs text-rose-600 dark:text-rose-400 font-bold underline">
-                      Cancel Plan
-                    </button>
-                  ) : (
-                    <button onClick={toggleTier} className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-amber-600 hover:bg-amber-500 text-white shadow-sm">
-                      Activate Pro
-                    </button>
-                  )}
-                </div>
-
-                <div className={`p-4 rounded-2xl border space-y-1 ${
-                  isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
-                }`}>
-                  <div className="flex justify-between items-center">
-                    <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>AI Engine Usage</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      isPaidUser ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-500'
-                    }`}>
-                      {isPaidUser ? 'Pro Rolling 2h' : 'Free Tier'}
-                    </span>
-                  </div>
-                  <p className="text-xs font-bold">
-                    {isPaidUser 
-                      ? `${AIQuotaTracker.getStatus(true).count} / 65 requests used this 2-hour window`
-                      : `${AIQuotaTracker.getStatus(false).count} / 5 free queries used`}
-                  </p>
-                  <p className={`text-[10px] ${isDark ? 'text-zinc-400' : 'text-[#8E8E93]'}`}>
-                    {isPaidUser 
-                      ? `Resets automatically every 2 hours. Next refresh in ~${AIQuotaTracker.getStatus(true).remainingMinutes}m.`
-                      : 'After 5 queries, app switches to zero-cost offline manual data.'}
-                  </p>
-                </div>
-
-                <div className={`p-4 rounded-2xl border space-y-2.5 ${
-                  isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
-                }`}>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Official Audit Document</span>
-                      <p className="text-xs font-extrabold">Home Appliance Passport (PDF)</p>
-                    </div>
-                    <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                      $2.99
-                    </span>
-                  </div>
-                  <p className={`text-[10px] leading-tight ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                    One-time export generates a certified PDF audit trail with verification hash for home inspections, move-outs, or sales. Unlimited exports for 3 days after initial use.
-                  </p>
-                  <button
-                    onClick={() => { setIsSettingsOpen(false); setIsPassportModalOpen(true); }}
-                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-2 rounded-xl shadow-sm transition-all active:scale-95"
-                  >
-                    Configure & Export Passport ↗
-                  </button>
-                </div>
-
-                <div className={`p-4 rounded-2xl border space-y-1.5 ${
-                  isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
-                }`}>
-                  <div className="flex justify-between items-center">
-                    <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Cloud Sync Engine</span>
-                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">Worker Active</span>
-                  </div>
-                  <p className="text-xs font-bold">Cloudflare Edge Proxy Connected</p>
-                  <p className={`text-[10px] leading-tight ${isDark ? 'text-zinc-400' : 'text-[#8E8E93]'}`}>
-                    Directly routed via https://appliance.naicumlegat.workers.dev/ with active Workers KV caching and zero client exposure.
-                  </p>
-                </div>
-
-                <div className={`p-4 rounded-2xl flex justify-between items-center border ${
-                  isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
-                }`}>
-                  <div>
-                    <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Appearance</span>
-                    <p className="text-sm font-extrabold">Theme Mode</p>
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => toggleTheme('dark')} className={`px-3.5 py-1.5 rounded-full text-xs font-bold ${
-                      isDark ? 'bg-black text-white shadow-sm' : 'bg-[#E5E5EA] text-[#636366]'
-                    }`}>Dark</button>
-                    <button onClick={() => toggleTheme('light')} className={`px-3.5 py-1.5 rounded-full text-xs font-bold ${
-                      !isDark ? 'bg-[#1C1C1E] text-white shadow-sm' : 'bg-zinc-800 text-zinc-400'
-                    }`}>Light</button>
-                  </div>
-                </div>
-
-                <div className={`p-4 rounded-2xl flex justify-between items-center border ${
-                  isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
-                }`}>
-                  <div className="pr-3">
-                    <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Privacy & Data</span>
-                    <p className="text-xs font-bold">Anonymous Reliability Sharing</p>
-                    <p className={`text-[10px] leading-tight mt-0.5 font-medium ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>Contributes anonymous failure rates and lifespans. Zero personal identity collected.</p>
-                  </div>
-                  <button
-                    onClick={toggleTelemetry}
-                    className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      telemetryOptIn
-                        ? (isDark ? 'bg-emerald-500 text-black' : 'bg-emerald-100 text-emerald-800 border border-emerald-300')
-                        : (isDark ? 'bg-zinc-700 text-zinc-400' : 'bg-[#E5E5EA] text-[#636366]')
-                    }`}
-                  >
-                    {telemetryOptIn ? 'Enabled' : 'Disabled'}
-                  </button>
-                </div>
-
-                <button onClick={() => setIsSettingsOpen(false)} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-sm">
-                  Save & Close
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Pro Overview Paywall Modal */}
-          {isPaywallOpen && (
-            <div
-              onClick={() => setIsPaywallOpen(false)}
-              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 cursor-pointer"
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default ${
-                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500">Pro Diagnostics</span>
-                    <h3 className="text-lg font-extrabold tracking-tight mt-0.5">Advanced DIY Hardware Triage</h3>
-                  </div>
-                  <AppleCloseButton isDark={isDark} onClick={() => setIsPaywallOpen(false)} />
-                </div>
-                <div className={`space-y-2 text-xs p-3.5 rounded-2xl font-medium ${
-                  isDark ? 'bg-zinc-800/80 text-zinc-300' : 'bg-[#E5E5EA]/60 text-[#1C1C1E]'
-                }`}>
-                  <p>✓ <strong>Deep Component Reasoning:</strong> Step-by-step diagnostic paths for limit switches, sensors, and pumps.</p>
-                  <p>✓ <strong>Adaptive Guidance:</strong> Interactive, multi-turn troubleshooting tailored to your appliance model.</p>
-                  <p>✓ <strong>High-Volume Diagnostics:</strong> 65 advanced reasoning requests every 2 hours.</p>
-                  <p>✓ <strong>Multi-Unit Properties:</strong> Organize equipment into custom units with independent alert muting.</p>
-                </div>
-
-                <p className={`text-[9.5px] italic leading-tight ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>
-                  Disclaimer: Appliance Engine provides DIY informational triage. Always disconnect power and water lines before inspecting. We assume no liability for repairs or maintenance undertaken.
-                </p>
-
-                <div className="flex flex-col gap-2 pt-1">
-                  <button onClick={() => { setIsPaidUser(true); localStorage.setItem('app_is_paid_user', 'true'); setIsPaywallOpen(false); }} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3 rounded-2xl shadow-sm">
-                    Activate Pro Diagnostics ($3.99/mo)
-                  </button>
-                  <button onClick={() => setIsPaywallOpen(false)} className={`text-xs font-bold py-1 text-center ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                    Continue with Basic Manual
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Cancellation Sheet */}
-          {isCancelModalOpen && (
-            <div
-              onClick={() => setIsCancelModalOpen(false)}
-              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[60] cursor-pointer"
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-sm rounded-[32px] p-6 space-y-3 shadow-2xl border cursor-default ${
-                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
-                }`}
-              >
-                <h3 className="text-sm font-extrabold">Cancel Pro Subscription?</h3>
-                <p className={`text-xs font-medium leading-relaxed ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                  We're sad to see you go! Thank you for your support. Your Pro access stays active until the end of this billing cycle.
-                </p>
-                <textarea
-                  rows="2"
-                  className={`w-full rounded-2xl p-2.5 text-xs font-medium focus:outline-none border ${
-                    isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/60 border-black/10 text-black'
-                  }`}
-                  placeholder="What could we improve? (Optional)"
-                  value={cancelFeedback}
-                  onChange={(e) => setCancelFeedback(e.target.value)}
-                />
-                <div className="flex gap-2 pt-1">
-                  <button onClick={() => setIsCancelModalOpen(false)} className={`flex-1 py-2.5 rounded-2xl text-xs font-bold ${
-                    isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
-                  }`}>
-                    Keep Plan
-                  </button>
-                  <button onClick={() => { setIsPaidUser(false); localStorage.setItem('app_is_paid_user', 'false'); setIsCancelModalOpen(false); setIsSettingsOpen(false); }} className="flex-1 py-2.5 rounded-2xl text-xs font-bold bg-rose-600 text-white shadow-sm">
-                    Confirm Cancel
                   </button>
                 </div>
               </div>
