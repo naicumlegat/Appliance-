@@ -1,1 +1,1367 @@
-a
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Appliance Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    input, textarea, select {
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .scrollbar-none::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="font-sans antialiased selection:bg-amber-600/30">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const MODEL_CASCADE = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    const CHAT_RETENTION_MS = 5 * 24 * 60 * 60 * 1000;
+
+    // Privacy-First Anonymous Reliability Telemetry
+    const TelemetryEngine = {
+      recordReliabilityEvent(eventType, modelNum, category, component = '') {
+        try {
+          const enabled = localStorage.getItem('app_telemetry_optin') !== 'false';
+          if (!enabled) return;
+
+          const rawEvents = localStorage.getItem('app_telemetry_queue') || '[]';
+          const queue = JSON.parse(rawEvents);
+
+          const sanitizedEvent = {
+            t: Date.now(),
+            e: eventType,
+            m: (modelNum || '').trim().toUpperCase(),
+            c: category || 'Appliance',
+            p: component || null
+          };
+
+          queue.push(sanitizedEvent);
+          if (queue.length > 50) queue.shift();
+          localStorage.setItem('app_telemetry_queue', JSON.stringify(queue));
+        } catch (err) {
+          // Silent local failure to prevent user disruption
+        }
+      }
+    };
+
+    const MODEL_IMAGE_REGISTRY = {
+      'gwe191': 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=600&q=80',
+      'fridge': 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80',
+      'refrigerator': 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80',
+      'jp3030': 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80',
+      'cooktop': 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80',
+      'airmega': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
+      'coway': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
+      'blueair': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
+      'purifier': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
+      'dishwasher': 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=600&q=80',
+      'washer': 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=600&q=80',
+      'dryer': 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=600&q=80'
+    };
+
+    function resolveProductImage(brand = '', model = '', category = '') {
+      const q = `${brand} ${model} ${category}`.toLowerCase();
+      for (const [key, url] of Object.entries(MODEL_IMAGE_REGISTRY)) {
+        if (q.includes(key)) return url;
+      }
+      return '';
+    }
+
+    function compressImageFile(file, maxWidth = 1200, quality = 0.72) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let w = img.width;
+            let h = img.height;
+            if (w > maxWidth) {
+              h = Math.round((h * maxWidth) / w);
+              w = maxWidth;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            const base64 = dataUrl.split(',')[1];
+            resolve({ dataUrl, base64, mimeType: 'image/jpeg' });
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const GLYPHS = {
+      purifier: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <rect x="5" y="3" width="14" height="18" rx="3"/>
+          <line x1="8" y1="7" x2="16" y2="7" strokeLinecap="round"/>
+          <line x1="8" y1="10" x2="16" y2="10" strokeLinecap="round"/>
+          <circle cx="12" cy="15" r="2.5"/>
+        </svg>
+      ),
+      refrigerator: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <rect x="5" y="2" width="14" height="20" rx="2.5"/>
+          <line x1="5" y1="10" x2="19" y2="10"/>
+          <line x1="8" y1="5" x2="8" y2="8" strokeLinecap="round"/>
+          <line x1="8" y1="13" x2="8" y2="17" strokeLinecap="round"/>
+        </svg>
+      ),
+      cooktop: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <rect x="2" y="5" width="20" height="14" rx="2.5"/>
+          <circle cx="7.5" cy="12" r="2.5"/>
+          <circle cx="16.5" cy="12" r="2.5"/>
+          <circle cx="7.5" cy="12" r="1"/>
+          <circle cx="16.5" cy="12" r="1"/>
+        </svg>
+      ),
+      dishwasher: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <rect x="3" y="3" width="18" height="18" rx="2.5"/>
+          <line x1="3" y1="8" x2="21" y2="8"/>
+          <circle cx="7" cy="5.5" r="1" fill="currentColor"/>
+          <circle cx="10" cy="5.5" r="1" fill="currentColor"/>
+          <line x1="7" y1="13" x2="17" y2="13" strokeLinecap="round"/>
+        </svg>
+      ),
+      default: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <rect x="4" y="4" width="16" height="16" rx="2.5"/>
+          <line x1="8" y1="12" x2="16" y2="12" strokeLinecap="round"/>
+          <line x1="12" y1="8" x2="12" y2="16" strokeLinecap="round"/>
+        </svg>
+      )
+    };
+
+    function getCategoryGlyph(type = '') {
+      const t = (type || '').toLowerCase();
+      if (t.includes('purifier') || t.includes('air') || t.includes('blueair') || t.includes('hepa')) return GLYPHS.purifier;
+      if (t.includes('fridge') || t.includes('refrigerat')) return GLYPHS.refrigerator;
+      if (t.includes('cooktop') || t.includes('stove') || t.includes('range') || t.includes('oven')) return GLYPHS.cooktop;
+      if (t.includes('dish')) return GLYPHS.dishwasher;
+      return GLYPHS.default;
+    }
+
+    async function callGeminiWithFallback(apiKey, prompt, temp = 0.2, timeoutMs = 12000, imagePayload = null) {
+      if (!apiKey || !apiKey.trim()) {
+        throw new Error('No API Key configured. Please add your key in Account Settings.');
+      }
+
+      let lastError = null;
+      for (const model of MODEL_CASCADE) {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+          try {
+            if (attempt > 0) await new Promise((r) => setTimeout(r, 1200));
+
+            const parts = [{ text: prompt }];
+            if (imagePayload) {
+              parts.push({
+                inlineData: { mimeType: imagePayload.mimeType, data: imagePayload.base64 }
+              });
+            }
+
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
+                body: JSON.stringify({
+                  contents: [{ parts }],
+                  generationConfig: { temperature: temp }
+                }),
+              }
+            );
+
+            clearTimeout(timeoutId);
+            const data = await res.json();
+
+            if (data.error) {
+              const code = data.error.code;
+              if (code === 503 || code === 429) {
+                lastError = `Rate limit (${code}). Retrying...`;
+                continue;
+              }
+              throw new Error(`API (${code}): ${data.error.message}`);
+            }
+
+            if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+              return data.candidates[0].content.parts[0].text;
+            }
+          } catch (err) {
+            clearTimeout(timeoutId);
+            lastError = err.message;
+          }
+        }
+      }
+      throw new Error(lastError || 'Service busy.');
+    }
+
+    function App() {
+      const [units, setUnits] = useState([
+        { id: 'unit_apt_25', name: 'APT 25', type: 'Residential Unit', notificationsEnabled: true },
+        { id: 'unit_airbnb_4b', name: 'Unit 4B (Downtown Airbnb)', type: 'Short-Term Rental', notificationsEnabled: false },
+        { id: 'unit_main', name: 'Main Residence', type: 'Personal Home', notificationsEnabled: true }
+      ]);
+      const [selectedUnitFilter, setSelectedUnitFilter] = useState('all');
+
+      const [appliances, setAppliances] = useState([
+        {
+          id: '1',
+          unitId: 'unit_apt_25',
+          name: 'Kitchen Fridge',
+          brand: 'GE',
+          modelNumber: 'GWE191JMLXFES',
+          category: 'Refrigerator',
+          imageUrl: MODEL_IMAGE_REGISTRY['gwe191'],
+          purchaseDate: '2025-11-15',
+          warrantyMonths: 12,
+          warrantyDoc: null,
+          receiptDoc: null,
+          componentsReplaceable: true,
+          consumables: [
+            {
+              id: 'c1',
+              name: 'Water Filter',
+              partNumber: 'RPWFE',
+              intervalDays: 180,
+              lastReplaced: new Date(Date.now() - 45 * 86400000).toISOString(),
+              installTips: 'Run 1.5–2 gallons through dispenser after install. Hold Water Filter pad for 3 sec to reset light.'
+            }
+          ],
+          replacementParts: [
+            { id: 'p1', category: 'Doors & Seals', name: 'Fresh Food Door Gasket', partNumber: 'WR14X31558' },
+            { id: 'p2', category: 'Ice & Water', name: 'Water Inlet Valve Assembly', partNumber: 'WR57X30890' }
+          ]
+        },
+        {
+          id: '2',
+          unitId: 'unit_apt_25',
+          name: 'Kitchen Cooktop',
+          brand: 'GE',
+          modelNumber: 'JP3030SWSS',
+          category: 'Cooktop',
+          imageUrl: MODEL_IMAGE_REGISTRY['jp3030'],
+          purchaseDate: '2026-01-20',
+          warrantyMonths: 24,
+          warrantyDoc: null,
+          receiptDoc: null,
+          componentsReplaceable: true,
+          consumables: [],
+          replacementParts: [
+            { id: 'p4', category: 'Heating & Elements', name: '8" Radiant Surface Element (2500W)', partNumber: 'WB30T10133' }
+          ]
+        },
+        {
+          id: '3',
+          unitId: 'unit_airbnb_4b',
+          name: 'Living Room Purifier',
+          brand: 'Coway',
+          modelNumber: 'Airmega 350',
+          category: 'Air Purifier',
+          imageUrl: MODEL_IMAGE_REGISTRY['airmega'],
+          purchaseDate: '',
+          warrantyMonths: 0,
+          warrantyDoc: null,
+          receiptDoc: null,
+          componentsReplaceable: false,
+          consumables: [
+            {
+              id: 'c2',
+              name: 'Max2 True HEPA Filter',
+              partNumber: 'AP-1512HH-FP',
+              intervalDays: 365,
+              lastReplaced: new Date(Date.now() - 353 * 86400000).toISOString(),
+              installTips: 'Remove plastic wrapping before insertion. Press and hold Filter Reset pad for 3 sec.'
+            }
+          ],
+          replacementParts: []
+        }
+      ]);
+
+      const [themeMode, setThemeMode] = useState('dark');
+      const [isPaidUser, setIsPaidUser] = useState(false);
+      const [userEmail, setUserEmail] = useState('homeowner@applianceengine.local');
+      const [apiKey, setApiKey] = useState('');
+      const [telemetryOptIn, setTelemetryOptIn] = useState(true);
+
+      const [selectedAppliance, setSelectedAppliance] = useState(null);
+      const [detailTab, setDetailTab] = useState('parts');
+      const [isAddOpen, setIsAddOpen] = useState(false);
+      const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+      const [isSelectMode, setIsSelectMode] = useState(false);
+      const [selectedIds, setSelectedIds] = useState([]);
+      const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+      const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+      const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+      const [cancelFeedback, setCancelFeedback] = useState('');
+
+      const [activeConsumableModal, setActiveConsumableModal] = useState(null);
+      const [isPickingDate, setIsPickingDate] = useState(false);
+      const [customReplaceDate, setCustomReplaceDate] = useState('');
+
+      const [activeAppliance, setActiveAppliance] = useState(null);
+      const [messages, setMessages] = useState([]);
+      const [queryInput, setQueryInput] = useState('');
+      const [isLoading, setIsLoading] = useState(false);
+
+      const [nameInput, setNameInput] = useState('');
+      const [brandInput, setBrandInput] = useState('');
+      const [modelInput, setModelInput] = useState('');
+      const [assignedUnitId, setAssignedUnitId] = useState('unit_apt_25');
+      const [purchaseDateInput, setPurchaseDateInput] = useState('');
+      const [warrantyMonthsInput, setWarrantyMonthsInput] = useState('12');
+      const [isAnalyzing, setIsAnalyzing] = useState(false);
+      const [lookupStatus, setLookupStatus] = useState('');
+
+      const cameraInputRef = useRef(null);
+
+      useEffect(() => {
+        setApiKey(localStorage.getItem('gemini_api_key') || '');
+        setIsPaidUser(localStorage.getItem('app_is_paid_user') === 'true');
+        setUserEmail(localStorage.getItem('app_user_email') || 'homeowner@applianceengine.local');
+        setThemeMode(localStorage.getItem('app_theme') || 'dark');
+        setTelemetryOptIn(localStorage.getItem('app_telemetry_optin') !== 'false');
+      }, []);
+
+      const isDark = themeMode === 'dark';
+
+      const toggleTheme = (mode) => {
+        setThemeMode(mode);
+        localStorage.setItem('app_theme', mode);
+      };
+
+      const toggleTier = () => {
+        const next = !isPaidUser;
+        setIsPaidUser(next);
+        localStorage.setItem('app_is_paid_user', next ? 'true' : 'false');
+      };
+
+      const toggleTelemetry = () => {
+        const next = !telemetryOptIn;
+        setTelemetryOptIn(next);
+        localStorage.setItem('app_telemetry_optin', next ? 'true' : 'false');
+      };
+
+      const toggleUnitNotifications = (unitId) => {
+        setUnits(units.map(u => u.id === unitId ? { ...u, notificationsEnabled: !u.notificationsEnabled } : u));
+      };
+
+      const calculateDaysRemaining = (lastReplaced, interval) => {
+        const diff = Math.floor((Date.now() - new Date(lastReplaced).getTime()) / (1000 * 60 * 60 * 24));
+        return interval - diff;
+      };
+
+      const getWarrantyRemainingDays = (purchaseDate, warrantyMonths) => {
+        if (!purchaseDate || !warrantyMonths || Number(warrantyMonths) <= 0) return null;
+        const pDate = new Date(purchaseDate);
+        if (isNaN(pDate.getTime())) return null;
+        const expDate = new Date(pDate);
+        expDate.setMonth(expDate.getMonth() + Number(warrantyMonths));
+        return Math.ceil((expDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      };
+
+      const filteredAppliances = isPaidUser && selectedUnitFilter !== 'all'
+        ? appliances.filter(a => a.unitId === selectedUnitFilter)
+        : appliances;
+
+      const toggleSelectId = (id) => {
+        setSelectedIds(selectedIds.includes(id) ? selectedIds.filter(item => item !== id) : [...selectedIds, id]);
+      };
+
+      const selectAll = () => {
+        setSelectedIds(selectedIds.length === filteredAppliances.length ? [] : filteredAppliances.map(a => a.id));
+      };
+
+      const confirmBulkDelete = () => {
+        selectedIds.forEach((id) => localStorage.removeItem(`chat_history_${id}`));
+        setAppliances(appliances.filter((a) => !selectedIds.includes(a.id)));
+        setSelectedIds([]);
+        setIsSelectMode(false);
+        setIsBulkDeleteModalOpen(false);
+      };
+
+      const handleFileUpload = async (applianceId, docType, e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const { dataUrl } = await compressImageFile(file, 1200, 0.72);
+          const filePayload = { name: file.name, dataUrl, uploadDate: new Date().toLocaleDateString() };
+          setAppliances(appliances.map(app => app.id === applianceId ? { ...app, [docType]: filePayload } : app));
+          if (selectedAppliance && selectedAppliance.id === applianceId) {
+            setSelectedAppliance({ ...selectedAppliance, [docType]: filePayload });
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      const handleCameraScanSticker = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setIsAnalyzing(true);
+        setLookupStatus('Analyzing sticker with vision...');
+
+        try {
+          const compressed = await compressImageFile(file, 1024, 0.75);
+          const activeKey = apiKey.trim();
+          if (!activeKey) {
+            setLookupStatus('Please add your Gemini API key in Settings first.');
+            setIsAnalyzing(false);
+            return;
+          }
+
+          const prompt = `Inspect this photo of an appliance sticker or QR barcode.
+Extract: 1. Brand 2. Model Number 3. Category.
+Return strictly valid JSON only: { "brand": "Brand", "modelNumber": "MODEL123", "category": "Category" }`;
+
+          const raw = await callGeminiWithFallback(activeKey, prompt, 0.1, 14000, compressed);
+          const cleanText = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.brand) setBrandInput(parsed.brand);
+            if (parsed.modelNumber) setModelInput(parsed.modelNumber);
+            if (!nameInput && parsed.brand) setNameInput(`${parsed.brand} ${parsed.category || 'Appliance'}`);
+            setLookupStatus(`Identified: ${parsed.brand} ${parsed.modelNumber}`);
+          }
+        } catch (err) {
+          setLookupStatus('Could not clearly read label. Please enter details manually.');
+        } finally {
+          setIsAnalyzing(false);
+        }
+      };
+
+      const handleAutoDiscoverAdd = async (e) => {
+        e.preventDefault();
+        if (!brandInput || !modelInput) return;
+
+        setIsAnalyzing(true);
+        setLookupStatus('Retrieving model telemetry & parts catalog...');
+
+        let discoveredConsumables = [];
+        let discoveredParts = [];
+        let detectedCategory = 'Appliance';
+        let componentsReplaceable = true;
+
+        const activeKey = apiKey.trim();
+        if (activeKey) {
+          try {
+            const prompt = `Identify appliance: Brand: "${brandInput}", Model: "${modelInput}"
+Return strictly valid JSON only:
+{
+  "category": "Refrigerator",
+  "areComponentsOfficiallyReplaceable": true,
+  "consumables": [
+    { "name": "Water Filter", "partNumber": "RPWFE", "intervalDays": 180, "installTips": "Flush 2 gallons." }
+  ],
+  "replacementParts": [
+    { "category": "Doors & Seals", "name": "Door Gasket", "partNumber": "WR14X31558" }
+  ]
+}`;
+            const raw = await callGeminiWithFallback(activeKey, prompt, 0.1, 14000);
+            const cleanText = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+            const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleanText);
+
+            if (parsed.category) detectedCategory = parsed.category;
+            if (typeof parsed.areComponentsOfficiallyReplaceable === 'boolean') {
+              componentsReplaceable = parsed.areComponentsOfficiallyReplaceable;
+            }
+            if (Array.isArray(parsed.consumables)) {
+              discoveredConsumables = parsed.consumables.map((item, idx) => ({
+                id: `c_${Date.now()}_${idx}`,
+                name: item.name || 'Consumable Filter',
+                partNumber: item.partNumber || 'OEM Standard',
+                intervalDays: Number(item.intervalDays) || 180,
+                lastReplaced: new Date().toISOString(),
+                installTips: item.installTips || 'Replace according to instructions.'
+              }));
+            }
+            if (componentsReplaceable && Array.isArray(parsed.replacementParts)) {
+              discoveredParts = parsed.replacementParts.map((item, idx) => ({
+                id: `p_${Date.now()}_${idx}`,
+                category: item.category || 'Components',
+                name: item.name,
+                partNumber: item.partNumber || 'OEM Part'
+              }));
+            }
+          } catch (err) {
+            console.warn(err);
+          }
+        }
+
+        const bLower = brandInput.toLowerCase();
+        const mLower = modelInput.toLowerCase();
+        if (detectedCategory === 'Appliance') {
+          if (bLower.includes('blueair') || bLower.includes('coway') || mLower.includes('air')) {
+            detectedCategory = 'Air Purifier';
+            componentsReplaceable = false;
+          } else if (mLower.includes('gwe') || mLower.includes('fridge')) {
+            detectedCategory = 'Refrigerator';
+            componentsReplaceable = true;
+          }
+        }
+
+        if (discoveredConsumables.length === 0 && detectedCategory === 'Air Purifier') {
+          discoveredConsumables = [{
+            id: `c_${Date.now()}_0`,
+            name: 'True HEPA & Carbon Filter',
+            partNumber: 'AP-1512HH-FP',
+            intervalDays: 180,
+            lastReplaced: new Date().toISOString(),
+            installTips: 'Reset indicator by holding reset button for 3 seconds.'
+          }];
+        }
+
+        const resolvedImg = resolveProductImage(brandInput, modelInput, detectedCategory);
+
+        const newItem = {
+          id: Date.now().toString(),
+          unitId: isPaidUser ? assignedUnitId : 'unit_main',
+          name: nameInput.trim() || `${brandInput} ${modelInput}`,
+          brand: brandInput.trim(),
+          modelNumber: modelInput.trim(),
+          category: detectedCategory,
+          imageUrl: resolvedImg,
+          purchaseDate: purchaseDateInput || '',
+          warrantyMonths: purchaseDateInput ? (Number(warrantyMonthsInput) || 12) : 0,
+          warrantyDoc: null,
+          receiptDoc: null,
+          componentsReplaceable,
+          consumables: discoveredConsumables,
+          replacementParts: discoveredParts
+        };
+
+        // Privacy-First Anonymous Reliability Ping
+        TelemetryEngine.recordReliabilityEvent('asset_registered', modelInput, detectedCategory);
+
+        setAppliances([newItem, ...appliances]);
+        setNameInput('');
+        setBrandInput('');
+        setModelInput('');
+        setPurchaseDateInput('');
+        setIsAnalyzing(false);
+        setIsAddOpen(false);
+      };
+
+      const handleCommitReplacementDate = (applianceId, consumableId, chosenDateStr) => {
+        const replacementIso = chosenDateStr ? new Date(chosenDateStr + 'T12:00:00').toISOString() : new Date().toISOString();
+        const app = appliances.find(a => a.id === applianceId);
+        const cons = app?.consumables?.find(c => c.id === consumableId);
+
+        // Privacy-First Anonymous Lifecycle Telemetry
+        if (app && cons) {
+          TelemetryEngine.recordReliabilityEvent('filter_replaced', app.modelNumber, app.category, cons.partNumber);
+        }
+
+        setAppliances(appliances.map(a => a.id === applianceId ? {
+          ...a,
+          consumables: a.consumables.map(c => c.id === consumableId ? { ...c, lastReplaced: replacementIso } : c)
+        } : a));
+
+        setIsPickingDate(false);
+        setActiveConsumableModal(null);
+        setSelectedAppliance(null);
+      };
+
+      const openAssistant = (item) => {
+        setActiveAppliance(item);
+        const savedHistory = localStorage.getItem(`chat_history_${item.id}`);
+        if (savedHistory) {
+          try { setMessages(JSON.parse(savedHistory).messages); } catch(e) {}
+        } else {
+          setMessages([{
+            id: '1',
+            sender: 'assistant',
+            text: isPaidUser
+              ? `Master Technician Diagnostic active for ${item.brand} (${item.modelNumber}). Describe any symptoms for circuit isolation, continuity checks, or safe repair triage.`
+              : `Manual Assistant active for ${item.brand} (${item.modelNumber}). Ask maintenance, care, or reset code questions from the official user manual.`
+          }]);
+        }
+      };
+
+      const sendQuery = async (text) => {
+        const q = text || queryInput;
+        if (!q.trim() || !activeAppliance || isLoading) return;
+
+        if (q.toLowerCase().includes('go deeper') && !isPaidUser) {
+          setIsPaywallOpen(true);
+          return;
+        }
+
+        const userMsg = { id: Date.now().toString(), sender: 'user', text: q };
+        const updated = [...messages, userMsg];
+        setMessages(updated);
+        setQueryInput('');
+        setIsLoading(true);
+
+        const activeKey = apiKey.trim();
+        if (activeKey) {
+          try {
+            const prompt = `Appliance: ${activeAppliance.brand} (${activeAppliance.modelNumber})
+User query: "${q}"
+Context: ${isPaidUser ? 'Pro Master Technician. Provide terminal checks, multimeter resistance ranges, and hardware fault isolation if relevant.' : 'Friendly manual guide. Provide 2-3 safe checks strictly from the owner guide under 80 words.'}
+Answer cleanly:`;
+            const reply = await callGeminiWithFallback(activeKey, prompt, 0.2);
+            setMessages([...updated, { id: Date.now().toString(), sender: 'assistant', text: reply }]);
+
+            // Anonymized Diagnostic Failure Symptom Telemetry
+            if (isPaidUser && q.toLowerCase().includes('go deeper')) {
+              TelemetryEngine.recordReliabilityEvent('hardware_triage', activeAppliance.modelNumber, activeAppliance.category);
+            }
+          } catch(err) {
+            setMessages([...updated, { id: Date.now().toString(), sender: 'assistant', text: `Diagnostic note: ${err.message}` }]);
+          } finally {
+            setIsLoading(false);
+          }
+        } else {
+          setTimeout(() => {
+            setMessages([...updated, { id: Date.now().toString(), sender: 'assistant', text: 'Please add your Gemini API key in Account Settings to query live service manuals.' }]);
+            setIsLoading(false);
+          }, 300);
+        }
+      };
+
+      // Direct Retailer Dispatchers
+      const openRetailer = (type, brand, partNumber) => {
+        const q = encodeURIComponent(`${brand} ${partNumber}`);
+        let url = `https://www.amazon.com/s?k=${q}&tag=applianceengine-20`;
+        if (type === 'oem') {
+          const b = (brand || '').toLowerCase();
+          if (b.includes('ge')) url = `https://www.geapplianceparts.com/store/parts/spec/${encodeURIComponent(partNumber)}`;
+          else if (b.includes('coway')) url = `https://cowaymega.com/search?q=${encodeURIComponent(partNumber)}`;
+          else if (b.includes('blueair')) url = `https://www.blueair.com/en-us/search?q=${encodeURIComponent(partNumber)}`;
+        }
+        window.open(url, '_blank', 'noopener,noreferrer');
+      };
+
+      return (
+        <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
+          isDark ? 'bg-black text-white' : 'bg-[#F2F2F7] text-[#1C1C1E]'
+        }`}>
+          {/* Apple Home-Style Header */}
+          <header className={`px-5 pt-12 pb-3 sticky top-0 z-20 backdrop-blur-2xl border-b transition-colors ${
+            isDark ? 'bg-black/75 border-white/10' : 'bg-white/75 border-black/5'
+          }`}>
+            <div className="flex justify-between items-end">
+              <div>
+                <p className="text-[12px] font-semibold uppercase tracking-wider text-amber-500">
+                  {isPaidUser ? 'Property Manager' : 'My Home'}
+                </p>
+                <h1 className="text-3xl font-extrabold tracking-tight">Appliances</h1>
+              </div>
+
+              <div className="flex items-center gap-2.5 pb-0.5">
+                <button
+                  onClick={() => setIsAddOpen(true)}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg active:scale-90 transition-transform shadow-sm ${
+                    isDark ? 'bg-white/10 hover:bg-white/15 text-white' : 'bg-black/5 hover:bg-black/10 text-black'
+                  }`}
+                  title="Add Accessory"
+                >
+                  +
+                </button>
+
+                <button
+                  onClick={() => setIsSettingsOpen(true)}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-sm ${
+                    isPaidUser
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      : isDark ? 'bg-white/10 hover:bg-white/15 text-white' : 'bg-black/5 hover:bg-black/10 text-black'
+                  }`}
+                  title="Settings"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                    <circle cx="12" cy="8" r="4"/>
+                    <path d="M4 20c0-4 4-5 8-5s8 1 8 5"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Pro-Only Unit Filter Carousel */}
+          {isPaidUser && !selectedAppliance && (
+            <div className={`px-5 py-3 border-b overflow-x-auto scrollbar-none flex gap-2 ${
+              isDark ? 'bg-zinc-950/40 border-white/5' : 'bg-white/40 border-black/5'
+            }`}>
+              <button
+                onClick={() => setSelectedUnitFilter('all')}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                  selectedUnitFilter === 'all'
+                    ? 'bg-amber-500 text-black'
+                    : isDark ? 'bg-white/10 text-zinc-300' : 'bg-black/5 text-zinc-700'
+                }`}
+              >
+                All ({appliances.length})
+              </button>
+              {units.map((u) => {
+                const count = appliances.filter(a => a.unitId === u.id).length;
+                return (
+                  <div
+                    key={u.id}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                      selectedUnitFilter === u.id
+                        ? 'bg-amber-500 text-black'
+                        : isDark ? 'bg-white/10 text-zinc-300' : 'bg-black/5 text-zinc-700'
+                    }`}
+                  >
+                    <button onClick={() => setSelectedUnitFilter(u.id)}>{u.name} ({count})</button>
+                    <button
+                      onClick={() => toggleUnitNotifications(u.id)}
+                      className={`text-[9px] px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold ${
+                        u.notificationsEnabled
+                          ? (selectedUnitFilter === u.id ? 'bg-black/20 text-black' : 'bg-emerald-500/20 text-emerald-400')
+                          : (selectedUnitFilter === u.id ? 'bg-black/20 text-black' : 'bg-zinc-800 text-zinc-500')
+                      }`}
+                    >
+                      {u.notificationsEnabled ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Main 2-Column Apple Home Squircle Grid */}
+          {!selectedAppliance ? (
+            <main className="flex-1 px-4 py-4 space-y-4 pb-28">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[12px] font-semibold text-zinc-400 tracking-wide uppercase">
+                  {filteredAppliances.length} {filteredAppliances.length === 1 ? 'Accessory' : 'Accessories'}
+                </span>
+                <button
+                  onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }}
+                  className="text-xs font-medium text-amber-500 hover:text-amber-400"
+                >
+                  {isSelectMode ? 'Done' : 'Edit'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {filteredAppliances.map((item) => {
+                  const isSelected = selectedIds.includes(item.id);
+                  const nearestConsumable = item.consumables?.[0];
+                  const daysLeft = nearestConsumable ? calculateDaysRemaining(nearestConsumable.lastReplaced, nearestConsumable.intervalDays) : null;
+                  const isClose = daysLeft !== null && daysLeft <= 14;
+                  const isOverdue = daysLeft !== null && daysLeft <= 0;
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        if (isSelectMode) toggleSelectId(item.id);
+                        else { setSelectedAppliance(item); setDetailTab('parts'); }
+                      }}
+                      className={`relative aspect-[1/1.05] rounded-[24px] p-3.5 flex flex-col justify-between transition-all duration-200 active:scale-[0.96] cursor-pointer shadow-sm ${
+                        isDark ? 'bg-zinc-900/80 border border-white/10 hover:border-white/20' : 'bg-white border border-black/5 hover:border-black/10'
+                      } ${isSelected ? 'ring-2 ring-amber-500' : ''}`}
+                    >
+                      {isSelectMode && (
+                        <div className={`absolute top-3 right-3 w-5 h-5 rounded-full border flex items-center justify-center text-xs font-bold ${
+                          isSelected ? 'bg-amber-500 border-amber-500 text-black' : isDark ? 'border-zinc-700' : 'border-zinc-300'
+                        }`}>
+                          {isSelected && '✓'}
+                        </div>
+                      )}
+
+                      {/* Top Tile Row: Category Icon & Health Dot */}
+                      <div className="flex justify-between items-start">
+                        <div className={`w-9 h-9 rounded-2xl flex items-center justify-center ${
+                          isDark ? 'bg-white/10 text-white' : 'bg-black/5 text-zinc-900'
+                        }`}>
+                          {getCategoryGlyph(item.category || item.name)}
+                        </div>
+
+                        {nearestConsumable && (
+                          <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isOverdue
+                              ? 'bg-rose-500/20 text-rose-400'
+                              : isClose
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-emerald-500/20 text-emerald-400'
+                          }`}>
+                            {isOverdue ? 'Due' : `${daysLeft}d`}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Middle: Subtle Thumbnail if Available */}
+                      {item.imageUrl && (
+                        <div className="flex-1 flex items-center justify-center my-1 overflow-hidden">
+                          <img src={item.imageUrl} alt={item.name} className="max-h-16 w-auto object-contain opacity-90 rounded-lg"/>
+                        </div>
+                      )}
+
+                      {/* Bottom Tile Info */}
+                      <div>
+                        <p className="text-[11px] font-semibold text-zinc-400 truncate">{item.brand}</p>
+                        <h2 className="text-[14px] font-bold tracking-tight truncate leading-tight">{item.name}</h2>
+                        <p className="text-[10px] text-zinc-500 truncate mt-0.5">{item.modelNumber}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </main>
+          ) : (
+            /* Apple Home-Style Accessory Detail Sheet */
+            <main className="flex-1 flex flex-col">
+              <div className={`p-6 border-b flex flex-col items-center justify-center relative ${
+                isDark ? 'bg-zinc-950/60 border-white/10' : 'bg-white border-black/5'
+              }`}>
+                <button
+                  onClick={() => setSelectedAppliance(null)}
+                  className={`absolute top-4 left-4 px-3.5 py-1.5 rounded-full text-xs font-semibold backdrop-blur-xl ${
+                    isDark ? 'bg-white/10 text-white' : 'bg-black/5 text-black'
+                  }`}
+                >
+                  Done
+                </button>
+
+                <div className="w-32 h-32 flex items-center justify-center my-2">
+                  {selectedAppliance.imageUrl ? (
+                    <img src={selectedAppliance.imageUrl} alt={selectedAppliance.name} className="max-h-full max-w-full object-contain rounded-2xl shadow-md"/>
+                  ) : (
+                    <div className={`w-20 h-20 rounded-3xl flex items-center justify-center ${
+                      isDark ? 'bg-white/10' : 'bg-black/5'
+                    }`}>
+                      {getCategoryGlyph(selectedAppliance.category)}
+                    </div>
+                  )}
+                </div>
+
+                <h2 className="text-xl font-extrabold tracking-tight mt-1">{selectedAppliance.name}</h2>
+                <p className="text-xs text-zinc-400 font-medium">{selectedAppliance.brand} • {selectedAppliance.modelNumber}</p>
+
+                {(() => {
+                  const daysLeft = getWarrantyRemainingDays(selectedAppliance.purchaseDate, selectedAppliance.warrantyMonths);
+                  if (daysLeft === null) return null;
+                  const isActive = daysLeft > 0;
+                  return (
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full mt-2 ${
+                      isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'
+                    }`}>
+                      {isActive ? `${daysLeft} days warranty remaining` : 'Warranty expired'}
+                    </span>
+                  );
+                })()}
+              </div>
+
+              {/* Segmented Control */}
+              <div className="flex px-4 pt-3 gap-2">
+                {[{ id: 'parts', label: 'Components' }, { id: 'docs', label: 'Documents' }].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setDetailTab(tab.id)}
+                    className={`flex-1 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                      detailTab === tab.id
+                        ? (isDark ? 'bg-white text-black' : 'bg-black text-white')
+                        : (isDark ? 'bg-white/5 text-zinc-400' : 'bg-black/5 text-zinc-600')
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                {detailTab === 'parts' && (
+                  <>
+                    {/* Consumable Section */}
+                    {selectedAppliance.consumables?.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 px-1">Active Maintenance</p>
+                        {selectedAppliance.consumables.map(c => {
+                          const d = calculateDaysRemaining(c.lastReplaced, c.intervalDays);
+                          return (
+                            <div
+                              key={c.id}
+                              onClick={() => { setActiveConsumableModal({ appliance: selectedAppliance, consumable: c }); setIsPickingDate(false); }}
+                              className={`rounded-2xl p-4 flex justify-between items-center cursor-pointer active:scale-[0.98] transition-transform ${
+                                isDark ? 'bg-zinc-900/90 border border-white/5' : 'bg-white border border-black/5 shadow-sm'
+                              }`}
+                            >
+                              <div>
+                                <p className="text-sm font-bold">{c.name}</p>
+                                <p className="text-xs text-zinc-400 font-mono">OEM #: {c.partNumber}</p>
+                              </div>
+                              <div className="text-right">
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                  d <= 0 ? 'bg-rose-500/20 text-rose-400' : d <= 14 ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'
+                                }`}>
+                                  {d <= 0 ? 'Due' : `${d}d left`}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Replacement Parts */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center px-1">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Component Catalog</p>
+                        <button onClick={() => openAssistant(selectedAppliance)} className="text-xs font-semibold text-amber-500">
+                          Ask Manual 💬
+                        </button>
+                      </div>
+
+                      {selectedAppliance.componentsReplaceable ? (
+                        selectedAppliance.replacementParts?.map(p => (
+                          <div key={p.id} className={`rounded-2xl p-3.5 flex justify-between items-center ${
+                            isDark ? 'bg-zinc-900/60 border border-white/5' : 'bg-white border border-black/5 shadow-sm'
+                          }`}>
+                            <div>
+                              <p className="text-xs font-bold text-amber-500 uppercase tracking-wider text-[9px]">{p.category}</p>
+                              <p className="text-xs font-semibold">{p.name}</p>
+                              <p className="text-[10px] text-zinc-400 font-mono">Part #: {p.partNumber}</p>
+                            </div>
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => openRetailer('amazon', selectedAppliance.brand, p.partNumber)}
+                                className="bg-amber-500 text-black text-xs font-bold px-3 py-1.5 rounded-full shadow-sm active:scale-95"
+                              >
+                                Buy ↗
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className={`rounded-2xl p-4 text-xs ${
+                          isDark ? 'bg-zinc-900/40 text-zinc-400' : 'bg-white text-zinc-600'
+                        }`}>
+                          Factory sealed unit. Manufacturer does not officially distribute retail internal replacement components.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {detailTab === 'docs' && (
+                  <div className="space-y-3">
+                    <div className={`rounded-2xl p-4 ${isDark ? 'bg-zinc-900/80 border border-white/5' : 'bg-white border border-black/5 shadow-sm'}`}>
+                      <div className="flex justify-between items-center mb-2">
+                        <p className="text-xs font-bold">Factory Warranty</p>
+                        <label className="text-xs font-bold text-amber-500 cursor-pointer">
+                          Upload
+                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(selectedAppliance.id, 'warrantyDoc', e)} />
+                        </label>
+                      </div>
+                      {selectedAppliance.warrantyDoc ? (
+                        <p className="text-xs text-zinc-400 truncate">{selectedAppliance.warrantyDoc.name}</p>
+                      ) : (
+                        <p className="text-xs text-zinc-500">No paperwork attached.</p>
+                      )}
+                    </div>
+
+                    <div className={`rounded-2xl p-4 ${isDark ? 'bg-zinc-900/80 border border-white/5' : 'bg-white border border-black/5 shadow-sm'}`}>
+                      <div className="flex justify-between items-center mb-2">
+                        <p className="text-xs font-bold">Purchase Receipt</p>
+                        <label className="text-xs font-bold text-amber-500 cursor-pointer">
+                          Upload
+                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(selectedAppliance.id, 'receiptDoc', e)} />
+                        </label>
+                      </div>
+                      {selectedAppliance.receiptDoc ? (
+                        <p className="text-xs text-zinc-400 truncate">{selectedAppliance.receiptDoc.name}</p>
+                      ) : (
+                        <p className="text-xs text-zinc-500">No receipt attached.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </main>
+          )}
+
+          {/* Assistant Modal */}
+          {activeAppliance && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50">
+              <div className={`w-full max-w-md h-[80vh] rounded-t-[32px] p-5 flex flex-col shadow-2xl ${
+                isDark ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-900'
+              }`}>
+                <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                  <div>
+                    <h3 className="text-sm font-extrabold">{isPaidUser ? 'Pro Diagnostic Tech' : 'Manual Assistant'}</h3>
+                    <p className="text-xs text-zinc-400">{activeAppliance.brand} {activeAppliance.modelNumber}</p>
+                  </div>
+                  <button onClick={() => setActiveAppliance(null)} className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-xs">✕</button>
+                </div>
+
+                <div className="flex gap-1.5 py-2 overflow-x-auto scrollbar-none">
+                  {['Filter reset', 'Not turning on', 'Go Deeper'].map(chip => (
+                    <button
+                      key={chip}
+                      onClick={() => sendQuery(chip)}
+                      className={`text-xs px-3 py-1 rounded-full font-medium whitespace-nowrap ${
+                        chip === 'Go Deeper'
+                          ? 'bg-amber-500 text-black font-bold'
+                          : isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-100 text-zinc-800'
+                      }`}
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2.5 py-2 text-xs">
+                  {messages.map(m => (
+                    <div key={m.id} className={`p-3 rounded-2xl max-w-[85%] whitespace-pre-line ${
+                      m.sender === 'user'
+                        ? 'ml-auto bg-amber-500 text-black font-medium'
+                        : isDark ? 'mr-auto bg-zinc-800/80 text-zinc-200' : 'mr-auto bg-zinc-100 text-zinc-800'
+                    }`}>
+                      {m.text}
+                    </div>
+                  ))}
+                  {isLoading && <div className="text-xs text-zinc-400 px-2 animate-pulse">Analyzing...</div>}
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <input
+                    className={`flex-1 rounded-full px-4 py-2 text-xs focus:outline-none ${
+                      isDark ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-black'
+                    }`}
+                    placeholder="Ask a question..."
+                    value={queryInput}
+                    disabled={isLoading}
+                    onChange={(e) => setQueryInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && sendQuery()}
+                  />
+                  <button onClick={() => sendQuery()} disabled={isLoading} className="bg-amber-500 text-black font-bold text-xs px-4 rounded-full">
+                    Send
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Consumable Action Modal with Date Picker */}
+          {activeConsumableModal && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50">
+              <div className={`w-full max-w-md rounded-t-[32px] p-6 space-y-4 shadow-2xl ${
+                isDark ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-900'
+              }`}>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-base font-bold">{activeConsumableModal.consumable.name}</h3>
+                    <p className="text-xs text-zinc-400">Part: {activeConsumableModal.consumable.partNumber}</p>
+                  </div>
+                  <button onClick={() => { setActiveConsumableModal(null); setIsPickingDate(false); }} className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-xs">✕</button>
+                </div>
+
+                {!isPickingDate ? (
+                  <>
+                    <button
+                      onClick={() => openRetailer('amazon', activeConsumableModal.appliance.brand, activeConsumableModal.consumable.partNumber)}
+                      className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs py-3 rounded-2xl shadow-sm active:scale-98 transition-all"
+                    >
+                      Order on Amazon ↗
+                    </button>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openRetailer('oem', activeConsumableModal.appliance.brand, activeConsumableModal.consumable.partNumber)}
+                        className={`flex-1 py-2.5 rounded-2xl text-xs font-semibold ${
+                          isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-100 text-zinc-700'
+                        }`}
+                      >
+                        Brand Store ↗
+                      </button>
+                      <button
+                        onClick={() => setIsPickingDate(true)}
+                        className="flex-1 py-2.5 rounded-2xl text-xs font-bold bg-emerald-600 text-white active:scale-98"
+                      >
+                        Mark as Replaced
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3 pt-1">
+                    <label className="text-xs font-semibold text-zinc-400">Select replacement date:</label>
+                    <input
+                      type="date"
+                      className={`w-full rounded-2xl p-3 text-xs focus:outline-none ${
+                        isDark ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-black'
+                      }`}
+                      value={customReplaceDate || new Date().toISOString().split('T')[0]}
+                      onChange={(e) => setCustomReplaceDate(e.target.value)}
+                    />
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={() => setIsPickingDate(false)} className={`flex-1 py-2.5 rounded-2xl text-xs font-medium ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
+                        Cancel
+                      </button>
+                      <button onClick={() => handleCommitReplacementDate(activeConsumableModal.appliance.id, activeConsumableModal.consumable.id, customReplaceDate)} className="flex-1 py-2.5 rounded-2xl text-xs font-bold bg-emerald-600 text-white">
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Add Accessory Sheet */}
+          {isAddOpen && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50">
+              <div className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 shadow-2xl ${
+                isDark ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-900'
+              }`}>
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-extrabold tracking-tight">Add Appliance</h3>
+                  <button onClick={() => setIsAddOpen(false)} className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-xs">✕</button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current && cameraInputRef.current.click()}
+                  className="w-full bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold text-xs py-3 rounded-2xl active:scale-98 transition-all"
+                >
+                  Scan QR / Sticker Tag
+                </button>
+                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCameraScanSticker} />
+
+                <form onSubmit={handleAutoDiscoverAdd} className="space-y-3">
+                  {isPaidUser && (
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Assign to Unit</label>
+                      <select
+                        className={`w-full rounded-2xl p-3 text-xs mt-1 ${isDark ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-black'}`}
+                        value={assignedUnitId}
+                        onChange={(e) => setAssignedUnitId(e.target.value)}
+                      >
+                        {units.map(u => <option key={u.id} value={u.id}>{u.name} ({u.type})</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Nickname</label>
+                    <input
+                      className={`w-full rounded-2xl p-3 text-xs mt-1 ${isDark ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-black'}`}
+                      placeholder="e.g. Master Bedroom Purifier"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Brand *</label>
+                      <input
+                        className={`w-full rounded-2xl p-3 text-xs mt-1 ${isDark ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-black'}`}
+                        placeholder="e.g. GE, Coway"
+                        value={brandInput}
+                        onChange={(e) => setBrandInput(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Model # *</label>
+                      <input
+                        className={`w-full rounded-2xl p-3 text-xs mt-1 ${isDark ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-black'}`}
+                        placeholder="e.g. GWE191"
+                        value={modelInput}
+                        onChange={(e) => setModelInput(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Purchase Date</label>
+                    <input
+                      type="date"
+                      className={`w-full rounded-2xl p-3 text-xs mt-1 ${isDark ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-black'}`}
+                      value={purchaseDateInput}
+                      onChange={(e) => setPurchaseDateInput(e.target.value)}
+                    />
+                  </div>
+
+                  {isAnalyzing && <p className="text-xs text-amber-500 font-medium text-center animate-pulse">{lookupStatus}</p>}
+
+                  <button
+                    type="submit"
+                    disabled={isAnalyzing}
+                    className="w-full bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs py-3.5 rounded-2xl shadow-md active:scale-98 transition-all"
+                  >
+                    {isAnalyzing ? 'Inspecting...' : 'Add Appliance'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Settings Modal (Theme, Subscriptions, Anonymous Telemetry) */}
+          {isSettingsOpen && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50">
+              <div className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 shadow-2xl ${
+                isDark ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-900'
+              }`}>
+                <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                  <div>
+                    <h3 className="text-base font-extrabold">Account & Settings</h3>
+                    <p className="text-xs text-zinc-400">{userEmail}</p>
+                  </div>
+                  <button onClick={() => setIsSettingsOpen(false)} className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-xs">✕</button>
+                </div>
+
+                <div className={`p-4 rounded-2xl flex justify-between items-center ${isDark ? 'bg-zinc-800/80' : 'bg-zinc-100'}`}>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Subscription</span>
+                    <p className="text-sm font-bold">{isPaidUser ? 'Pro Manager' : 'Free Standard'}</p>
+                  </div>
+                  {isPaidUser ? (
+                    <button onClick={() => setIsCancelModalOpen(true)} className="text-xs text-rose-400 font-semibold underline">
+                      Cancel Plan
+                    </button>
+                  ) : (
+                    <button onClick={toggleTier} className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500 text-black">
+                      Activate Pro
+                    </button>
+                  )}
+                </div>
+
+                <div className={`p-4 rounded-2xl flex justify-between items-center ${isDark ? 'bg-zinc-800/80' : 'bg-zinc-100'}`}>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Appearance</span>
+                    <p className="text-sm font-bold">Theme Mode</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => toggleTheme('dark')} className={`px-3 py-1 rounded-full text-xs font-bold ${isDark ? 'bg-black text-white' : 'text-zinc-500'}`}>Dark</button>
+                    <button onClick={() => toggleTheme('light')} className={`px-3 py-1 rounded-full text-xs font-bold ${!isDark ? 'bg-white text-black shadow-sm' : 'text-zinc-500'}`}>Light</button>
+                  </div>
+                </div>
+
+                {/* Privacy-First Anonymous Reliability Telemetry Toggle */}
+                <div className={`p-4 rounded-2xl flex justify-between items-center ${isDark ? 'bg-zinc-800/80' : 'bg-zinc-100'}`}>
+                  <div className="pr-3">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Privacy & Data</span>
+                    <p className="text-xs font-bold">Anonymous Reliability Sharing</p>
+                    <p className="text-[10px] text-zinc-500 leading-tight mt-0.5">Contributes anonymous model failure rates and lifespans. Zero personal identity or emails collected.</p>
+                  </div>
+                  <button
+                    onClick={toggleTelemetry}
+                    className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      telemetryOptIn ? 'bg-emerald-500 text-black' : 'bg-zinc-700 text-zinc-400'
+                    }`}
+                  >
+                    {telemetryOptIn ? 'Enabled' : 'Disabled'}
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Gemini API Key</label>
+                  <input
+                    type="password"
+                    className={`w-full rounded-2xl p-3 text-xs focus:outline-none ${isDark ? 'bg-zinc-800 text-white' : 'bg-zinc-100 text-black'}`}
+                    placeholder="AIzaSy..."
+                    value={apiKey}
+                    onChange={(e) => { setApiKey(e.target.value); localStorage.setItem('gemini_api_key', e.target.value.trim()); }}
+                  />
+                </div>
+
+                <button onClick={() => setIsSettingsOpen(false)} className="w-full bg-amber-500 text-black font-extrabold text-xs py-3 rounded-2xl shadow-sm">
+                  Save & Close
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Non-Intrusive Pro Overview (Triggered when tapping 'Go Deeper' on Free) */}
+          {isPaywallOpen && (
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl ${
+                isDark ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-900'
+              }`}>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500">Pro Master Diagnostics</span>
+                    <h3 className="text-lg font-extrabold tracking-tight mt-0.5">Component & Electrical Triage</h3>
+                  </div>
+                  <button onClick={() => setIsPaywallOpen(false)} className="text-xs text-zinc-400">✕</button>
+                </div>
+                <div className={`space-y-2 text-xs p-3.5 rounded-2xl ${isDark ? 'bg-zinc-800/80 text-zinc-300' : 'bg-zinc-100 text-zinc-700'}`}>
+                  <p>✓ <strong>Hardware Circuit Isolation:</strong> Diagnose faulty microswitches, limiters, and control boards.</p>
+                  <p>✓ <strong>Multimeter Ohm Testing:</strong> Exact terminal resistance values and continuity steps.</p>
+                  <p>✓ <strong>Multi-Unit Properties:</strong> Organize appliances into units (APT 25, Airbnb) with per-unit alert muting.</p>
+                </div>
+                <div className="flex flex-col gap-2 pt-1">
+                  <button onClick={() => { setIsPaidUser(true); localStorage.setItem('app_is_paid_user', 'true'); setIsPaywallOpen(false); }} className="w-full bg-amber-500 text-black font-extrabold text-xs py-3 rounded-2xl active:scale-98">
+                    Activate Pro Diagnostics
+                  </button>
+                  <button onClick={() => setIsPaywallOpen(false)} className="text-xs text-zinc-400 py-1 text-center">
+                    Continue with Basic Manual
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cancellation Sheet */}
+          {isCancelModalOpen && (
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[60]">
+              <div className={`w-full max-w-sm rounded-[32px] p-6 space-y-3 shadow-2xl ${
+                isDark ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-900'
+              }`}>
+                <h3 className="text-sm font-extrabold">Cancel Pro Subscription?</h3>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  We're sad to see you go! Thank you for your support. Your Pro access stays active until the end of this billing cycle.
+                </p>
+                <textarea
+                  rows="2"
+                  className={`w-full rounded-2xl p-2.5 text-xs focus:outline-none ${isDark ? 'bg-zinc-800' : 'bg-zinc-100'}`}
+                  placeholder="What could we improve? (Optional)"
+                  value={cancelFeedback}
+                  onChange={(e) => setCancelFeedback(e.target.value)}
+                />
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => setIsCancelModalOpen(false)} className={`flex-1 py-2 rounded-2xl text-xs font-semibold ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
+                    Keep Plan
+                  </button>
+                  <button onClick={() => { setIsPaidUser(false); localStorage.setItem('app_is_paid_user', 'false'); setIsCancelModalOpen(false); setIsSettingsOpen(false); }} className="flex-1 py-2 rounded-2xl text-xs font-bold bg-rose-600 text-white">
+                    Confirm Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
+
