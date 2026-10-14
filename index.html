@@ -15,9 +15,9 @@
       user-select: none;
       -webkit-user-select: none;
     }
-    input, textarea, select {
-      user-select: text;
-      -webkit-user-select: text;
+    input, textarea, select, .selectable-text {
+      user-select: text !important;
+      -webkit-user-select: text !important;
     }
     .scrollbar-none::-webkit-scrollbar {
       display: none;
@@ -39,7 +39,7 @@
     const FREE_TOTAL_QUOTA = 5;
     const PRO_WINDOW_QUOTA = 65;
 
-    // Client-Side Rolling Quota & Lockout Manager
+    // Rolling Quota & Offline Message Count Tracker
     const AIQuotaTracker = {
       getStatus(isPaid) {
         if (isPaid) {
@@ -83,29 +83,68 @@
           const current = Number(localStorage.getItem('free_ai_used_count') || 0);
           localStorage.setItem('free_ai_used_count', (current + 1).toString());
         }
+      },
+      getOfflineOverQuotaCount() {
+        return Number(localStorage.getItem('free_offline_post_quota_count') || 0);
+      },
+      incrementOfflineOverQuota() {
+        const cur = Number(localStorage.getItem('free_offline_post_quota_count') || 0) + 1;
+        localStorage.setItem('free_offline_post_quota_count', cur.toString());
+        return cur;
       }
     };
 
+    // Daily Greeting Checker: Only greets once per calendar day
+    function shouldSendDailyGreeting() {
+      const today = new Date().toISOString().split('T')[0];
+      const lastGreetDate = localStorage.getItem('last_daily_greeting_date');
+      if (lastGreetDate !== today) {
+        localStorage.setItem('last_daily_greeting_date', today);
+        return true;
+      }
+      return false;
+    }
+
+    // Zero-Token Local Manual Lookup Matcher using baked dossier
     function queryLocalManualDatabase(appliance, rawQuery) {
       const q = (rawQuery || '').toLowerCase();
-      
-      if (q.includes('filter') || q.includes('reset') || q.includes('light')) {
+      const dossier = appliance.manualDossier || {};
+
+      if (dossier.errorCodes && typeof dossier.errorCodes === 'object') {
+        for (const [code, desc] of Object.entries(dossier.errorCodes)) {
+          if (q.includes(code.toLowerCase())) {
+            return `Verified Manual Error Code [${code}] for ${appliance.brand} ${appliance.modelNumber}:\n\n${desc}`;
+          }
+        }
+      }
+
+      if (q.includes('reset') || q.includes('reboot') || q.includes('restart')) {
+        if (dossier.resetProcedure) {
+          return `Official Reset Procedure for ${appliance.brand} ${appliance.modelNumber}:\n\n${dossier.resetProcedure}`;
+        }
         const matchedConsumable = appliance.consumables?.[0];
         if (matchedConsumable && matchedConsumable.installTips) {
-          return `Local Manual Guidance for ${appliance.brand} ${appliance.modelNumber}:\n\n${matchedConsumable.installTips}`;
+          return `Local Reset Guidance for ${appliance.brand} ${appliance.modelNumber}:\n\n${matchedConsumable.installTips}`;
         }
-        return `Manual Reset Procedure: To reset the filter alert indicator on most ${appliance.brand} models, hold the Filter Status / Reset button firmly for 3 to 5 seconds until the display light chimes or shifts to blue/green.`;
       }
 
-      if (q.includes('burn') || q.includes('heat') || q.includes('ignit') || q.includes('element')) {
-        return `Owner Manual Care Note: Ensure burner ports and glass contacts are free from grease deposits. Disconnect power for 60 seconds at your circuit breaker if touch sensors fail to register.`;
+      if (dossier.commonFixes && typeof dossier.commonFixes === 'object') {
+        for (const [symptomKey, fixDesc] of Object.entries(dossier.commonFixes)) {
+          const cleanKey = symptomKey.replace(/_/g, ' ');
+          if (q.includes(cleanKey) || cleanKey.split(' ').some(w => w.length > 3 && q.includes(w))) {
+            return `Offline Guide for ${appliance.brand} (${appliance.modelNumber}) - ${cleanKey.toUpperCase()}:\n\n${fixDesc}`;
+          }
+        }
       }
 
-      if (q.includes('frost') || q.includes('leak') || q.includes('cool') || q.includes('water')) {
-        return `Standard Manual Diagnostic: Inspect the door gasket seal for tears and verify vents are not blocked by storage bins. Clear internal drain tubes if standing water collects in the lower deli drawer.`;
+      if (q.includes('filter') || q.includes('cartridge') || q.includes('flapper')) {
+        const c = appliance.consumables?.[0];
+        if (c) {
+          return `Consumable Specifications:\n- Part #: ${c.partNumber}\n- Interval: Every ${c.intervalDays} days\n- Guide: ${c.installTips}`;
+        }
       }
 
-      return `Owner Guide Summary: Verified manual documentation for ${appliance.brand} (${appliance.modelNumber}) recommends checking power connections, testing breaker switch reset, and verifying cycle locks. Review attached docs under Warranty & Documents for full schematics.`;
+      return `Owner Documentation Summary: Verified manual documentation for ${appliance.brand} (${appliance.modelNumber}) recommends verifying electrical connections, clearing air/water paths, and resetting power at the main breaker. Full wiring & warranty docs are attached below.`;
     }
 
     async function generateAuditVerificationHash(dataString) {
@@ -159,9 +198,15 @@
       'coway': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
       'blueair': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
       'purifier': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
+      'thermostat': 'https://images.unsplash.com/photo-1545259741-2ea3ebf61fa3?auto=format&fit=crop&w=600&q=80',
+      'ecobee': 'https://images.unsplash.com/photo-1545259741-2ea3ebf61fa3?auto=format&fit=crop&w=600&q=80',
+      'nest': 'https://images.unsplash.com/photo-1545259741-2ea3ebf61fa3?auto=format&fit=crop&w=600&q=80',
       'dishwasher': 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=600&q=80',
       'washer': 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=600&q=80',
-      'dryer': 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=600&q=80'
+      'dryer': 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=600&q=80',
+      'toilet': 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80',
+      'faucet': 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=600&q=80',
+      'heater': 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80'
     };
 
     function resolveProductImage(brand = '', model = '', category = '') {
@@ -236,6 +281,17 @@
           <line x1="7" y1="13" x2="17" y2="13" strokeLinecap="round"/>
         </svg>
       ),
+      thermostat: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 7v5l3 3"/>
+        </svg>
+      ),
+      plumbing: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
+          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+        </svg>
+      ),
       default: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
           <rect x="4" y="4" width="16" height="16" rx="2.5"/>
@@ -247,10 +303,12 @@
 
     function getCategoryGlyph(type = '') {
       const t = (type || '').toLowerCase();
-      if (t.includes('purifier') || t.includes('air') || t.includes('blueair') || t.includes('hepa')) return GLYPHS.purifier;
+      if (t.includes('purifier') || t.includes('air') || t.includes('hepa')) return GLYPHS.purifier;
       if (t.includes('fridge') || t.includes('refrigerat')) return GLYPHS.refrigerator;
       if (t.includes('cooktop') || t.includes('stove') || t.includes('range') || t.includes('oven')) return GLYPHS.cooktop;
       if (t.includes('dish')) return GLYPHS.dishwasher;
+      if (t.includes('thermostat') || t.includes('climate') || t.includes('hvac')) return GLYPHS.thermostat;
+      if (t.includes('toilet') || t.includes('faucet') || t.includes('sink') || t.includes('plumb') || t.includes('heater') || t.includes('disposal')) return GLYPHS.plumbing;
       return GLYPHS.default;
     }
 
@@ -281,6 +339,8 @@
       else if (b.includes('samsung')) url = 'https://www.samsung.com/us/support/register/';
       else if (b.includes('lg')) url = 'https://www.lg.com/us/support/product-registration';
       else if (b.includes('bosch')) url = 'https://www.bosch-home.com/us/owner-support/product-registration';
+      else if (b.includes('ecobee')) url = 'https://www.ecobee.com/register/';
+      else if (b.includes('kohler')) url = 'https://www.kohler.com/en/support/product-registration';
       else url = `https://www.google.com/search?q=${encodeURIComponent(brand + ' ' + model + ' register product warranty')}`;
       window.open(url, '_blank', 'noopener,noreferrer');
     };
@@ -300,7 +360,7 @@
     };
 
     // Primary Dispatcher through Cloudflare Worker
-    async function requestDiagnosticFromWorker(prompt, history = [], imagePayload = null, isPaid = false) {
+    async function requestDiagnosticFromWorker(prompt, history = [], imagePayload = null, isPaid = false, needsGreeting = false) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
 
@@ -313,7 +373,8 @@
             prompt: (prompt || '').substring(0, 500),
             history,
             imagePayload,
-            isPaid
+            isPaid,
+            needsGreeting
           })
         });
 
@@ -363,7 +424,18 @@
           replacementParts: [
             { id: 'p1', category: 'Doors & Seals', name: 'Fresh Food Door Gasket', partNumber: 'WR14X31558' },
             { id: 'p2', category: 'Ice & Water', name: 'Water Inlet Valve Assembly', partNumber: 'WR57X30890' }
-          ]
+          ],
+          manualDossier: {
+            resetProcedure: "Press and hold the Water Filter status pad firmly for 3 seconds until the indicator light chimes and switches to green/blue.",
+            errorCodes: {
+              "88 88": "Power interruption / surge display code. Disconnect power cord for 60 seconds at the outlet to clear control board logic.",
+              "E2": "Defrost sensor fault. Check freezer thermistor continuity at the main cabinet harness."
+            },
+            commonFixes: {
+              "water leaking": "Clear the internal defrost drain tube beneath the evaporator coils; inspect water valve union behind access grill.",
+              "fan noise": "Check for frost obstruction around the evaporator fan motor in the freezer compartment."
+            }
+          }
         },
         {
           id: '2',
@@ -382,7 +454,14 @@
           consumables: [],
           replacementParts: [
             { id: 'p4', category: 'Heating & Elements', name: '8" Radiant Surface Element (2500W)', partNumber: 'WB30T10133' }
-          ]
+          ],
+          manualDossier: {
+            resetProcedure: "Turn all burner knobs to OFF. Trip the dedicated 240V double-pole circuit breaker OFF for 60 seconds, then toggle ON.",
+            errorCodes: {},
+            commonFixes: {
+              "burner not heating": "Inspect radiant element wiring spade terminals beneath the glass cooktop pan; verify infinite switch contacts."
+            }
+          }
         },
         {
           id: '3',
@@ -410,7 +489,14 @@
               installTips: 'Remove plastic wrapping before insertion. Press and hold Filter Reset pad for 3 sec.'
             }
           ],
-          replacementParts: []
+          replacementParts: [],
+          manualDossier: {
+            resetProcedure: "Press and hold the Filter Reset button firmly for 3 seconds until the indicator light chimes and turns off.",
+            errorCodes: {},
+            commonFixes: {
+              "red indicator light": "Clean the particle sensor on the side panel with a damp cotton swab; vacuum pre-filter screen."
+            }
+          }
         }
       ]);
 
@@ -621,13 +707,13 @@
         const file = e.target.files[0];
         if (!file) return;
         setIsAnalyzing(true);
-        setLookupStatus('Inspecting data tag...');
+        setLookupStatus('Inspecting data tag / sticker...');
 
         try {
           const compressed = await compressImageFile(file, 800, 0.65);
-          const prompt = `Identify appliance brand, model number, and category from this sticker. Return pure JSON: { "brand": "Brand", "modelNumber": "MODEL123", "category": "Category" }`;
+          const prompt = `Inspect this equipment sticker or rating plate. Extract brand, model number, and primary equipment category (e.g. Refrigerator, Dishwasher, Cooktop, Smart Thermostat, Toilet, Faucet, Water Heater). Return pure JSON only: { "brand": "Brand", "modelNumber": "MODEL123", "category": "Category" }`;
 
-          const raw = await requestDiagnosticFromWorker(prompt, [], compressed, isPaidUser);
+          const raw = await requestDiagnosticFromWorker(prompt, [], compressed, isPaidUser, false);
           const cleanText = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
           const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
 
@@ -635,7 +721,7 @@
             const parsed = JSON.parse(jsonMatch[0]);
             if (parsed.brand) setBrandInput(parsed.brand);
             if (parsed.modelNumber) setModelInput(parsed.modelNumber);
-            if (!nameInput && parsed.brand) setNameInput(`${parsed.brand} ${parsed.category || 'Appliance'}`);
+            if (!nameInput && parsed.brand) setNameInput(`${parsed.brand} ${parsed.category || 'Equipment'}`);
             setLookupStatus(`Identified: ${parsed.brand} ${parsed.modelNumber}`);
           }
         } catch (err) {
@@ -645,27 +731,34 @@
         }
       };
 
+      // Universal Equipment Auto-Discovery with Baked Offline Manual Dossier
       const handleAutoDiscoverAdd = async (e) => {
         e.preventDefault();
         if (!brandInput || !modelInput) return;
 
         setIsAnalyzing(true);
-        setLookupStatus('Querying equipment database...');
+        setLookupStatus('Analyzing hardware & building offline manual...');
 
         let discoveredConsumables = [];
         let discoveredParts = [];
-        let detectedCategory = 'Appliance';
+        let detectedCategory = 'Home Appliance';
         let componentsReplaceable = true;
+        let bakedDossier = {};
 
         try {
-          const prompt = `Lookup appliance: Brand "${brandInput}", Model "${modelInput}". Return pure JSON only:
+          const prompt = `Lookup residential equipment: Brand "${brandInput}", Model "${modelInput}". Works for all appliances, HVAC, thermostats, and plumbing fixtures. Return pure JSON only:
 {
   "category": "Refrigerator",
   "areComponentsOfficiallyReplaceable": true,
-  "consumables": [{ "name": "Filter", "partNumber": "RPWFE", "intervalDays": 180, "installTips": "Flush 2 gallons" }],
-  "replacementParts": [{ "category": "Doors", "name": "Gasket", "partNumber": "WR14X31558" }]
+  "consumables": [{ "name": "Water Filter", "partNumber": "RPWFE", "intervalDays": 180, "installTips": "Flush 2 gallons" }],
+  "replacementParts": [{ "category": "Doors & Seals", "name": "Fresh Food Door Gasket", "partNumber": "WR14X31558" }],
+  "manualDossier": {
+    "resetProcedure": "Hold filter button firmly for 3 seconds",
+    "errorCodes": { "E1": "Sensor disconnected" },
+    "commonFixes": { "leaking": "Check drain tube connection", "not cooling": "Clean condenser coils" }
+  }
 }`;
-          const raw = await requestDiagnosticFromWorker(prompt, [], null, isPaidUser);
+          const raw = await requestDiagnosticFromWorker(prompt, [], null, isPaidUser, false);
           const cleanText = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
           const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
           const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleanText);
@@ -674,20 +767,23 @@
           if (typeof parsed.areComponentsOfficiallyReplaceable === 'boolean') {
             componentsReplaceable = parsed.areComponentsOfficiallyReplaceable;
           }
+          if (parsed.manualDossier && typeof parsed.manualDossier === 'object') {
+            bakedDossier = parsed.manualDossier;
+          }
           if (Array.isArray(parsed.consumables)) {
             discoveredConsumables = parsed.consumables.map((item, idx) => ({
               id: `c_${Date.now()}_${idx}`,
-              name: item.name || 'Consumable Filter',
+              name: item.name || 'Maintenance Consumable',
               partNumber: item.partNumber || 'OEM Standard',
               intervalDays: Number(item.intervalDays) || 180,
               lastReplaced: new Date().toISOString(),
-              installTips: item.installTips || 'Replace per instructions.'
+              installTips: item.installTips || 'Replace per owner guide.'
             }));
           }
           if (componentsReplaceable && Array.isArray(parsed.replacementParts)) {
             discoveredParts = parsed.replacementParts.map((item, idx) => ({
               id: `p_${Date.now()}_${idx}`,
-              category: item.category || 'Components',
+              category: item.category || 'Mechanical',
               name: item.name,
               partNumber: item.partNumber || 'OEM Part'
             }));
@@ -696,12 +792,18 @@
 
         const bLower = brandInput.toLowerCase();
         const mLower = modelInput.toLowerCase();
-        if (detectedCategory === 'Appliance') {
+        if (detectedCategory === 'Home Appliance') {
           if (bLower.includes('blueair') || bLower.includes('coway') || mLower.includes('air')) {
             detectedCategory = 'Air Purifier';
             componentsReplaceable = false;
           } else if (mLower.includes('gwe') || mLower.includes('fridge')) {
             detectedCategory = 'Refrigerator';
+            componentsReplaceable = true;
+          } else if (bLower.includes('ecobee') || bLower.includes('nest') || mLower.includes('thermostat')) {
+            detectedCategory = 'Smart Thermostat';
+            componentsReplaceable = false;
+          } else if (bLower.includes('kohler') || bLower.includes('toto') || mLower.includes('toilet')) {
+            detectedCategory = 'Plumbing Fixture';
             componentsReplaceable = true;
           }
         }
@@ -730,6 +832,8 @@
           defaultSeasonal.push({ id: `st_${Date.now()}`, label: 'Vacuum condenser coils to maintain cooling efficiency', intervalMonths: 6, lastCompleted: new Date().toISOString(), dismissed: false });
         } else if (detectedCategory.includes('Dishwasher')) {
           defaultSeasonal.push({ id: `st_${Date.now()}`, label: 'Clean bottom filter basket under warm water', intervalMonths: 3, lastCompleted: new Date().toISOString(), dismissed: false });
+        } else if (detectedCategory.includes('Thermostat') || detectedCategory.includes('HVAC')) {
+          defaultSeasonal.push({ id: `st_${Date.now()}`, label: 'Check HVAC return air filter and replace if gray', intervalMonths: 3, lastCompleted: new Date().toISOString(), dismissed: false });
         }
 
         const newItem = {
@@ -747,7 +851,8 @@
           componentsReplaceable,
           seasonalTasks: defaultSeasonal,
           consumables: discoveredConsumables,
-          replacementParts: discoveredParts
+          replacementParts: discoveredParts,
+          manualDossier: bakedDossier
         };
 
         TelemetryEngine.recordReliabilityEvent('asset_registered', modelInput, detectedCategory);
@@ -813,18 +918,26 @@
 
         const quota = AIQuotaTracker.getStatus(isPaidUser);
 
+        // QUOTA REACHED FOR FREE USER: 100% Zero-Token Offline Manual Lookups
         if (!isPaidUser && quota.isLocked) {
+          const offlineTurnNumber = AIQuotaTracker.incrementOfflineOverQuota();
           const localManualAnswer = queryLocalManualDatabase(activeAppliance, q);
+          
+          // Friendly text-only reminder every 15 messages (non-intrusive)
+          const shouldAppend15TurnNudge = offlineTurnNumber % 15 === 0;
+
           const limitCardMsg = {
             id: Date.now().toString(),
             sender: 'assistant',
             text: localManualAnswer,
-            showUpgradeGate: true
+            showUpgradeGate: false, // Do not repeat the big card
+            showInlineNudge: shouldAppend15TurnNudge
           };
           setMessages([...updated, limitCardMsg]);
           return;
         }
 
+        // QUOTA CAP REACHED FOR PRO USER (65 requests in 2 hours)
         if (isPaidUser && quota.isLocked) {
           setMessages([...updated, {
             id: Date.now().toString(),
@@ -838,10 +951,10 @@
         try {
           AIQuotaTracker.increment(isPaidUser);
 
-          // Always inject appliance metadata so Gemini knows the exact target unit
           const prompt = `[Context: ${activeAppliance.brand} ${activeAppliance.modelNumber} (${activeAppliance.category})] User question: ${q}`;
+          const needsGreeting = shouldSendDailyGreeting();
 
-          const reply = await requestDiagnosticFromWorker(prompt, messages, null, isPaidUser);
+          const reply = await requestDiagnosticFromWorker(prompt, messages, null, isPaidUser, needsGreeting);
 
           const hasTechNotice = reply.includes('[TECH_RECOMMENDED]');
           const hasReplaceNotice = reply.includes('[REPLACEMENT_RECOMMENDED]');
@@ -851,7 +964,8 @@
             .trim();
 
           const currentQuotaAfter = AIQuotaTracker.getStatus(isPaidUser);
-          const reachedLimitNow = !isPaidUser && currentQuotaAfter.isLocked;
+          // Show the large Upgrade Card EXACTLY ONCE on the turn that reaches the limit (turn 5)
+          const justReachedLimitNow = !isPaidUser && currentQuotaAfter.count === FREE_TOTAL_QUOTA;
 
           const assistantMsg = {
             id: Date.now().toString(),
@@ -859,7 +973,8 @@
             text: cleanReply,
             suggestTech: hasTechNotice,
             suggestReplacement: hasReplaceNotice,
-            showUpgradeGate: reachedLimitNow
+            showUpgradeGate: justReachedLimitNow,
+            showInlineNudge: false
           };
 
           const finalMessages = [...updated, assistantMsg];
@@ -999,7 +1114,7 @@
                     <h2 className="text-[15px] font-bold tracking-tight truncate leading-tight">{item.name}</h2>
                     {!isSelectMode && <span className={isDark ? "text-zinc-500 text-xs" : "text-[#8E8E93] text-xs font-semibold"}>➔</span>}
                   </div>
-                  <p className={`text-xs font-medium mt-0.5 truncate ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{item.brand} • {item.modelNumber}</p>
+                  <p className={`text-xs font-medium mt-0.5 truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{item.brand} • {item.modelNumber}</p>
                   <p className={`text-[11px] mt-0.5 truncate ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>{item.category}</p>
                 </div>
               </div>
@@ -1068,7 +1183,7 @@
                           <div className="flex-1 pr-3">
                             <div className="flex items-center gap-2">
                               <p className="text-xs font-semibold">{c.name}</p>
-                              <span className={`text-[10px] font-mono ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>({c.partNumber})</span>
+                              <span className={`text-[10px] font-mono selectable-text ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>({c.partNumber})</span>
                             </div>
                             <div className={`w-full h-1.5 rounded-full mt-1.5 overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-[#E5E5EA]'}`}>
                               <div
@@ -1126,7 +1241,7 @@
         <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
           isDark ? 'bg-black text-white' : 'bg-[#F2F2F7] text-[#1C1C1E]'
         }`}>
-          {/* Apple Home Header */}
+          {/* Header */}
           <header className={`px-5 pt-12 pb-3.5 sticky top-0 z-20 backdrop-blur-2xl border-b transition-colors ${
             isDark ? 'bg-black/75 border-white/10' : 'bg-white/80 border-black/10'
           }`}>
@@ -1146,7 +1261,7 @@
                       ? 'bg-white/10 hover:bg-white/15 text-white'
                       : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-[#1C1C1E] border border-black/5'
                   }`}
-                  title="Add Appliance"
+                  title="Add Equipment"
                 >
                   +
                 </button>
@@ -1176,7 +1291,7 @@
             <main className="flex-1 px-4 py-4 space-y-3.5 pb-28">
               <div className="flex justify-between items-center px-1">
                 <span className={`text-[12px] font-bold tracking-wide uppercase ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                  {appliances.length} {appliances.length === 1 ? 'Appliance Added' : 'Appliances Added'}
+                  {appliances.length} {appliances.length === 1 ? 'Fixture Added' : 'Fixtures & Appliances Added'}
                 </span>
 
                 <div className="flex items-center gap-2">
@@ -1268,11 +1383,11 @@
                               <div className={`p-5 text-center rounded-2xl border flex flex-col items-center justify-center gap-2 ${
                                 isDark ? 'text-zinc-400 bg-black/20 border-white/5' : 'text-[#636366] bg-white/60 border-black/5'
                               }`}>
-                                <p className="text-xs font-semibold">No appliances in this unit</p>
+                                <p className="text-xs font-semibold">No equipment in this unit</p>
                                 <button
                                   onClick={() => handleAddApplianceToSpecificGroup(unit.name)}
                                   className="w-8 h-8 rounded-full bg-amber-600 hover:bg-amber-500 text-white font-bold flex items-center justify-center text-sm shadow-sm active:scale-90 transition-transform"
-                                  title="Add appliance to this group"
+                                  title="Add equipment to this group"
                                 >
                                   +
                                 </button>
@@ -1317,7 +1432,7 @@
                 </div>
 
                 <h2 className="text-xl font-extrabold tracking-tight mt-1">{selectedAppliance.name}</h2>
-                <p className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.brand} • {selectedAppliance.modelNumber}</p>
+                <p className={`text-xs font-semibold selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.brand} • {selectedAppliance.modelNumber}</p>
 
                 {(() => {
                   const daysLeft = getWarrantyRemainingDays(selectedAppliance.purchaseDate, selectedAppliance.warrantyMonths);
@@ -1369,7 +1484,7 @@
                           <div>
                             <p className="text-xs font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider text-[9px]">{p.category}</p>
                             <p className="text-xs font-semibold">{p.name}</p>
-                            <p className={`text-[10px] font-mono ${isDark ? 'text-zinc-400' : 'text-[#8E8E93]'}`}>Part #: {p.partNumber}</p>
+                            <p className={`text-[10px] font-mono selectable-text ${isDark ? 'text-zinc-400' : 'text-[#8E8E93]'}`}>Part #: {p.partNumber}</p>
                           </div>
                           <button
                             onClick={() => openAmazon(selectedAppliance.brand, p.partNumber)}
@@ -1383,7 +1498,7 @@
                       <div className={`rounded-2xl p-4 text-xs font-medium ${
                         isDark ? 'bg-zinc-900/40 text-zinc-400' : 'bg-white border border-black/10 text-[#636366]'
                       }`}>
-                        Factory sealed unit. Manufacturer does not officially distribute retail internal replacement components.
+                        Factory sealed fixture. Manufacturer does not officially distribute retail internal replacement components.
                       </div>
                     )}
                   </div>
@@ -1429,7 +1544,7 @@
 
                       {selectedAppliance.warrantyDoc ? (
                         <div className={`border rounded-lg p-2.5 mt-3 flex items-center justify-between ${isDark ? 'bg-black/40 border-white/5' : 'bg-stone-50 border-black/5'}`}>
-                          <p className={`text-xs truncate ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.warrantyDoc.name}</p>
+                          <p className={`text-xs truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.warrantyDoc.name}</p>
                           <a href={selectedAppliance.warrantyDoc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline font-bold">View</a>
                         </div>
                       ) : (
@@ -1451,7 +1566,7 @@
                       </div>
                       {selectedAppliance.receiptDoc ? (
                         <div className={`border rounded-lg p-2.5 mt-2 flex items-center justify-between ${isDark ? 'bg-black/40 border-white/5' : 'bg-stone-50 border-black/5'}`}>
-                          <p className={`text-xs truncate ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.receiptDoc.name}</p>
+                          <p className={`text-xs truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.receiptDoc.name}</p>
                           <a href={selectedAppliance.receiptDoc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline font-bold">View</a>
                         </div>
                       ) : (
@@ -1513,7 +1628,7 @@
             </div>
           )}
 
-          {/* Assistant Modal with In-Chat Upgrade Gate Card */}
+          {/* Assistant Modal with Selectable Text & Monetization Referral Hooks */}
           {activeAppliance && (
             <div
               onClick={() => setActiveAppliance(null)}
@@ -1540,7 +1655,7 @@
                 </div>
 
                 <div className="flex gap-1.5 py-2 overflow-x-auto scrollbar-none">
-                  {['Filter reset', 'Not turning on', 'Go Deeper'].map(chip => (
+                  {['Reset procedure', 'Error code lookup', 'Go Deeper'].map(chip => (
                     <button
                       key={chip}
                       onClick={() => sendQuery(chip)}
@@ -1558,7 +1673,7 @@
                 <div className="flex-1 overflow-y-auto space-y-2.5 py-2 text-xs">
                   {messages.map(m => (
                     <div key={m.id} className="space-y-1.5">
-                      <div className={`p-3 rounded-2xl max-w-[85%] whitespace-pre-line font-medium ${
+                      <div className={`p-3 rounded-2xl max-w-[85%] whitespace-pre-line font-medium selectable-text ${
                         m.sender === 'user'
                           ? 'ml-auto bg-amber-600 text-white'
                           : isDark ? 'mr-auto bg-zinc-800/80 text-zinc-200' : 'mr-auto bg-[#E5E5EA] text-[#1C1C1E]'
@@ -1566,32 +1681,72 @@
                         {m.text}
                       </div>
 
+                      {/* Friendly 15-message inline suggestion (non-intrusive) */}
+                      {m.showInlineNudge && (
+                        <div className={`mr-auto max-w-[90%] px-3.5 py-2 rounded-xl text-[11px] flex items-center justify-between border ${
+                          isDark ? 'bg-zinc-800/60 border-amber-500/30 text-zinc-300' : 'bg-amber-50 border-amber-200 text-[#1C1C1E]'
+                        }`}>
+                          <span>Upgrading would likely increase troubleshooting success rate thanks to advanced reasoning.</span>
+                          <button
+                            onClick={() => setIsPaywallOpen(true)}
+                            className="ml-2 font-bold text-amber-600 dark:text-amber-400 hover:underline shrink-0"
+                          >
+                            Upgrade to Pro ↗
+                          </button>
+                        </div>
+                      )}
+
+                      {/* One-Time Upgrade Gate Card upon 5th free query */}
                       {m.showUpgradeGate && (
                         <div 
-                          onClick={() => setIsPaywallOpen(true)}
-                          className={`mr-auto max-w-[90%] p-3.5 rounded-2xl border space-y-2 cursor-pointer transition-all active:scale-[0.98] ${
-                            isDark ? 'bg-amber-950/40 border-amber-500/50 hover:bg-amber-950/60' : 'bg-amber-50 border-amber-300 hover:bg-amber-100 shadow-sm'
+                          className={`mr-auto max-w-[92%] p-4 rounded-2xl border space-y-2.5 shadow-sm ${
+                            isDark ? 'bg-zinc-900 border-amber-500/50' : 'bg-amber-50/90 border-amber-300'
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                              Free Query Limit Reached (5/5 Used)
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-500">
+                              Free Advanced Reasoning Limit Reached
                             </span>
-                            <span className="text-amber-600 dark:text-amber-400 font-bold text-sm">➔</span>
+                            <span className="text-amber-600 dark:text-amber-500 font-bold text-sm">➔</span>
                           </div>
-                          <p className={`text-xs font-bold ${isDark ? 'text-zinc-200' : 'text-[#1C1C1E]'}`}>
-                            Upgrade to Pro to Continue Advanced Reasoning
+
+                          <p className={`text-xs font-bold leading-snug ${isDark ? 'text-zinc-200' : 'text-[#1C1C1E]'}`}>
+                            Unlock 65 Adaptive Troubleshooting Inquiries Every 2 Hours
                           </p>
-                          <p className={`text-[11px] leading-tight ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                            Subsequent queries automatically fall back to basic owner guides. Upgrade to unlock 65 deep circuit & electrical diagnostic queries every 2 hours.
+
+                          <p className={`text-[11px] leading-relaxed ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                            Subsequent queries automatically draw from your offline verified manual dossier at zero cost. Upgrade to Pro for deeper adaptive guidance and full multi-unit management.
                           </p>
-                          <div className="flex items-center justify-end text-amber-600 dark:text-amber-400 text-xs font-bold pt-0.5">
-                            <span>Open Upgrade Screen</span>
-                            <span className="ml-1">➔</span>
+
+                          {/* Explicit Safety & Liability Disclaimer */}
+                          <p className={`text-[9.5px] leading-tight italic pt-0.5 ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>
+                            Notice: All guidance is provided for educational and informational purposes only. Always disconnect power or water before servicing. We assume no liability for DIY maintenance or repairs.
+                          </p>
+
+                          <div className="flex items-center justify-between pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Close card and proceed using manual
+                                setMessages(messages.map(msg => msg.id === m.id ? { ...msg, showUpgradeGate: false } : msg));
+                              }}
+                              className={`text-[10.5px] font-semibold underline ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}
+                            >
+                              Continue with Basic Manual
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setIsPaywallOpen(true)}
+                              className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-sm transition-transform active:scale-95"
+                            >
+                              Tap Here to Upgrade ↗
+                            </button>
                           </div>
                         </div>
                       )}
 
+                      {/* Contractor Referral Lead Button */}
                       {m.suggestTech && (
                         <div className={`mr-auto max-w-[88%] p-3 rounded-2xl border space-y-2 ${
                           isDark ? 'bg-zinc-950/80 border-amber-500/30' : 'bg-white border-amber-300 shadow-sm'
@@ -1601,7 +1756,7 @@
                             <p className="text-xs font-bold">Certified In-Person Service Option</p>
                           </div>
                           <p className={`text-[11px] leading-tight ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                            This failure requires specialized mechanical or line-voltage repair. Authorized local technicians can be dispatched if you prefer not to service it.
+                            This failure involves specialized line-voltage, mechanical, or plumbing repair. Authorized local technicians can be dispatched if you prefer not to service it.
                           </p>
                           <button
                             onClick={() => openLocalTech(activeAppliance.brand, activeAppliance.category)}
@@ -1612,6 +1767,7 @@
                         </div>
                       )}
 
+                      {/* Replacement Model Referral Lead Button */}
                       {m.suggestReplacement && (
                         <div className={`mr-auto max-w-[88%] p-3 rounded-2xl border space-y-2 ${
                           isDark ? 'bg-zinc-950/80 border-rose-500/30' : 'bg-white border-rose-300 shadow-sm'
@@ -1674,7 +1830,7 @@
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="text-base font-bold">{activeConsumableModal.consumable.name}</h3>
-                    <p className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Part: {activeConsumableModal.consumable.partNumber}</p>
+                    <p className={`text-xs font-semibold selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Part: {activeConsumableModal.consumable.partNumber}</p>
                   </div>
                   <AppleCloseButton isDark={isDark} onClick={() => { setActiveConsumableModal(null); setIsPickingDate(false); }} />
                 </div>
@@ -1722,7 +1878,7 @@
             </div>
           )}
 
-          {/* Add Appliance Sheet */}
+          {/* Add Equipment Sheet */}
           {isAddOpen && (
             <div
               onClick={() => setIsAddOpen(false)}
@@ -1735,7 +1891,7 @@
                 }`}
               >
                 <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-extrabold tracking-tight">Add Appliance</h3>
+                  <h3 className="text-lg font-extrabold tracking-tight">Add Equipment or Fixture</h3>
                   <AppleCloseButton isDark={isDark} onClick={() => setIsAddOpen(false)} />
                 </div>
 
@@ -1748,7 +1904,7 @@
                       : 'bg-amber-100 border-amber-300 text-amber-900'
                   }`}
                 >
-                  Scan QR / Sticker Tag
+                  Scan QR / Data Badge Tag
                 </button>
                 <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCameraScanSticker} />
 
@@ -1795,7 +1951,7 @@
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      placeholder="e.g. Master Bedroom Purifier"
+                      placeholder="e.g. Master Bedroom Purifier, Ecobee Hallway"
                       value={nameInput}
                       onChange={(e) => setNameInput(e.target.value)}
                     />
@@ -1808,7 +1964,7 @@
                         className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                           isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                         }`}
-                        placeholder="e.g. GE, Coway"
+                        placeholder="e.g. GE, Ecobee, Kohler"
                         value={brandInput}
                         onChange={(e) => setBrandInput(e.target.value)}
                         required
@@ -1820,7 +1976,7 @@
                         className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                           isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                         }`}
-                        placeholder="e.g. GWE191"
+                        placeholder="e.g. GWE191, EB-STATE6, K-3999"
                         value={modelInput}
                         onChange={(e) => setModelInput(e.target.value)}
                         required
@@ -1863,7 +2019,7 @@
                     disabled={isAnalyzing}
                     className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-md active:scale-98 transition-all"
                   >
-                    {isAnalyzing ? 'Inspecting...' : 'Add Appliance'}
+                    {isAnalyzing ? 'Inspecting...' : 'Add Equipment'}
                   </button>
                 </form>
               </div>
@@ -1909,7 +2065,7 @@
                 }`}
               >
                 <h3 className="text-base font-extrabold">Delete {selectedIds.length} Items?</h3>
-                <p className={`text-xs font-medium ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>This will permanently remove the selected appliances.</p>
+                <p className={`text-xs font-medium ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>This will permanently remove the selected equipment.</p>
                 <div className="flex gap-2 pt-2">
                   <button onClick={() => setIsBulkDeleteModalOpen(false)} className={`flex-1 text-xs py-2.5 rounded-2xl font-bold ${
                     isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
@@ -2049,7 +2205,7 @@
 
               <div style={{ marginBottom: '24px' }}>
                 <h2 style={{ fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', color: '#374151', borderBottom: '1px solid #E5E7EB', paddingBottom: '4px', marginBottom: '10px' }}>
-                  Audited Equipment & In-Scope Appliances ({passportFilteredAppliances.length})
+                  Audited Equipment & In-Scope Fixtures ({passportFilteredAppliances.length})
                 </h2>
 
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5px', textAlign: 'left' }}>
@@ -2089,7 +2245,7 @@
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5px', textAlign: 'left' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #D1D5DB' }}>
-                        <th style={{ padding: '7px 8px' }}>Appliance</th>
+                        <th style={{ padding: '7px 8px' }}>Equipment</th>
                         <th style={{ padding: '7px 8px' }}>Component / Filter</th>
                         <th style={{ padding: '7px 8px' }}>OEM Part #</th>
                         <th style={{ padding: '7px 8px' }}>Replacement Interval</th>
@@ -2277,18 +2433,23 @@
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500">Pro Diagnostics</span>
-                    <h3 className="text-lg font-extrabold tracking-tight mt-0.5">Component & Electrical Triage</h3>
+                    <h3 className="text-lg font-extrabold tracking-tight mt-0.5">Advanced DIY Hardware Triage</h3>
                   </div>
                   <AppleCloseButton isDark={isDark} onClick={() => setIsPaywallOpen(false)} />
                 </div>
                 <div className={`space-y-2 text-xs p-3.5 rounded-2xl font-medium ${
                   isDark ? 'bg-zinc-800/80 text-zinc-300' : 'bg-[#E5E5EA]/60 text-[#1C1C1E]'
                 }`}>
-                  <p>✓ <strong>Hardware Circuit Isolation:</strong> Diagnose faulty microswitches, limiters, and control boards.</p>
-                  <p>✓ <strong>Multimeter Ohm Testing:</strong> Exact terminal resistance values and continuity steps.</p>
+                  <p>✓ <strong>Deep Component Reasoning:</strong> Step-by-step diagnostic paths for limit switches, sensors, and pumps.</p>
+                  <p>✓ <strong>Adaptive Guidance:</strong> Interactive, multi-turn troubleshooting tailored to your appliance model.</p>
                   <p>✓ <strong>High-Volume Diagnostics:</strong> 65 advanced reasoning requests every 2 hours.</p>
-                  <p>✓ <strong>Multi-Unit Properties:</strong> Organize appliances into custom units with independent alert muting.</p>
+                  <p>✓ <strong>Multi-Unit Properties:</strong> Organize equipment into custom units with independent alert muting.</p>
                 </div>
+
+                <p className={`text-[9.5px] italic leading-tight ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>
+                  Disclaimer: Appliance Engine provides DIY informational triage. Always disconnect power and water lines before inspecting. We assume no liability for repairs or maintenance undertaken.
+                </p>
+
                 <div className="flex flex-col gap-2 pt-1">
                   <button onClick={() => { setIsPaidUser(true); localStorage.setItem('app_is_paid_user', 'true'); setIsPaywallOpen(false); }} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3 rounded-2xl shadow-sm">
                     Activate Pro Diagnostics ($3.99/mo)
