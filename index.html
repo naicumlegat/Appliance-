@@ -173,7 +173,56 @@
       return ['Routine power reset', 'Inspect common wear parts', 'Clear error state', 'Go Deeper'];
     }
 
-    // Natural, Conversational Offline Diagnostic Engine
+    // Dynamic Official Link Routing: Prioritizes verified AI-extracted URLs
+    const openWarrantyRegistration = (appliance) => {
+      if (appliance && appliance.warrantyUrl && appliance.warrantyUrl.startsWith('http')) {
+        window.open(appliance.warrantyUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      const b = (appliance?.brand || '').toLowerCase();
+      let url = '';
+      if (b.includes('ge')) url = 'https://products.geappliances.com/appliance/gea-support-search-content?contentId=16851';
+      else if (b.includes('coway')) url = 'https://cowaymega.com/pages/warranty-registration';
+      else if (b.includes('moen')) url = 'https://www.moen.com/customer-support/register-your-product';
+      else if (b.includes('kohler')) url = 'https://www.kohler.com/en/my-account/product-registration';
+      else if (b.includes('blueair')) url = 'https://www.blueair.com/blogs/order-and-shipping/how-do-i-register-my-purifier-for-the-blueair-warranty';
+      else if (b.includes('samsung')) url = 'https://www.samsung.com/us/support/register/';
+      else if (b.includes('lg')) url = 'https://www.lg.com/us/support/product-registration';
+      else if (b.includes('whirlpool')) url = 'https://www.whirlpool.com/owners.html';
+      else if (b.includes('bosch')) url = 'https://www.bosch-home.com/us/owner-support/product-registration';
+      else if (b.includes('ecobee')) url = 'https://www.ecobee.com/register/';
+      else {
+        const cleanBrand = (appliance?.brand || '').trim();
+        url = `https://www.google.com/search?q=${encodeURIComponent(`${cleanBrand} official product warranty registration`)}`;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
+    };
+
+    const openOfficialBrandSupport = (appliance) => {
+      if (appliance && appliance.supportUrl && appliance.supportUrl.startsWith('http')) {
+        window.open(appliance.supportUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      const b = (appliance?.brand || '').toLowerCase();
+      let url = '';
+      if (b.includes('ge')) url = 'https://www.geappliances.com/ge/service-and-support/service-and-repair.htm';
+      else if (b.includes('coway')) url = 'https://cowaymega.com/pages/contact-us';
+      else if (b.includes('moen')) url = 'https://www.moen.com/customer-support';
+      else if (b.includes('kohler')) url = 'https://www.kohler.com/en/support';
+      else if (b.includes('blueair')) url = 'https://www.blueair.com/us/customer-support.html';
+      else if (b.includes('samsung')) url = 'https://www.samsung.com/us/support/service/';
+      else if (b.includes('lg')) url = 'https://www.lg.com/us/support/repair-service/schedule-repair';
+      else if (b.includes('whirlpool')) url = 'https://www.whirlpool.com/services/contact-us.html';
+      else if (b.includes('bosch')) url = 'https://www.bosch-home.com/us/owner-support/repair-service';
+      else {
+        const cleanBrand = (appliance?.brand || '').trim();
+        const modelStr = appliance?.modelNumber ? ` ${appliance.modelNumber}` : '';
+        url = `https://www.google.com/search?q=${encodeURIComponent(`${cleanBrand}${modelStr} official customer service repair support`)}`;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
+    };
+
+    // Conversational Offline Diagnostic Engine
     const ExpertDiagnosticEngine = {
       SEMANTIC_VECTORS: {
         fluid_dispenser: {
@@ -209,20 +258,18 @@
         const name = appliance.name || brand;
         const cat = (appliance.category || 'Appliance').toLowerCase();
 
-        // 1. Error Code Scan
         if (dossier.errorCodes && typeof dossier.errorCodes === 'object') {
           for (const [code, desc] of Object.entries(dossier.errorCodes)) {
             const cleanCode = code.toLowerCase();
             if (q.includes(cleanCode) || q.replace(/[\s-]/g, '').includes(cleanCode.replace(/[\s-]/g, ''))) {
               return `Here is what code ${code.toUpperCase()} indicates on your ${brand} ${name}:\n\n` +
                      `1. Probable Cause: ${desc}\n` +
-                     `2. Physical Check: Inspect the associated wiring harness and sensor connection.\n` +
+                     `2. Physical Check: Inspect the associated wiring harness and sensor seating.\n` +
                      `3. Logic Clear: Switch off the breaker for 60 seconds to clear residual microprocessor memory.`;
             }
           }
         }
 
-        // 2. Vector Intent Scoring
         const scores = {};
         const queryTokens = q.split(/[\s,?.!-]+/).filter(t => t.length > 2);
 
@@ -249,7 +296,6 @@
           }
         }
 
-        // 3. Match against Absorbed Model Dossier
         if (dossier.commonFixes && typeof dossier.commonFixes === 'object') {
           if (dominantVector && dossier.commonFixes[dominantVector]) {
             return `Here are the verified steps to resolve this on your ${brand} ${name}:\n\n` +
@@ -266,7 +312,6 @@
           }
         }
 
-        // 4. Reset & Filter Indicator Inquiries
         if (dominantVector === 'reset_codes' || this.matchesCategory(q, 'reset_codes')) {
           const isFilterLightQuery = q.includes('filter') || q.includes('light') || q.includes('indicator') || q.includes('red');
           if (isFilterLightQuery && appliance.consumables?.[0]?.installTips) {
@@ -282,7 +327,6 @@
           }
         }
 
-        // 5. Intelligent Subsystem Heuristics
         if (dominantVector === 'fluid_dispenser' && (cat.includes('fridge') || cat.includes('refrigerat'))) {
           return `If your ${brand} ${name} isn't dispensing water or making ice, check these three likely causes:\n\n` +
                  `1. Filter Seating / Bypass: Remove the water filter and firmly twist it back in until it clicks. A slightly misaligned filter engages the built-in auto-shutoff valve.\n` +
@@ -340,30 +384,6 @@
         return Math.abs(hash).toString(16).toUpperCase().padStart(16, '0');
       }
     }
-
-    const TelemetryEngine = {
-      recordReliabilityEvent(eventType, modelNum, category, component = '') {
-        try {
-          const enabled = localStorage.getItem('app_telemetry_optin') !== 'false';
-          if (!enabled) return;
-
-          const rawEvents = localStorage.getItem('app_telemetry_queue') || '[]';
-          const queue = JSON.parse(rawEvents);
-
-          const sanitizedEvent = {
-            t: Date.now(),
-            e: eventType,
-            m: (modelNum || '').trim().toUpperCase(),
-            c: category || 'Appliance',
-            p: component || null
-          };
-
-          queue.push(sanitizedEvent);
-          if (queue.length > 50) queue.shift();
-          localStorage.setItem('app_telemetry_queue', JSON.stringify(queue));
-        } catch (err) {}
-      }
-    };
 
     const MODEL_IMAGE_REGISTRY = {
       'gwe191': 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=600&q=80',
@@ -453,23 +473,6 @@
       );
     }
 
-    const openWarrantyRegistration = (brand, model) => {
-      const b = (brand || '').toLowerCase();
-      let url = `https://www.google.com/search?q=${encodeURIComponent(brand + ' ' + (model || '') + ' register product warranty')}`;
-      if (b.includes('ge')) url = 'https://www.geappliances.com/ge/service-and-support/register-your-appliance.htm';
-      else if (b.includes('coway')) url = 'https://cowaymega.com/pages/warranty';
-      else if (b.includes('kohler')) url = 'https://www.kohler.com/en/support/product-registration';
-      window.open(url, '_blank', 'noopener,noreferrer');
-    };
-
-    const openOfficialBrandSupport = (brand, model) => {
-      const b = (brand || '').toLowerCase();
-      let url = `https://www.google.com/search?q=${encodeURIComponent(brand + ' ' + (model || '') + ' official customer support warranty claim')}`;
-      if (b.includes('ge')) url = 'https://www.geappliances.com/ge/service-and-support/service-and-repair.htm';
-      else if (b.includes('coway')) url = 'https://cowaymega.com/pages/contact-us';
-      window.open(url, '_blank', 'noopener,noreferrer');
-    };
-
     async function requestDiagnosticFromWorker(prompt, history = [], imagePayload = null, isPaid = false, needsGreeting = false) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -514,6 +517,8 @@
           modelNumber: 'GWE191JMLXFES',
           category: 'Refrigerator',
           imageUrl: MODEL_IMAGE_REGISTRY['gwe191'],
+          warrantyUrl: 'https://products.geappliances.com/appliance/gea-support-search-content?contentId=16851',
+          supportUrl: 'https://www.geappliances.com/ge/service-and-support/service-and-repair.htm',
           purchaseDate: '2025-11-15',
           warrantyMonths: 12,
           warrantyDoc: null,
@@ -538,7 +543,7 @@
             { id: 'p3', category: 'Motors & Fans', name: 'Evaporator Fan Motor Assembly', partNumber: 'WR60X26866' }
           ],
           manualDossier: {
-            resetProcedure: "Press and hold the Water Filter status pad firmly for 3 seconds until chime sounds.",
+            resetProcedure: "Press and hold Water Filter pad firmly for 3 seconds until chime sounds.",
             errorCodes: { "88 88": "Power surge lock. Unplug power cord for 60 seconds." },
             commonFixes: {
               "fluid_dispenser": "1. Filter Seating / Bypass: Remove RPWFE filter and verify alignment; ensure filter bypass plug is not engaged.\n2. Frozen Door Water Line: Disconnect power and point hair dryer at lower freezer door hinge for 8 minutes to thaw internal water reservoir line.\n3. Dispenser Door Switch: Ensure French doors are fully flush; ajar sensors cut water valve voltage.",
@@ -556,6 +561,8 @@
           modelNumber: 'JP3030SWSS',
           category: 'Cooktop',
           imageUrl: MODEL_IMAGE_REGISTRY['jp3030'],
+          warrantyUrl: 'https://products.geappliances.com/appliance/gea-support-search-content?contentId=16851',
+          supportUrl: 'https://www.geappliances.com/ge/service-and-support/service-and-repair.htm',
           purchaseDate: '2026-01-20',
           warrantyMonths: 24,
           warrantyDoc: null,
@@ -581,6 +588,8 @@
           modelNumber: 'AP-1512HH',
           category: 'Air Purifier',
           imageUrl: MODEL_IMAGE_REGISTRY['airmega'],
+          warrantyUrl: 'https://cowaymega.com/pages/warranty-registration',
+          supportUrl: 'https://cowaymega.com/pages/contact-us',
           purchaseDate: '',
           warrantyMonths: 0,
           warrantyDoc: null,
@@ -873,6 +882,9 @@
         }
       };
 
+      // ==============================================================
+      // UNIVERSAL SUBSYSTEM ABSORPTION & DYNAMIC OFFICIAL LINK EXTRACTION
+      // ==============================================================
       const handleAutoDiscoverAdd = async (e) => {
         e.preventDefault();
         const effectiveBrand = (brandInput || '').trim() || 'Custom';
@@ -880,7 +892,7 @@
         const cacheKey = `${effectiveBrand}_${effectiveModel}`.toLowerCase().replace(/[^a-z0-9_]/g, '');
 
         setIsAnalyzing(true);
-        setLookupStatus('Absorbing full equipment manual & subsystem specs...');
+        setLookupStatus('Absorbing full equipment manual & official support links...');
 
         let discoveredConsumables = [];
         let discoveredParts = [];
@@ -888,6 +900,8 @@
         let componentsReplaceable = true;
         let bakedDossier = {};
         let resolvedCanonicalName = nameInput.trim();
+        let extractedWarrantyUrl = '';
+        let extractedSupportUrl = '';
 
         const cachedRegistryRaw = localStorage.getItem('device_knowledge_registry') || '{}';
         const cachedRegistry = JSON.parse(cachedRegistryRaw);
@@ -900,14 +914,17 @@
           discoveredParts = cached.replacementParts || [];
           bakedDossier = cached.manualDossier || {};
           componentsReplaceable = cached.componentsReplaceable ?? true;
+          extractedWarrantyUrl = cached.warrantyUrl || '';
+          extractedSupportUrl = cached.supportUrl || '';
         } else {
           try {
             const prompt = `Perform exhaustive product manual absorption for: Brand "${effectiveBrand}", Model/Type "${effectiveModel || nameInput || 'Standard'}".
-Return comprehensive operational subsystems across fluid/air flow, thermal heating/cooling, mechanical sensors, and reset codes.
-Return PURE JSON ONLY:
+Return comprehensive operational subsystems, official registration URL, and official brand support URL in PURE JSON ONLY:
 {
   "canonicalName": "Clean Commercial Marketing Name Without Repeating Model String",
   "category": "Equipment Category",
+  "warrantyUrl": "https://official-brand-portal.com/register-product",
+  "supportUrl": "https://official-brand-portal.com/customer-support",
   "areComponentsOfficiallyReplaceable": true,
   "consumables": [
     { "name": "Consumable Filter/Item", "partNumber": "OEM-PART", "intervalDays": 180, "installTips": "Exact install guide." }
@@ -940,6 +957,9 @@ Return PURE JSON ONLY:
               resolvedCanonicalName = sanitizeCommercialName(parsed.canonicalName, effectiveModel);
             }
             if (parsed.category) detectedCategory = parsed.category;
+            if (parsed.warrantyUrl) extractedWarrantyUrl = parsed.warrantyUrl;
+            if (parsed.supportUrl) extractedSupportUrl = parsed.supportUrl;
+
             if (typeof parsed.areComponentsOfficiallyReplaceable === 'boolean') {
               componentsReplaceable = parsed.areComponentsOfficiallyReplaceable;
             }
@@ -969,6 +989,8 @@ Return PURE JSON ONLY:
               cachedRegistry[cacheKey] = {
                 canonicalName: resolvedCanonicalName,
                 category: detectedCategory,
+                warrantyUrl: extractedWarrantyUrl,
+                supportUrl: extractedSupportUrl,
                 consumables: discoveredConsumables,
                 replacementParts: discoveredParts,
                 manualDossier: bakedDossier,
@@ -1010,6 +1032,8 @@ Return PURE JSON ONLY:
           modelNumber: effectiveModel,
           category: detectedCategory,
           imageUrl: resolveProductImage(effectiveBrand, effectiveModel, detectedCategory),
+          warrantyUrl: extractedWarrantyUrl,
+          supportUrl: extractedSupportUrl,
           purchaseDate: purchaseDateInput || '',
           warrantyMonths: purchaseDateInput ? (Number(warrantyMonthsInput) || 12) : 0,
           warrantyDoc: null,
@@ -1089,7 +1113,6 @@ Return PURE JSON ONLY:
 
         const quota = AIQuotaTracker.getStatus(isPaidUser);
 
-        // QUOTA REACHED FOR FREE USER: Run Advanced Offline Diagnostic Engine
         if (!isPaidUser && quota.isLocked) {
           const offlineTurnNumber = AIQuotaTracker.incrementOfflineOverQuota();
           const smartManualAnswer = ExpertDiagnosticEngine.evaluateQuery(activeAppliance, q);
@@ -1112,7 +1135,6 @@ Return PURE JSON ONLY:
           return;
         }
 
-        // QUOTA CAP REACHED FOR PRO USER
         if (isPaidUser && quota.isLocked) {
           setMessages([...updated, {
             id: Date.now().toString(),
@@ -1686,7 +1708,7 @@ Return PURE JSON ONLY:
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <button
-                            onClick={() => openWarrantyRegistration(selectedAppliance.brand, selectedAppliance.modelNumber)}
+                            onClick={() => openWarrantyRegistration(selectedAppliance)}
                             className="bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors shadow-sm"
                           >
                             <span>Activate</span>
@@ -1704,7 +1726,7 @@ Return PURE JSON ONLY:
                       <div className={`pt-2 border-t flex items-center justify-between ${isDark ? 'border-white/5' : 'border-black/5'}`}>
                         <span className={`text-[10px] ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Need manufacturer repair or file a claim?</span>
                         <button
-                          onClick={() => openOfficialBrandSupport(selectedAppliance.brand, selectedAppliance.modelNumber)}
+                          onClick={() => openOfficialBrandSupport(selectedAppliance)}
                           className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border flex items-center gap-1 ${
                             isDark ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700' : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-black border-black/5'
                           }`}
@@ -1914,7 +1936,6 @@ Return PURE JSON ONLY:
                   <AppleCloseButton isDark={isDark} onClick={() => setActiveAppliance(null)} />
                 </div>
 
-                {/* Adaptive Action Chips */}
                 <div className="flex gap-1.5 py-2 overflow-x-auto scrollbar-none">
                   {getAdaptiveChips(activeAppliance).map(chip => (
                     <button
@@ -2187,7 +2208,7 @@ Return PURE JSON ONLY:
                         className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                           isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                         }`}
-                        placeholder="e.g. Kohler, Coway, GE"
+                        placeholder="e.g. Moen, Kohler, Coway, GE"
                         value={brandInput}
                         onChange={(e) => setBrandInput(e.target.value)}
                         required
@@ -2199,7 +2220,7 @@ Return PURE JSON ONLY:
                         className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                           isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                         }`}
-                        placeholder="e.g. AP-1512HH or Sink"
+                        placeholder="e.g. 7594SRS or Sink"
                         value={modelInput}
                         onChange={(e) => setModelInput(e.target.value)}
                       />
@@ -2214,7 +2235,7 @@ Return PURE JSON ONLY:
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      placeholder="e.g. Coway Airmega Mighty Air Purifier"
+                      placeholder="e.g. Moen Arbor Pulldown Kitchen Faucet"
                       value={nameInput}
                       onChange={(e) => setNameInput(e.target.value)}
                     />
@@ -2228,7 +2249,7 @@ Return PURE JSON ONLY:
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      placeholder="e.g. Master Bedroom, Unit 4B Kitchen"
+                      placeholder="e.g. Master Bathroom, Kitchen Island"
                       value={nicknameInput}
                       onChange={(e) => setNicknameInput(e.target.value)}
                     />
@@ -2438,7 +2459,7 @@ Return PURE JSON ONLY:
             </div>
           )}
 
-          {/* HIDDEN CONTAINER FOR TAMPER-PROOF AUDIT PASSPORT PDF */}
+          {/* HIDDEN CONTAINER FOR AUDIT PASSPORT PDF */}
           <div style={{ display: 'none' }}>
             <div id="passport-document-export" style={{ padding: '28px', fontFamily: 'Arial, sans-serif', color: '#111827', backgroundColor: '#FFFFFF' }}>
               <div style={{ borderBottom: '3px solid #D97706', paddingBottom: '16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
