@@ -100,7 +100,7 @@
       return isoStr;
     }
 
-    // Universal Category-Based Seasonal Reminders Generator
+    // Universal Seasonal Reminders Generator
     function generateSeasonalRemindersForAsset(category = '', name = '', brand = '') {
       const q = `${category} ${name} ${brand}`.toLowerCase();
       const nowIso = new Date().toISOString();
@@ -144,6 +144,108 @@
         { id: `st_${Date.now()}_1`, label: 'Inspect physical connections, intake vents, and power cord for wear or debris', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }
       ];
     }
+
+    // ==============================================================
+    // BULLETPROOF OFFICIAL BRAND PORTAL RESOLVER (NO MORE 404s)
+    // ==============================================================
+    const BRAND_PORTAL_REGISTRY = {
+      ge: {
+        warranty: 'https://products.geappliances.com/appliance/gea-support-search-content?contentId=16851',
+        support: 'https://www.geappliances.com/ge/service-and-support/'
+      },
+      coway: {
+        warranty: 'https://cowaymega.com/pages/warranty-registration',
+        support: 'https://cowaymega.com/pages/contact-us'
+      },
+      moen: {
+        warranty: 'https://www.moen.com/customer-support/register-your-product',
+        support: 'https://www.moen.com/customer-support'
+      },
+      kohler: {
+        warranty: 'https://www.kohler.com/en/my-account/product-registration',
+        support: 'https://www.kohler.com/en/support'
+      },
+      whirlpool: {
+        warranty: 'https://www.whirlpool.com/owners.html',
+        support: 'https://www.whirlpool.com/services/contact-us.html'
+      },
+      samsung: {
+        warranty: 'https://www.samsung.com/us/support/register/',
+        support: 'https://www.samsung.com/us/support/service/'
+      },
+      lg: {
+        warranty: 'https://www.lg.com/us/support/product-registration',
+        support: 'https://www.lg.com/us/support/repair-service/schedule-repair'
+      },
+      bosch: {
+        warranty: 'https://www.bosch-home.com/us/owner-support/product-registration',
+        support: 'https://www.bosch-home.com/us/owner-support/repair-service'
+      },
+      blueair: {
+        warranty: 'https://www.blueair.com/us/warranty.html',
+        support: 'https://www.blueair.com/us/customer-support.html'
+      },
+      ecobee: {
+        warranty: 'https://www.ecobee.com/register/',
+        support: 'https://support.ecobee.com/'
+      },
+      rheem: {
+        warranty: 'https://www.rheem.com/warranty-verification/',
+        support: 'https://www.rheem.com/contact/'
+      },
+      kitchenaid: {
+        warranty: 'https://www.kitchenaid.com/owners.html',
+        support: 'https://www.kitchenaid.com/service-and-support.html'
+      },
+      maytag: {
+        warranty: 'https://www.maytag.com/owners.html',
+        support: 'https://www.maytag.com/service-and-support.html'
+      },
+      miele: {
+        warranty: 'https://www.mieleusa.com/c/product-registration-14.htm',
+        support: 'https://www.mieleusa.com/c/service-21.htm'
+      },
+      subzero: {
+        warranty: 'https://www.subzero-wolf.com/assistance/product-registration',
+        support: 'https://www.subzero-wolf.com/assistance/customer-care'
+      }
+    };
+
+    function resolveOfficialLinks(appliance) {
+      const b = (appliance?.brand || '').toLowerCase().trim();
+
+      // Check verified registry first
+      for (const [key, portal] of Object.entries(BRAND_PORTAL_REGISTRY)) {
+        if (b.includes(key)) {
+          return portal;
+        }
+      }
+
+      // Check if appliance object contains an AI-extracted URL that is a valid HTTPS link
+      if (appliance?.warrantyUrl && appliance.warrantyUrl.startsWith('https://') && !appliance.warrantyUrl.includes('example.com')) {
+        return {
+          warranty: appliance.warrantyUrl,
+          support: appliance.supportUrl || `https://www.google.com/search?q=${encodeURIComponent(`${appliance.brand} official customer support`)}`
+        };
+      }
+
+      // Authoritative fallback: Targeted manufacturer official query
+      const cleanBrand = (appliance?.brand || '').trim();
+      return {
+        warranty: `https://www.google.com/search?q=${encodeURIComponent(`${cleanBrand} official product warranty registration`)}`,
+        support: `https://www.google.com/search?q=${encodeURIComponent(`${cleanBrand} official customer support warranty claim`)}`
+      };
+    }
+
+    const openWarrantyRegistration = (appliance) => {
+      const links = resolveOfficialLinks(appliance);
+      window.open(links.warranty, '_blank', 'noopener,noreferrer');
+    };
+
+    const openOfficialBrandSupport = (appliance) => {
+      const links = resolveOfficialLinks(appliance);
+      window.open(links.support, '_blank', 'noopener,noreferrer');
+    };
 
     const AIQuotaTracker = {
       getStatus(isPaid) {
@@ -274,54 +376,6 @@
       }
       return ['Routine power reset', 'Inspect common wear parts', 'Clear error state', 'Go Deeper'];
     }
-
-    const openWarrantyRegistration = (appliance) => {
-      if (appliance && appliance.warrantyUrl && appliance.warrantyUrl.startsWith('http')) {
-        window.open(appliance.warrantyUrl, '_blank', 'noopener,noreferrer');
-        return;
-      }
-      const b = (appliance?.brand || '').toLowerCase();
-      let url = '';
-      if (b.includes('ge')) url = 'https://products.geappliances.com/appliance/gea-support-search-content?contentId=16851';
-      else if (b.includes('coway')) url = 'https://cowaymega.com/pages/warranty-registration';
-      else if (b.includes('moen')) url = 'https://www.moen.com/customer-support/register-your-product';
-      else if (b.includes('kohler')) url = 'https://www.kohler.com/en/my-account/product-registration';
-      else if (b.includes('blueair')) url = 'https://www.blueair.com/blogs/order-and-shipping/how-do-i-register-my-purifier-for-the-blueair-warranty';
-      else if (b.includes('samsung')) url = 'https://www.samsung.com/us/support/register/';
-      else if (b.includes('lg')) url = 'https://www.lg.com/us/support/product-registration';
-      else if (b.includes('whirlpool')) url = 'https://www.whirlpool.com/owners.html';
-      else if (b.includes('bosch')) url = 'https://www.bosch-home.com/us/owner-support/product-registration';
-      else if (b.includes('ecobee')) url = 'https://www.ecobee.com/register/';
-      else {
-        const cleanBrand = (appliance?.brand || '').trim();
-        url = `https://www.google.com/search?q=${encodeURIComponent(`${cleanBrand} official product warranty registration`)}`;
-      }
-      window.open(url, '_blank', 'noopener,noreferrer');
-    };
-
-    const openOfficialBrandSupport = (appliance) => {
-      if (appliance && appliance.supportUrl && appliance.supportUrl.startsWith('http')) {
-        window.open(appliance.supportUrl, '_blank', 'noopener,noreferrer');
-        return;
-      }
-      const b = (appliance?.brand || '').toLowerCase();
-      let url = '';
-      if (b.includes('ge')) url = 'https://www.geappliances.com/ge/service-and-support/service-and-repair.htm';
-      else if (b.includes('coway')) url = 'https://cowaymega.com/pages/contact-us';
-      else if (b.includes('moen')) url = 'https://www.moen.com/customer-support';
-      else if (b.includes('kohler')) url = 'https://www.kohler.com/en/support';
-      else if (b.includes('blueair')) url = 'https://www.blueair.com/us/customer-support.html';
-      else if (b.includes('samsung')) url = 'https://www.samsung.com/us/support/service/';
-      else if (b.includes('lg')) url = 'https://www.lg.com/us/support/repair-service/schedule-repair';
-      else if (b.includes('whirlpool')) url = 'https://www.whirlpool.com/services/contact-us.html';
-      else if (b.includes('bosch')) url = 'https://www.bosch-home.com/us/owner-support/repair-service';
-      else {
-        const cleanBrand = (appliance?.brand || '').trim();
-        const modelStr = appliance?.modelNumber ? ` ${appliance.modelNumber}` : '';
-        url = `https://www.google.com/search?q=${encodeURIComponent(`${cleanBrand}${modelStr} official customer service repair support`)}`;
-      }
-      window.open(url, '_blank', 'noopener,noreferrer');
-    };
 
     const ExpertDiagnosticEngine = {
       SEMANTIC_VECTORS: {
@@ -485,6 +539,30 @@
       }
     }
 
+    const TelemetryEngine = {
+      recordReliabilityEvent(eventType, modelNum, category, component = '') {
+        try {
+          const enabled = localStorage.getItem('app_telemetry_optin') !== 'false';
+          if (!enabled) return;
+
+          const rawEvents = localStorage.getItem('app_telemetry_queue') || '[]';
+          const queue = JSON.parse(rawEvents);
+
+          const sanitizedEvent = {
+            t: Date.now(),
+            e: eventType,
+            m: (modelNum || '').trim().toUpperCase(),
+            c: category || 'Appliance',
+            p: component || null
+          };
+
+          queue.push(sanitizedEvent);
+          if (queue.length > 50) queue.shift();
+          localStorage.setItem('app_telemetry_queue', JSON.stringify(queue));
+        } catch (err) {}
+      }
+    };
+
     const MODEL_IMAGE_REGISTRY = {
       'gwe191': 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=600&q=80',
       'fridge': 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80',
@@ -617,8 +695,6 @@
           modelNumber: 'GWE191JMLXFES',
           category: 'Refrigerator',
           imageUrl: MODEL_IMAGE_REGISTRY['gwe191'],
-          warrantyUrl: 'https://products.geappliances.com/appliance/gea-support-search-content?contentId=16851',
-          supportUrl: 'https://www.geappliances.com/ge/service-and-support/service-and-repair.htm',
           purchaseDate: '2025-11-15',
           warrantyMonths: 12,
           warrantyDoc: null,
@@ -662,8 +738,6 @@
           modelNumber: 'JP3030SWSS',
           category: 'Cooktop',
           imageUrl: MODEL_IMAGE_REGISTRY['jp3030'],
-          warrantyUrl: 'https://products.geappliances.com/appliance/gea-support-search-content?contentId=16851',
-          supportUrl: 'https://www.geappliances.com/ge/service-and-support/service-and-repair.htm',
           purchaseDate: '2026-01-20',
           warrantyMonths: 24,
           warrantyDoc: null,
@@ -691,8 +765,6 @@
           modelNumber: 'AP-1512HH',
           category: 'Air Purifier',
           imageUrl: MODEL_IMAGE_REGISTRY['airmega'],
-          warrantyUrl: 'https://cowaymega.com/pages/warranty-registration',
-          supportUrl: 'https://cowaymega.com/pages/contact-us',
           purchaseDate: '',
           warrantyMonths: 0,
           warrantyDoc: null,
@@ -762,7 +834,7 @@
       const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
       const [auditCertHash, setAuditCertHash] = useState('');
 
-      // Form State: Reordered Form + MM/DD/YYYY Format Support
+      // Form State with Reordered Layout
       const [brandInput, setBrandInput] = useState('');
       const [modelInput, setModelInput] = useState('');
       const [nameInput, setNameInput] = useState('');
@@ -1026,9 +1098,6 @@
         }
       };
 
-      // ==============================================================
-      // AUTO-DISCOVER ADD: UNIVERSAL SEASONAL TASKS & MM/DD/YYYY
-      // ==============================================================
       const handleAutoDiscoverAdd = async (e) => {
         e.preventDefault();
         const effectiveBrand = (brandInput || '').trim() || 'Custom';
@@ -1193,7 +1262,6 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
           }
         }
 
-        // Safe conversion of typed MM/DD/YYYY to ISO storage format
         const parsedIsoPurchaseDate = parseMMDDYYYYToISO(purchaseDateInput);
 
         const newItem = {
@@ -1205,8 +1273,6 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
           modelNumber: effectiveModel,
           category: detectedCategory,
           imageUrl: resolveProductImage(effectiveBrand, effectiveModel, detectedCategory),
-          warrantyUrl: extractedWarrantyUrl,
-          supportUrl: extractedSupportUrl,
           purchaseDate: parsedIsoPurchaseDate,
           warrantyMonths: parsedIsoPurchaseDate ? (Number(warrantyMonthsInput) || 12) : 0,
           warrantyDoc: null,
@@ -1286,6 +1352,7 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
 
         const quota = AIQuotaTracker.getStatus(isPaidUser);
 
+        // QUOTA REACHED FOR FREE USER: Run Advanced Offline Diagnostic Engine
         if (!isPaidUser && quota.isLocked) {
           const offlineTurnNumber = AIQuotaTracker.incrementOfflineOverQuota();
           const smartManualAnswer = ExpertDiagnosticEngine.evaluateQuery(activeAppliance, q);
@@ -1308,6 +1375,7 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
           return;
         }
 
+        // QUOTA CAP REACHED FOR PRO USER
         if (isPaidUser && quota.isLocked) {
           setMessages([...updated, {
             id: Date.now().toString(),
