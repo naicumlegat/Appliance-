@@ -39,8 +39,46 @@
     const FREE_TOTAL_QUOTA = 5;
     const PRO_WINDOW_QUOTA = 65;
 
-    const FREE_CHAT_RETENTION_MS = 24 * 60 * 60 * 1000;
-    const PRO_CHAT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+    // Strict Chat Retention Limits
+    const FREE_CHAT_RETENTION_MS = 24 * 60 * 60 * 1000;      // 24 Hours for Free Tier
+    const PRO_CHAT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;  // Past 7 Days for Pro Tier
+
+    // ==============================================================
+    // CENTRALIZED AFFILIATE MONETIZATION ROUTER
+    // ==============================================================
+    const AFFILIATE_SETTINGS = {
+      amazonTag: 'applianceengine-20',   // Replace when your Amazon Associates account is approved
+      skimlinksPubId: 'YOUR_SKIMLINKS_ID', // Replace when your Skimlinks account is approved
+      useSkimlinks: false                 // Set to true once Skimlinks ID is added
+    };
+
+    function buildPartPurchaseUrl(brand, partItem, targetStore = 'amazon') {
+      const cleanBrand = (brand || '').trim();
+      const partNumber = (partItem?.partNumber || '').trim();
+      const partName = (partItem?.name || '').trim();
+      const asin = (partItem?.asin || '').trim();
+
+      // 1. AMAZON DIRECT DEEP LINK
+      if (targetStore === 'amazon') {
+        const tagParam = AFFILIATE_SETTINGS.amazonTag ? `tag=${AFFILIATE_SETTINGS.amazonTag}` : '';
+
+        // If direct ASIN is present, jump straight to product buy page:
+        if (asin && /^B[0-9A-Z]{9}$/i.test(asin)) {
+          return `https://www.amazon.com/dp/${asin}?${tagParam}`;
+        }
+
+        // Precision fallback: Quoted exact SKU search + OEM qualifier
+        const query = `"${partNumber}" ${cleanBrand} ${partName} OEM`.trim();
+        return `https://www.amazon.com/s?k=${encodeURIComponent(query)}&${tagParam}`;
+      }
+
+      // 2. OEM DIRECT STORE (Sears PartsDirect SKU Deep Link)
+      const oemDestination = `https://www.searspartsdirect.com/part/${encodeURIComponent(partNumber)}`;
+      if (AFFILIATE_SETTINGS.useSkimlinks && AFFILIATE_SETTINGS.skimlinksPubId && AFFILIATE_SETTINGS.skimlinksPubId !== 'YOUR_SKIMLINKS_ID') {
+        return `https://go.skimlinks.com/?id=${AFFILIATE_SETTINGS.skimlinksPubId}&url=${encodeURIComponent(oemDestination)}`;
+      }
+      return oemDestination;
+    }
 
     const AIQuotaTracker = {
       getStatus(isPaid) {
@@ -173,7 +211,7 @@
       return ['Routine power reset', 'Inspect common wear parts', 'Clear error state', 'Go Deeper'];
     }
 
-    // Dynamic Official Link Routing: Prioritizes verified AI-extracted URLs
+    // Dynamic Official Link Routing
     const openWarrantyRegistration = (appliance) => {
       if (appliance && appliance.warrantyUrl && appliance.warrantyUrl.startsWith('http')) {
         window.open(appliance.warrantyUrl, '_blank', 'noopener,noreferrer');
@@ -385,6 +423,30 @@
       }
     }
 
+    const TelemetryEngine = {
+      recordReliabilityEvent(eventType, modelNum, category, component = '') {
+        try {
+          const enabled = localStorage.getItem('app_telemetry_optin') !== 'false';
+          if (!enabled) return;
+
+          const rawEvents = localStorage.getItem('app_telemetry_queue') || '[]';
+          const queue = JSON.parse(rawEvents);
+
+          const sanitizedEvent = {
+            t: Date.now(),
+            e: eventType,
+            m: (modelNum || '').trim().toUpperCase(),
+            c: category || 'Appliance',
+            p: component || null
+          };
+
+          queue.push(sanitizedEvent);
+          if (queue.length > 50) queue.shift();
+          localStorage.setItem('app_telemetry_queue', JSON.stringify(queue));
+        } catch (err) {}
+      }
+    };
+
     const MODEL_IMAGE_REGISTRY = {
       'gwe191': 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=600&q=80',
       'fridge': 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80',
@@ -532,15 +594,16 @@
               id: 'c1',
               name: 'Water Filter',
               partNumber: 'RPWFE',
+              asin: 'B00M255U2A',
               intervalDays: 180,
               lastReplaced: new Date(Date.now() - 45 * 86400000).toISOString(),
               installTips: 'Run 1.5–2 gallons through dispenser after install. Hold Water Filter pad for 3 sec to reset light.'
             }
           ],
           replacementParts: [
-            { id: 'p1', category: 'Doors & Seals', name: 'Fresh Food Door Gasket', partNumber: 'WR14X31558' },
-            { id: 'p2', category: 'Ice & Water', name: 'Water Inlet Valve Assembly', partNumber: 'WR57X30890' },
-            { id: 'p3', category: 'Motors & Fans', name: 'Evaporator Fan Motor Assembly', partNumber: 'WR60X26866' }
+            { id: 'p1', category: 'Doors & Seals', name: 'Fresh Food Door Gasket', partNumber: 'WR14X31558', asin: 'B08F2VJBLT' },
+            { id: 'p2', category: 'Ice & Water', name: 'Water Inlet Valve Assembly', partNumber: 'WR57X30890', asin: 'B07P8N9Z7B' },
+            { id: 'p3', category: 'Motors & Fans', name: 'Evaporator Fan Motor Assembly', partNumber: 'WR60X26866', asin: 'B0845B256T' }
           ],
           manualDossier: {
             resetProcedure: "Press and hold Water Filter pad firmly for 3 seconds until chime sounds.",
@@ -571,7 +634,7 @@
           seasonalTasks: [],
           consumables: [],
           replacementParts: [
-            { id: 'p4', category: 'Heating & Elements', name: '8" Radiant Surface Element (2500W)', partNumber: 'WB30T10133' }
+            { id: 'p4', category: 'Heating & Elements', name: '8" Radiant Surface Element (2500W)', partNumber: 'WB30T10133', asin: 'B00ECV5X2U' }
           ],
           manualDossier: {
             resetProcedure: "Trip dedicated 240V breaker OFF for 60 seconds, then toggle ON.",
@@ -603,6 +666,7 @@
               id: 'c2',
               name: 'Max2 True HEPA Filter',
               partNumber: 'AP-1512HH-FP',
+              asin: 'B00CIEXOKE',
               intervalDays: 365,
               lastReplaced: new Date(Date.now() - 353 * 86400000).toISOString(),
               installTips: 'Remove plastic wrapping before insertion. Press and hold Filter Reset pad for 3 sec.'
@@ -658,13 +722,14 @@
       const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
       const [auditCertHash, setAuditCertHash] = useState('');
 
-      const [nameInput, setNameInput] = useState('');
-      const [nicknameInput, setNicknameInput] = useState('');
+      // Form State with Reordered Layout
       const [brandInput, setBrandInput] = useState('');
       const [modelInput, setModelInput] = useState('');
-      const [groupTextInput, setGroupTextInput] = useState('');
+      const [nameInput, setNameInput] = useState('');
+      const [nicknameInput, setNicknameInput] = useState('');
       const [purchaseDateInput, setPurchaseDateInput] = useState('');
       const [warrantyMonthsInput, setWarrantyMonthsInput] = useState('12');
+      const [groupTextInput, setGroupTextInput] = useState('');
       const [isAnalyzing, setIsAnalyzing] = useState(false);
       const [lookupStatus, setLookupStatus] = useState('');
 
@@ -682,6 +747,45 @@
         setPassportPurchased(passPurchased);
         if (passFirstUsed) setPassportFirstUsedTimestamp(Number(passFirstUsed));
       }, []);
+
+      // Debounced Live Auto-Populate for Product Name
+      useEffect(() => {
+        const b = brandInput.trim();
+        const m = modelInput.trim();
+
+        if (!b && !m) return;
+
+        const timer = setTimeout(async () => {
+          const cacheKey = `${b}_${m}`.toLowerCase().replace(/[^a-z0-9_]/g, '');
+          const cachedRegistry = JSON.parse(localStorage.getItem('device_knowledge_registry') || '{}');
+
+          if (cachedRegistry[cacheKey]?.canonicalName) {
+            setNameInput(cachedRegistry[cacheKey].canonicalName);
+            return;
+          }
+
+          if (b && m) {
+            try {
+              setLookupStatus('Identifying product name...');
+              const prompt = `Identify clean commercial retail title for Brand "${b}", Model "${m}". Return pure JSON only: { "canonicalName": "Clean Title" }`;
+              const raw = await requestDiagnosticFromWorker(prompt, [], null, isPaidUser, false);
+              const cleanText = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+              const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                if (parsed.canonicalName) {
+                  setNameInput(sanitizeCommercialName(parsed.canonicalName, m));
+                }
+              }
+            } catch (err) {}
+            finally {
+              setLookupStatus('');
+            }
+          }
+        }, 650);
+
+        return () => clearTimeout(timer);
+      }, [brandInput, modelInput]);
 
       const isDark = themeMode === 'dark';
 
@@ -883,13 +987,17 @@
       };
 
       // ==============================================================
-      // UNIVERSAL SUBSYSTEM ABSORPTION & DYNAMIC OFFICIAL LINK EXTRACTION
+      // UNIVERSAL SUBSYSTEM ABSORPTION WITH ASIN EXTRACTION
       // ==============================================================
       const handleAutoDiscoverAdd = async (e) => {
         e.preventDefault();
         const effectiveBrand = (brandInput || '').trim() || 'Custom';
         const effectiveModel = (modelInput || '').trim();
-        const cacheKey = `${effectiveBrand}_${effectiveModel}`.toLowerCase().replace(/[^a-z0-9_]/g, '');
+        const effectiveName = (nameInput || '').trim();
+
+        if (!effectiveBrand || (!effectiveModel && !effectiveName)) return;
+
+        const cacheKey = `${effectiveBrand}_${effectiveModel || effectiveName}`.toLowerCase().replace(/[^a-z0-9_]/g, '');
 
         setIsAnalyzing(true);
         setLookupStatus('Absorbing full equipment manual & official support links...');
@@ -899,7 +1007,7 @@
         let detectedCategory = 'Home Fixture';
         let componentsReplaceable = true;
         let bakedDossier = {};
-        let resolvedCanonicalName = nameInput.trim();
+        let resolvedCanonicalName = effectiveName;
         let extractedWarrantyUrl = '';
         let extractedSupportUrl = '';
 
@@ -918,8 +1026,8 @@
           extractedSupportUrl = cached.supportUrl || '';
         } else {
           try {
-            const prompt = `Perform exhaustive product manual absorption for: Brand "${effectiveBrand}", Model/Type "${effectiveModel || nameInput || 'Standard'}".
-Return comprehensive operational subsystems, official registration URL, and official brand support URL in PURE JSON ONLY:
+            const prompt = `Perform exhaustive product manual absorption for: Brand "${effectiveBrand}", Model/Type "${effectiveModel || effectiveName || 'Standard'}". Product Name hint: "${effectiveName}".
+Return comprehensive operational subsystems, official registration URL, official brand support URL, and direct Amazon ASINs in PURE JSON ONLY:
 {
   "canonicalName": "Clean Commercial Marketing Name Without Repeating Model String",
   "category": "Equipment Category",
@@ -927,10 +1035,10 @@ Return comprehensive operational subsystems, official registration URL, and offi
   "supportUrl": "https://official-brand-portal.com/customer-support",
   "areComponentsOfficiallyReplaceable": true,
   "consumables": [
-    { "name": "Consumable Filter/Item", "partNumber": "OEM-PART", "intervalDays": 180, "installTips": "Exact install guide." }
+    { "name": "Consumable Filter/Item", "partNumber": "OEM-PART", "asin": "B000000000", "intervalDays": 180, "installTips": "Exact install guide." }
   ],
   "replacementParts": [
-    { "category": "Mechanical", "name": "OEM Part Name", "partNumber": "OEM-PART" }
+    { "category": "Mechanical", "name": "OEM Part Name", "partNumber": "OEM-PART", "asin": "" }
   ],
   "manualDossier": {
     "resetProcedure": "Hold designated reset button for 3 to 5 seconds until status LED shifts.",
@@ -953,7 +1061,7 @@ Return comprehensive operational subsystems, official registration URL, and offi
             const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleanText);
 
-            if (parsed.canonicalName && !nameInput.trim()) {
+            if (parsed.canonicalName && !effectiveName) {
               resolvedCanonicalName = sanitizeCommercialName(parsed.canonicalName, effectiveModel);
             }
             if (parsed.category) detectedCategory = parsed.category;
@@ -971,6 +1079,7 @@ Return comprehensive operational subsystems, official registration URL, and offi
                 id: `c_${Date.now()}_${idx}`,
                 name: item.name || 'Consumable Item',
                 partNumber: item.partNumber || 'Standard',
+                asin: item.asin || '',
                 intervalDays: Number(item.intervalDays) || 180,
                 lastReplaced: new Date().toISOString(),
                 installTips: item.installTips || 'Replace per owner guide.'
@@ -981,7 +1090,8 @@ Return comprehensive operational subsystems, official registration URL, and offi
                 id: `p_${Date.now()}_${idx}`,
                 category: item.category || 'Mechanical',
                 name: item.name,
-                partNumber: item.partNumber || 'OEM Part'
+                partNumber: item.partNumber || 'OEM Part',
+                asin: item.asin || ''
               }));
             }
 
@@ -1002,7 +1112,7 @@ Return comprehensive operational subsystems, official registration URL, and offi
         }
 
         const cleanFallbackTitle = sanitizeCommercialName(
-          resolvedCanonicalName || nameInput.trim() || `${effectiveBrand} ${effectiveModel || 'Fixture'}`,
+          resolvedCanonicalName || effectiveName || `${effectiveBrand} ${effectiveModel || 'Fixture'}`,
           effectiveModel
         );
 
@@ -1046,12 +1156,12 @@ Return comprehensive operational subsystems, official registration URL, and offi
         };
 
         setAppliances([newItem, ...appliances]);
-        setNameInput('');
-        setNicknameInput('');
         setBrandInput('');
         setModelInput('');
-        setGroupTextInput('');
+        setNameInput('');
+        setNicknameInput('');
         setPurchaseDateInput('');
+        setGroupTextInput('');
         setIsAnalyzing(false);
         setIsAddOpen(false);
       };
@@ -1113,6 +1223,7 @@ Return comprehensive operational subsystems, official registration URL, and offi
 
         const quota = AIQuotaTracker.getStatus(isPaidUser);
 
+        // QUOTA REACHED FOR FREE USER: Run Advanced Offline Diagnostic Engine
         if (!isPaidUser && quota.isLocked) {
           const offlineTurnNumber = AIQuotaTracker.incrementOfflineOverQuota();
           const smartManualAnswer = ExpertDiagnosticEngine.evaluateQuery(activeAppliance, q);
@@ -1135,6 +1246,7 @@ Return comprehensive operational subsystems, official registration URL, and offi
           return;
         }
 
+        // QUOTA CAP REACHED FOR PRO USER
         if (isPaidUser && quota.isLocked) {
           setMessages([...updated, {
             id: Date.now().toString(),
@@ -1184,11 +1296,6 @@ Return comprehensive operational subsystems, official registration URL, and offi
         } finally {
           setIsLoading(false);
         }
-      };
-
-      const openAmazon = (brand, partNumber) => {
-        const q = encodeURIComponent(`${brand} ${partNumber}`);
-        window.open(`https://www.amazon.com/s?k=${q}&tag=applianceengine-20`, '_blank', 'noopener,noreferrer');
       };
 
       const openLocalTech = (brand, category) => {
@@ -1603,18 +1710,21 @@ Return comprehensive operational subsystems, official registration URL, and offi
                   )}
                 </div>
 
-                <div className="flex items-center justify-center gap-2 mt-1 px-4 max-w-full">
+                {/* Title with Subtle Inline Edit Icon */}
+                <div className="flex items-center justify-center gap-1.5 mt-1 px-4 max-w-full">
                   <h2 className="text-xl font-extrabold tracking-tight text-center truncate">
                     {selectedAppliance.name}
                   </h2>
                   <button
                     onClick={() => openEditModal(selectedAppliance)}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition-transform border ${
-                      isDark ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-white' : 'bg-[#E5E5EA] border-black/10 text-black hover:bg-[#D1D1D6]'
+                    className={`p-1 rounded-md opacity-60 hover:opacity-100 transition-opacity ${
+                      isDark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-black'
                     }`}
                     title="Edit Name & Nickname"
                   >
-                    ✎
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                    </svg>
                   </button>
                 </div>
 
@@ -1675,17 +1785,33 @@ Return comprehensive operational subsystems, official registration URL, and offi
                         <div key={p.id} className={`rounded-2xl p-3.5 flex justify-between items-center border ${
                           isDark ? 'bg-zinc-900/60 border-white/5' : 'bg-white border-black/10 shadow-sm'
                         }`}>
-                          <div>
+                          <div className="pr-2 min-w-0">
                             <p className="text-xs font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider text-[9px]">{p.category}</p>
-                            <p className="text-xs font-semibold">{p.name}</p>
+                            <p className="text-xs font-semibold truncate">{p.name}</p>
                             <p className={`text-[10px] font-mono selectable-text ${isDark ? 'text-zinc-400' : 'text-[#8E8E93]'}`}>Part #: {p.partNumber}</p>
                           </div>
-                          <button
-                            onClick={() => openAmazon(selectedAppliance.brand, p.partNumber)}
-                            className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-sm active:scale-95"
-                          >
-                            Buy ↗
-                          </button>
+                          
+                          {/* DUAL AFFILIATE ACTION BUTTONS */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => window.open(buildPartPurchaseUrl(selectedAppliance.brand, p, 'oem'), '_blank')}
+                              className={`text-[11px] font-bold px-2.5 py-1.5 rounded-full border transition-all active:scale-95 ${
+                                isDark 
+                                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-white/10' 
+                                  : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-black border-black/5'
+                              }`}
+                              title="Official OEM Store"
+                            >
+                              OEM Direct ↗
+                            </button>
+                            <button
+                              onClick={() => window.open(buildPartPurchaseUrl(selectedAppliance.brand, p, 'amazon'), '_blank')}
+                              className="bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-sm transition-all active:scale-95"
+                              title="Buy on Amazon"
+                            >
+                              Amazon ↗
+                            </button>
+                          </div>
                         </div>
                       ))
                     ) : (
@@ -2114,10 +2240,19 @@ Return comprehensive operational subsystems, official registration URL, and offi
                 {!isPickingDate ? (
                   <>
                     <button
-                      onClick={() => openAmazon(activeConsumableModal.appliance.brand, activeConsumableModal.consumable.partNumber)}
+                      onClick={() => window.open(buildPartPurchaseUrl(activeConsumableModal.appliance.brand, activeConsumableModal.consumable, 'amazon'), '_blank')}
                       className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-3 rounded-2xl shadow-sm active:scale-98 transition-all"
                     >
                       Order on Amazon ↗
+                    </button>
+
+                    <button
+                      onClick={() => window.open(buildPartPurchaseUrl(activeConsumableModal.appliance.brand, activeConsumableModal.consumable, 'oem'), '_blank')}
+                      className={`w-full py-3 rounded-2xl text-xs font-bold border transition-all active:scale-98 ${
+                        isDark ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-white/10' : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-black border-black/5'
+                      }`}
+                    >
+                      Order from OEM Supplier ↗
                     </button>
 
                     <button
@@ -2129,12 +2264,14 @@ Return comprehensive operational subsystems, official registration URL, and offi
                   </>
                 ) : (
                   <div className="space-y-3 pt-1">
-                    <label className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Select replacement date:</label>
+                    <label className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Enter replacement date (YYYY-MM-DD):</label>
                     <input
-                      type="date"
+                      type="text"
+                      inputMode="numeric"
                       className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
+                      placeholder="e.g. 2026-10-14"
                       value={customReplaceDate || new Date().toISOString().split('T')[0]}
                       onChange={(e) => setCustomReplaceDate(e.target.value)}
                     />
@@ -2154,7 +2291,10 @@ Return comprehensive operational subsystems, official registration URL, and offi
             </div>
           )}
 
-          {/* Add Equipment Sheet */}
+          {/* ==============================================================
+              REORDERED ADD EQUIPMENT SHEET:
+              Brand -> Model -> Product Name (Live Auto) -> Nickname -> Date -> Warranty
+              ============================================================== */}
           {isAddOpen && (
             <div
               onClick={() => setIsAddOpen(false)}
@@ -2201,74 +2341,97 @@ Return comprehensive operational subsystems, official registration URL, and offi
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Brand / Maker *</label>
-                      <input
-                        className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                          isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                        }`}
-                        placeholder="e.g. Moen, Kohler, Coway, GE"
-                        value={brandInput}
-                        onChange={(e) => setBrandInput(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Model # or Type</label>
-                      <input
-                        className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
-                          isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                        }`}
-                        placeholder="e.g. 7594SRS or Sink"
-                        value={modelInput}
-                        onChange={(e) => setModelInput(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
+                  {/* 1. BRAND */}
                   <div>
                     <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      Product Name (Auto-Populates)
+                      1. Brand / Manufacturer *
                     </label>
                     <input
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      placeholder="e.g. Moen Arbor Pulldown Kitchen Faucet"
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
+                      placeholder="e.g. Coway, GE, Moen, Kohler"
+                      value={brandInput}
+                      onChange={(e) => setBrandInput(e.target.value)}
+                      required
                     />
                   </div>
 
+                  {/* 2. MODEL # (OPTIONAL) */}
                   <div>
                     <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      Nickname (Optional)
+                      2. Model # (Optional)
                     </label>
                     <input
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      placeholder="e.g. Master Bathroom, Kitchen Island"
+                      placeholder="e.g. AP-1512HH, GWE191 (Leave blank if unknown)"
+                      value={modelInput}
+                      onChange={(e) => setModelInput(e.target.value)}
+                    />
+                  </div>
+
+                  {/* 3. PRODUCT NAME (AUTO-POPULATES OR DIRECT SEARCH) */}
+                  <div>
+                    <div className="flex justify-between items-center">
+                      <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                        3. Product Name *
+                      </label>
+                      {lookupStatus && (
+                        <span className="text-[10px] text-amber-500 font-medium animate-pulse">
+                          {lookupStatus}
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
+                      }`}
+                      placeholder="e.g. Airmega Mighty Air Purifier or Kitchen Sink"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  {/* 4. NICKNAME (OPTIONAL) */}
+                  <div>
+                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                      4. Nickname (Optional)
+                    </label>
+                    <input
+                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
+                      }`}
+                      placeholder="e.g. Living Room, Upstairs, APT 25 Primary"
                       value={nicknameInput}
                       onChange={(e) => setNicknameInput(e.target.value)}
                     />
                   </div>
 
+                  {/* 5. PURCHASE DATE (TYPED FORMAT) */}
                   <div>
-                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Purchase Date</label>
+                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                      5. Purchase Date (YYYY-MM-DD)
+                    </label>
                     <input
-                      type="date"
+                      type="text"
+                      inputMode="numeric"
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
+                      placeholder="e.g. 2026-01-15 (Optional)"
                       value={purchaseDateInput}
                       onChange={(e) => setPurchaseDateInput(e.target.value)}
                     />
                   </div>
 
+                  {/* 6. WARRANTY DURATION */}
                   <div>
-                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Warranty Duration</label>
+                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                      6. Warranty Duration
+                    </label>
                     <select
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
@@ -2283,14 +2446,12 @@ Return comprehensive operational subsystems, official registration URL, and offi
                     </select>
                   </div>
 
-                  {isAnalyzing && <p className="text-xs text-amber-600 dark:text-amber-500 font-bold text-center animate-pulse">{lookupStatus}</p>}
-
                   <button
                     type="submit"
                     disabled={isAnalyzing}
                     className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-md active:scale-98 transition-all"
                   >
-                    {isAnalyzing ? 'Inspecting...' : 'Add Equipment'}
+                    {isAnalyzing ? 'Inspecting & Absorbing Specs...' : 'Add Equipment'}
                   </button>
                 </form>
               </div>
