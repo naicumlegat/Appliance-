@@ -48,26 +48,48 @@
       useSkimlinks: false
     };
 
+    // ==============================================================
+    // RESILIENT MULTI-STORE PART PURCHASE ROUTER (DIRECT ASIN & OEM)
+    // ==============================================================
     function buildPartPurchaseUrl(brand, partItem, targetStore = 'amazon') {
       const cleanBrand = (brand || '').trim();
       const partNumber = (partItem?.partNumber || '').trim();
       const partName = (partItem?.name || '').trim();
       const asin = (partItem?.asin || '').trim();
 
+      // 1. AMAZON DIRECT OR CLEAN SEARCH FALLBACK
       if (targetStore === 'amazon') {
         const tagParam = AFFILIATE_SETTINGS.amazonTag ? `tag=${AFFILIATE_SETTINGS.amazonTag}` : '';
+
+        // If direct ASIN is present and valid, jump straight to product buy page:
         if (asin && /^B[0-9A-Z]{9}$/i.test(asin)) {
           return `https://www.amazon.com/dp/${asin}?${tagParam}`;
         }
-        const query = `"${partNumber}" ${cleanBrand} ${partName} OEM`.trim();
+
+        // Clean unquoted query that Amazon's search algorithm resolves accurately
+        const query = `${partNumber} OEM ${cleanBrand} ${partName}`.replace(/\s+/g, ' ').trim();
         return `https://www.amazon.com/s?k=${encodeURIComponent(query)}&${tagParam}`;
       }
 
-      const oemDestination = `https://www.searspartsdirect.com/part/${encodeURIComponent(partNumber)}`;
-      if (AFFILIATE_SETTINGS.useSkimlinks && AFFILIATE_SETTINGS.skimlinksPubId && AFFILIATE_SETTINGS.skimlinksPubId !== 'YOUR_SKIMLINKS_ID') {
-        return `https://go.skimlinks.com/?id=${AFFILIATE_SETTINGS.skimlinksPubId}&url=${encodeURIComponent(oemDestination)}`;
+      // 2. MULTI-VENDOR OEM DIRECT (RepairClinic + Multi-Distributor Auto-Routing)
+      const bLower = cleanBrand.toLowerCase();
+      let oemUrl = '';
+
+      if (bLower.includes('coway')) {
+        oemUrl = `https://cowaymega.com/search?q=${encodeURIComponent(partNumber || partName)}`;
+      } else if (bLower.includes('moen')) {
+        oemUrl = `https://www.moen.com/search?query=${encodeURIComponent(partNumber)}`;
+      } else if (bLower.includes('kohler')) {
+        oemUrl = `https://www.kohler.com/en/search?q=${encodeURIComponent(partNumber)}`;
+      } else {
+        // Universal OEM Aggregator (RepairClinic catalog search, covers GE, Whirlpool, LG, Bosch, Samsung, etc.)
+        oemUrl = `https://www.repairclinic.com/Shop-For-Parts?query=${encodeURIComponent(partNumber)}`;
       }
-      return oemDestination;
+
+      if (AFFILIATE_SETTINGS.useSkimlinks && AFFILIATE_SETTINGS.skimlinksPubId && AFFILIATE_SETTINGS.skimlinksPubId !== 'YOUR_SKIMLINKS_ID') {
+        return `https://go.skimlinks.com/?id=${AFFILIATE_SETTINGS.skimlinksPubId}&url=${encodeURIComponent(oemUrl)}`;
+      }
+      return oemUrl;
     }
 
     // Format MM/DD/YYYY as user types
@@ -100,7 +122,6 @@
       return isoStr;
     }
 
-    // Universal Seasonal Reminders Generator
     function generateSeasonalRemindersForAsset(category = '', name = '', brand = '') {
       const q = `${category} ${name} ${brand}`.toLowerCase();
       const nowIso = new Date().toISOString();
@@ -146,7 +167,7 @@
     }
 
     // ==============================================================
-    // BULLETPROOF OFFICIAL BRAND PORTAL RESOLVER (NO MORE 404s)
+    // GUARANTEED OFFICIAL BRAND PORTALS
     // ==============================================================
     const BRAND_PORTAL_REGISTRY = {
       ge: {
@@ -214,14 +235,12 @@
     function resolveOfficialLinks(appliance) {
       const b = (appliance?.brand || '').toLowerCase().trim();
 
-      // Check verified registry first
       for (const [key, portal] of Object.entries(BRAND_PORTAL_REGISTRY)) {
         if (b.includes(key)) {
           return portal;
         }
       }
 
-      // Check if appliance object contains an AI-extracted URL that is a valid HTTPS link
       if (appliance?.warrantyUrl && appliance.warrantyUrl.startsWith('https://') && !appliance.warrantyUrl.includes('example.com')) {
         return {
           warranty: appliance.warrantyUrl,
@@ -229,7 +248,6 @@
         };
       }
 
-      // Authoritative fallback: Targeted manufacturer official query
       const cleanBrand = (appliance?.brand || '').trim();
       return {
         warranty: `https://www.google.com/search?q=${encodeURIComponent(`${cleanBrand} official product warranty registration`)}`,
@@ -245,6 +263,70 @@
     const openOfficialBrandSupport = (appliance) => {
       const links = resolveOfficialLinks(appliance);
       window.open(links.support, '_blank', 'noopener,noreferrer');
+    };
+
+    // ==============================================================
+    // NON-BLOCKING TELEMETRY ENGINE WITH NAVIGATOR.SENDBEACON
+    // ==============================================================
+    const TelemetryEngine = {
+      recordReliabilityEvent(eventType, modelNum, category, component = '') {
+        try {
+          const enabled = localStorage.getItem('app_telemetry_optin') !== 'false';
+          if (!enabled) return;
+
+          const rawEvents = localStorage.getItem('app_telemetry_queue') || '[]';
+          const queue = JSON.parse(rawEvents);
+
+          queue.push({
+            t: Date.now(),
+            e: eventType,
+            m: (modelNum || '').trim().toUpperCase(),
+            c: category || 'Appliance',
+            p: component || null
+          });
+
+          if (queue.length > 50) queue.shift();
+          localStorage.setItem('app_telemetry_queue', JSON.stringify(queue));
+
+          // Immediately schedule OS-level background dispatch
+          this.flushQueue();
+        } catch (err) {}
+      },
+
+      async flushQueue() {
+        if (!navigator.onLine) return;
+        const rawEvents = localStorage.getItem('app_telemetry_queue') || '[]';
+        const queue = JSON.parse(rawEvents);
+        if (queue.length === 0) return;
+
+        const payload = JSON.stringify({ events: queue });
+        const endpoint = WORKER_ENDPOINT.replace(/\/$/, '') + '/telemetry';
+
+        // 1. Primary: Use OS-level background beaconing (0ms UI latency, survives page exit)
+        if (navigator.sendBeacon) {
+          const blob = new Blob([payload], { type: 'application/json' });
+          const sent = navigator.sendBeacon(endpoint, blob);
+          if (sent) {
+            localStorage.setItem('app_telemetry_queue', '[]');
+            return;
+          }
+        }
+
+        // 2. Fallback: Keepalive background fetch
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true
+          });
+          if (res.ok) {
+            localStorage.setItem('app_telemetry_queue', '[]');
+          }
+        } catch (err) {
+          // Retains queue in localStorage until the device re-establishes connection
+        }
+      }
     };
 
     const AIQuotaTracker = {
@@ -539,30 +621,6 @@
       }
     }
 
-    const TelemetryEngine = {
-      recordReliabilityEvent(eventType, modelNum, category, component = '') {
-        try {
-          const enabled = localStorage.getItem('app_telemetry_optin') !== 'false';
-          if (!enabled) return;
-
-          const rawEvents = localStorage.getItem('app_telemetry_queue') || '[]';
-          const queue = JSON.parse(rawEvents);
-
-          const sanitizedEvent = {
-            t: Date.now(),
-            e: eventType,
-            m: (modelNum || '').trim().toUpperCase(),
-            c: category || 'Appliance',
-            p: component || null
-          };
-
-          queue.push(sanitizedEvent);
-          if (queue.length > 50) queue.shift();
-          localStorage.setItem('app_telemetry_queue', JSON.stringify(queue));
-        } catch (err) {}
-      }
-    };
-
     const MODEL_IMAGE_REGISTRY = {
       'gwe191': 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=600&q=80',
       'fridge': 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80',
@@ -834,7 +892,7 @@
       const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
       const [auditCertHash, setAuditCertHash] = useState('');
 
-      // Form State with Reordered Layout
+      // Form State with Reordered Layout & MM/DD/YYYY
       const [brandInput, setBrandInput] = useState('');
       const [modelInput, setModelInput] = useState('');
       const [nameInput, setNameInput] = useState('');
@@ -858,6 +916,9 @@
         const passFirstUsed = localStorage.getItem('passport_first_used');
         setPassportPurchased(passPurchased);
         if (passFirstUsed) setPassportFirstUsedTimestamp(Number(passFirstUsed));
+
+        // Flush queued telemetry on startup
+        TelemetryEngine.flushQueue();
       }, []);
 
       // Debounced Live Auto-Populate for Product Name
@@ -1235,7 +1296,6 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
           } catch (err) {}
         }
 
-        // Apply universal seasonal reminder matrix if AI returned empty
         if (!extractedSeasonal || extractedSeasonal.length === 0) {
           extractedSeasonal = generateSeasonalRemindersForAsset(detectedCategory, resolvedCanonicalName || effectiveName, effectiveBrand);
         }
@@ -1285,6 +1345,10 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
         };
 
         setAppliances([newItem, ...appliances]);
+
+        // Record anonymous reliability telemetry without blocking UI thread
+        TelemetryEngine.recordReliabilityEvent('asset_registered', effectiveModel, detectedCategory);
+
         setBrandInput('');
         setModelInput('');
         setNameInput('');
@@ -1349,6 +1413,9 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
         const updated = [...messages, userMsg];
         setMessages(updated);
         setQueryInput('');
+
+        // Track anonymous hardware diagnostic query without blocking UI
+        TelemetryEngine.recordReliabilityEvent('hardware_triage', activeAppliance.modelNumber, activeAppliance.category);
 
         const quota = AIQuotaTracker.getStatus(isPaidUser);
 
@@ -1566,7 +1633,6 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
                   </button>
                 </div>
 
-                {/* Universal Seasonal Care Reminders */}
                 {item.seasonalTasks && item.seasonalTasks.filter(st => !st.dismissed).map(st => (
                   <div
                     key={st.id}
@@ -2422,7 +2488,7 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
                       className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      placeholder="e.g. 10/14/2026"
+                      placeholder="MM/DD/YYYY (e.g. 10/14/2026)"
                       value={customReplaceDate || formatISOToMMDDYYYY(new Date().toISOString())}
                       onChange={(e) => setCustomReplaceDate(formatToMMDDYYYY(e.target.value))}
                     />
@@ -2442,10 +2508,7 @@ Return comprehensive operational subsystems, seasonal preventive tasks, registra
             </div>
           )}
 
-          {/* ==============================================================
-              REORDERED ADD EQUIPMENT SHEET:
-              Brand -> Model -> Product Name (Live Auto) -> Nickname -> Date (MM/DD/YYYY) -> Warranty
-              ============================================================== */}
+          {/* Reordered Add Equipment Sheet */}
           {isAddOpen && (
             <div
               onClick={() => setIsAddOpen(false)}
