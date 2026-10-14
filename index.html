@@ -39,17 +39,13 @@
     const FREE_TOTAL_QUOTA = 5;
     const PRO_WINDOW_QUOTA = 65;
 
-    // Strict Chat Retention Limits
-    const FREE_CHAT_RETENTION_MS = 24 * 60 * 60 * 1000;      // 24 Hours for Free Tier
-    const PRO_CHAT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;  // Past 7 Days for Pro Tier
+    const FREE_CHAT_RETENTION_MS = 24 * 60 * 60 * 1000;
+    const PRO_CHAT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-    // ==============================================================
-    // CENTRALIZED AFFILIATE MONETIZATION ROUTER
-    // ==============================================================
     const AFFILIATE_SETTINGS = {
-      amazonTag: 'applianceengine-20',   // Replace when your Amazon Associates account is approved
-      skimlinksPubId: 'YOUR_SKIMLINKS_ID', // Replace when your Skimlinks account is approved
-      useSkimlinks: false                 // Set to true once Skimlinks ID is added
+      amazonTag: 'applianceengine-20',
+      skimlinksPubId: 'YOUR_SKIMLINKS_ID',
+      useSkimlinks: false
     };
 
     function buildPartPurchaseUrl(brand, partItem, targetStore = 'amazon') {
@@ -58,26 +54,95 @@
       const partName = (partItem?.name || '').trim();
       const asin = (partItem?.asin || '').trim();
 
-      // 1. AMAZON DIRECT DEEP LINK
       if (targetStore === 'amazon') {
         const tagParam = AFFILIATE_SETTINGS.amazonTag ? `tag=${AFFILIATE_SETTINGS.amazonTag}` : '';
-
-        // If direct ASIN is present, jump straight to product buy page:
         if (asin && /^B[0-9A-Z]{9}$/i.test(asin)) {
           return `https://www.amazon.com/dp/${asin}?${tagParam}`;
         }
-
-        // Precision fallback: Quoted exact SKU search + OEM qualifier
         const query = `"${partNumber}" ${cleanBrand} ${partName} OEM`.trim();
         return `https://www.amazon.com/s?k=${encodeURIComponent(query)}&${tagParam}`;
       }
 
-      // 2. OEM DIRECT STORE (Sears PartsDirect SKU Deep Link)
       const oemDestination = `https://www.searspartsdirect.com/part/${encodeURIComponent(partNumber)}`;
       if (AFFILIATE_SETTINGS.useSkimlinks && AFFILIATE_SETTINGS.skimlinksPubId && AFFILIATE_SETTINGS.skimlinksPubId !== 'YOUR_SKIMLINKS_ID') {
         return `https://go.skimlinks.com/?id=${AFFILIATE_SETTINGS.skimlinksPubId}&url=${encodeURIComponent(oemDestination)}`;
       }
       return oemDestination;
+    }
+
+    // Format MM/DD/YYYY as user types
+    function formatToMMDDYYYY(rawVal) {
+      const digits = rawVal.replace(/\D/g, '').slice(0, 8);
+      if (digits.length <= 2) return digits;
+      if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+      return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    }
+
+    function parseMMDDYYYYToISO(dateStr) {
+      if (!dateStr || dateStr.length < 10) return '';
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        const [m, d, y] = parts;
+        if (m && d && y && y.length === 4) {
+          return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        }
+      }
+      return '';
+    }
+
+    function formatISOToMMDDYYYY(isoStr) {
+      if (!isoStr) return '';
+      const datePart = isoStr.split('T')[0];
+      const parts = datePart.split('-');
+      if (parts.length === 3) {
+        return `${parts[1]}/${parts[2]}/${parts[0]}`;
+      }
+      return isoStr;
+    }
+
+    // Universal Category-Based Seasonal Reminders Generator
+    function generateSeasonalRemindersForAsset(category = '', name = '', brand = '') {
+      const q = `${category} ${name} ${brand}`.toLowerCase();
+      const nowIso = new Date().toISOString();
+
+      if (q.includes('fridge') || q.includes('refrigerat')) {
+        return [
+          { id: `st_${Date.now()}_1`, label: 'Vacuum bottom/rear condenser coils to preserve compressor efficiency and prevent overheating', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }
+        ];
+      }
+      if (q.includes('purifier') || q.includes('air') || q.includes('hepa')) {
+        return [
+          { id: `st_${Date.now()}_1`, label: 'Gently wipe particle sensor lens with dry cotton swab and vacuum mesh pre-filter screen', intervalMonths: 2, lastCompleted: nowIso, dismissed: false }
+        ];
+      }
+      if (q.includes('dish') || q.includes('washer')) {
+        return [
+          { id: `st_${Date.now()}_1`, label: 'Twist and rinse lower cylindrical filter basket under hot water to clear food debris', intervalMonths: 1, lastCompleted: nowIso, dismissed: false }
+        ];
+      }
+      if (q.includes('dryer') || q.includes('laundry')) {
+        return [
+          { id: `st_${Date.now()}_1`, label: 'Vacuum exhaust lint chamber and inspect exterior wall vent flap for lint accumulation', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }
+        ];
+      }
+      if (q.includes('hvac') || q.includes('heat pump') || q.includes('air conditioner') || q.includes('condenser')) {
+        return [
+          { id: `st_${Date.now()}_1`, label: 'Flush condensate drain pan with 1 cup white vinegar to prevent algal drain blockage', intervalMonths: 3, lastCompleted: nowIso, dismissed: false }
+        ];
+      }
+      if (q.includes('heater') || q.includes('boiler') || q.includes('tank')) {
+        return [
+          { id: `st_${Date.now()}_1`, label: 'Drain 2-3 gallons from bottom drain spigot to purge mineral sediment build-up', intervalMonths: 12, lastCompleted: nowIso, dismissed: false }
+        ];
+      }
+      if (q.includes('sink') || q.includes('faucet') || q.includes('plumb')) {
+        return [
+          { id: `st_${Date.now()}_1`, label: 'Unscrew aerator nozzle and soak in vinegar to dissolve calcium restriction', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }
+        ];
+      }
+      return [
+        { id: `st_${Date.now()}_1`, label: 'Inspect physical connections, intake vents, and power cord for wear or debris', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }
+      ];
     }
 
     const AIQuotaTracker = {
@@ -184,7 +249,6 @@
       return cleaned.replace(/\s{2,}/g, ' ').replace(/\(\s*\)/g, '').trim();
     }
 
-    // Dynamic, Equipment-Specific Suggestion Chips
     function getAdaptiveChips(appliance) {
       if (!appliance) return ['Troubleshooting checks', 'Error code check', 'Go Deeper'];
       const cat = (appliance.category || '').toLowerCase();
@@ -211,7 +275,6 @@
       return ['Routine power reset', 'Inspect common wear parts', 'Clear error state', 'Go Deeper'];
     }
 
-    // Dynamic Official Link Routing
     const openWarrantyRegistration = (appliance) => {
       if (appliance && appliance.warrantyUrl && appliance.warrantyUrl.startsWith('http')) {
         window.open(appliance.warrantyUrl, '_blank', 'noopener,noreferrer');
@@ -260,7 +323,6 @@
       window.open(url, '_blank', 'noopener,noreferrer');
     };
 
-    // Conversational Offline Diagnostic Engine
     const ExpertDiagnosticEngine = {
       SEMANTIC_VECTORS: {
         fluid_dispenser: {
@@ -423,30 +485,6 @@
       }
     }
 
-    const TelemetryEngine = {
-      recordReliabilityEvent(eventType, modelNum, category, component = '') {
-        try {
-          const enabled = localStorage.getItem('app_telemetry_optin') !== 'false';
-          if (!enabled) return;
-
-          const rawEvents = localStorage.getItem('app_telemetry_queue') || '[]';
-          const queue = JSON.parse(rawEvents);
-
-          const sanitizedEvent = {
-            t: Date.now(),
-            e: eventType,
-            m: (modelNum || '').trim().toUpperCase(),
-            c: category || 'Appliance',
-            p: component || null
-          };
-
-          queue.push(sanitizedEvent);
-          if (queue.length > 50) queue.shift();
-          localStorage.setItem('app_telemetry_queue', JSON.stringify(queue));
-        } catch (err) {}
-      }
-    };
-
     const MODEL_IMAGE_REGISTRY = {
       'gwe191': 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=600&q=80',
       'fridge': 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80',
@@ -587,7 +625,7 @@
           receiptDoc: null,
           componentsReplaceable: true,
           seasonalTasks: [
-            { id: 'st1', label: 'Vacuum condenser coils to preserve compressor efficiency', intervalMonths: 6, lastCompleted: '2026-04-10', dismissed: false }
+            { id: 'st1', label: 'Vacuum condenser coils to preserve compressor efficiency and prevent overheating', intervalMonths: 6, lastCompleted: '2026-04-10', dismissed: false }
           ],
           consumables: [
             {
@@ -631,7 +669,9 @@
           warrantyDoc: null,
           receiptDoc: null,
           componentsReplaceable: true,
-          seasonalTasks: [],
+          seasonalTasks: [
+            { id: 'st2', label: 'Inspect glass-ceramic surface for micro-fractures and clean infinite switch terminals', intervalMonths: 6, lastCompleted: '2026-01-20', dismissed: false }
+          ],
           consumables: [],
           replacementParts: [
             { id: 'p4', category: 'Heating & Elements', name: '8" Radiant Surface Element (2500W)', partNumber: 'WB30T10133', asin: 'B00ECV5X2U' }
@@ -659,7 +699,7 @@
           receiptDoc: null,
           componentsReplaceable: false,
           seasonalTasks: [
-            { id: 'st3', label: 'Wipe dust particle sensor lens gently with a dry cotton swab', intervalMonths: 2, lastCompleted: '2026-08-01', dismissed: false }
+            { id: 'st3', label: 'Wipe dust particle sensor lens gently with a dry cotton swab and vacuum mesh pre-filter screen', intervalMonths: 2, lastCompleted: '2026-08-01', dismissed: false }
           ],
           consumables: [
             {
@@ -722,7 +762,7 @@
       const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
       const [auditCertHash, setAuditCertHash] = useState('');
 
-      // Form State with Reordered Layout
+      // Form State: Reordered Form + MM/DD/YYYY Format Support
       const [brandInput, setBrandInput] = useState('');
       const [modelInput, setModelInput] = useState('');
       const [nameInput, setNameInput] = useState('');
@@ -987,7 +1027,7 @@
       };
 
       // ==============================================================
-      // UNIVERSAL SUBSYSTEM ABSORPTION WITH ASIN EXTRACTION
+      // AUTO-DISCOVER ADD: UNIVERSAL SEASONAL TASKS & MM/DD/YYYY
       // ==============================================================
       const handleAutoDiscoverAdd = async (e) => {
         e.preventDefault();
@@ -1010,6 +1050,7 @@
         let resolvedCanonicalName = effectiveName;
         let extractedWarrantyUrl = '';
         let extractedSupportUrl = '';
+        let extractedSeasonal = [];
 
         const cachedRegistryRaw = localStorage.getItem('device_knowledge_registry') || '{}';
         const cachedRegistry = JSON.parse(cachedRegistryRaw);
@@ -1024,16 +1065,20 @@
           componentsReplaceable = cached.componentsReplaceable ?? true;
           extractedWarrantyUrl = cached.warrantyUrl || '';
           extractedSupportUrl = cached.supportUrl || '';
+          extractedSeasonal = cached.seasonalTasks || [];
         } else {
           try {
             const prompt = `Perform exhaustive product manual absorption for: Brand "${effectiveBrand}", Model/Type "${effectiveModel || effectiveName || 'Standard'}". Product Name hint: "${effectiveName}".
-Return comprehensive operational subsystems, official registration URL, official brand support URL, and direct Amazon ASINs in PURE JSON ONLY:
+Return comprehensive operational subsystems, seasonal preventive tasks, registration URL, support URL, and direct Amazon ASINs in PURE JSON ONLY:
 {
   "canonicalName": "Clean Commercial Marketing Name Without Repeating Model String",
   "category": "Equipment Category",
   "warrantyUrl": "https://official-brand-portal.com/register-product",
   "supportUrl": "https://official-brand-portal.com/customer-support",
   "areComponentsOfficiallyReplaceable": true,
+  "seasonalTasks": [
+    { "label": "Specific preventive maintenance action", "intervalMonths": 6 }
+  ],
   "consumables": [
     { "name": "Consumable Filter/Item", "partNumber": "OEM-PART", "asin": "B000000000", "intervalDays": 180, "installTips": "Exact install guide." }
   ],
@@ -1074,6 +1119,15 @@ Return comprehensive operational subsystems, official registration URL, official
             if (parsed.manualDossier && typeof parsed.manualDossier === 'object') {
               bakedDossier = parsed.manualDossier;
             }
+            if (Array.isArray(parsed.seasonalTasks) && parsed.seasonalTasks.length > 0) {
+              extractedSeasonal = parsed.seasonalTasks.map((st, sIdx) => ({
+                id: `st_${Date.now()}_${sIdx}`,
+                label: st.label,
+                intervalMonths: Number(st.intervalMonths) || 6,
+                lastCompleted: new Date().toISOString(),
+                dismissed: false
+              }));
+            }
             if (Array.isArray(parsed.consumables)) {
               discoveredConsumables = parsed.consumables.map((item, idx) => ({
                 id: `c_${Date.now()}_${idx}`,
@@ -1101,6 +1155,7 @@ Return comprehensive operational subsystems, official registration URL, official
                 category: detectedCategory,
                 warrantyUrl: extractedWarrantyUrl,
                 supportUrl: extractedSupportUrl,
+                seasonalTasks: extractedSeasonal,
                 consumables: discoveredConsumables,
                 replacementParts: discoveredParts,
                 manualDossier: bakedDossier,
@@ -1109,6 +1164,11 @@ Return comprehensive operational subsystems, official registration URL, official
               localStorage.setItem('device_knowledge_registry', JSON.stringify(cachedRegistry));
             }
           } catch (err) {}
+        }
+
+        // Apply universal seasonal reminder matrix if AI returned empty
+        if (!extractedSeasonal || extractedSeasonal.length === 0) {
+          extractedSeasonal = generateSeasonalRemindersForAsset(detectedCategory, resolvedCanonicalName || effectiveName, effectiveBrand);
         }
 
         const cleanFallbackTitle = sanitizeCommercialName(
@@ -1133,6 +1193,9 @@ Return comprehensive operational subsystems, official registration URL, official
           }
         }
 
+        // Safe conversion of typed MM/DD/YYYY to ISO storage format
+        const parsedIsoPurchaseDate = parseMMDDYYYYToISO(purchaseDateInput);
+
         const newItem = {
           id: Date.now().toString(),
           unitId: finalUnitId,
@@ -1144,12 +1207,12 @@ Return comprehensive operational subsystems, official registration URL, official
           imageUrl: resolveProductImage(effectiveBrand, effectiveModel, detectedCategory),
           warrantyUrl: extractedWarrantyUrl,
           supportUrl: extractedSupportUrl,
-          purchaseDate: purchaseDateInput || '',
-          warrantyMonths: purchaseDateInput ? (Number(warrantyMonthsInput) || 12) : 0,
+          purchaseDate: parsedIsoPurchaseDate,
+          warrantyMonths: parsedIsoPurchaseDate ? (Number(warrantyMonthsInput) || 12) : 0,
           warrantyDoc: null,
           receiptDoc: null,
           componentsReplaceable: discoveredParts.length > 0 && componentsReplaceable,
-          seasonalTasks: [],
+          seasonalTasks: extractedSeasonal,
           consumables: discoveredConsumables,
           replacementParts: discoveredParts,
           manualDossier: bakedDossier
@@ -1167,10 +1230,10 @@ Return comprehensive operational subsystems, official registration URL, official
       };
 
       const handleCommitReplacementDate = (applianceId, consumableId, chosenDateStr) => {
-        const replacementIso = chosenDateStr ? new Date(chosenDateStr + 'T12:00:00').toISOString() : new Date().toISOString();
+        const isoString = parseMMDDYYYYToISO(chosenDateStr) || new Date().toISOString();
         setAppliances(appliances.map(a => a.id === applianceId ? {
           ...a,
-          consumables: a.consumables.map(c => c.id === consumableId ? { ...c, lastReplaced: replacementIso } : c)
+          consumables: a.consumables.map(c => c.id === consumableId ? { ...c, lastReplaced: isoString } : c)
         } : a));
         setIsPickingDate(false);
         setActiveConsumableModal(null);
@@ -1223,7 +1286,6 @@ Return comprehensive operational subsystems, official registration URL, official
 
         const quota = AIQuotaTracker.getStatus(isPaidUser);
 
-        // QUOTA REACHED FOR FREE USER: Run Advanced Offline Diagnostic Engine
         if (!isPaidUser && quota.isLocked) {
           const offlineTurnNumber = AIQuotaTracker.incrementOfflineOverQuota();
           const smartManualAnswer = ExpertDiagnosticEngine.evaluateQuery(activeAppliance, q);
@@ -1246,7 +1308,6 @@ Return comprehensive operational subsystems, official registration URL, official
           return;
         }
 
-        // QUOTA CAP REACHED FOR PRO USER
         if (isPaidUser && quota.isLocked) {
           setMessages([...updated, {
             id: Date.now().toString(),
@@ -1437,6 +1498,29 @@ Return comprehensive operational subsystems, official registration URL, official
                   </button>
                 </div>
 
+                {/* Universal Seasonal Care Reminders */}
+                {item.seasonalTasks && item.seasonalTasks.filter(st => !st.dismissed).map(st => (
+                  <div
+                    key={st.id}
+                    className={`mb-2 rounded-xl p-2.5 flex items-center justify-between text-xs border ${
+                      isDark ? 'bg-amber-950/20 border-amber-500/25' : 'bg-amber-50/80 border-amber-200'
+                    }`}
+                  >
+                    <div className="pr-2">
+                      <p className={`text-[11px] font-semibold ${isDark ? 'text-amber-300' : 'text-amber-900'}`}>Seasonal Care Reminder</p>
+                      <p className={`text-[10px] leading-snug mt-0.5 ${isDark ? 'text-zinc-300' : 'text-stone-600'}`}>{st.label}</p>
+                    </div>
+                    <button
+                      onClick={() => handleDismissSeasonalTask(item.id, st.id)}
+                      className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-colors shrink-0 border ${
+                        isDark ? 'text-zinc-400 hover:text-zinc-100 bg-zinc-900/60 border-zinc-700/60' : 'text-stone-600 hover:text-stone-900 bg-white border-stone-300'
+                      }`}
+                    >
+                      ✕ Dismiss
+                    </button>
+                  </div>
+                ))}
+
                 {item.consumables?.length > 0 ? (
                   <div className="space-y-1.5">
                     {item.consumables.map(c => {
@@ -1451,7 +1535,7 @@ Return comprehensive operational subsystems, official registration URL, official
                           onClick={() => {
                             setActiveConsumableModal({ appliance: item, consumable: c });
                             setIsPickingDate(false);
-                            setCustomReplaceDate(new Date().toISOString().split('T')[0]);
+                            setCustomReplaceDate(formatISOToMMDDYYYY(new Date().toISOString()));
                           }}
                           className={`rounded-xl p-2.5 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all border ${
                             isClose
@@ -1500,7 +1584,7 @@ Return comprehensive operational subsystems, official registration URL, official
                   <div className={`rounded-xl p-2 flex items-center justify-between text-[11px] ${
                     isDark ? 'bg-zinc-900/60 text-zinc-500' : 'bg-[#E5E5EA]/50 text-[#636366]'
                   }`}>
-                    <span>No recurring consumable required</span>
+                    <span>No recurring filter required</span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                       isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
                     }`}>
@@ -1791,7 +1875,6 @@ Return comprehensive operational subsystems, official registration URL, official
                             <p className={`text-[10px] font-mono selectable-text ${isDark ? 'text-zinc-400' : 'text-[#8E8E93]'}`}>Part #: {p.partNumber}</p>
                           </div>
                           
-                          {/* DUAL AFFILIATE ACTION BUTTONS */}
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button
                               onClick={() => window.open(buildPartPurchaseUrl(selectedAppliance.brand, p, 'oem'), '_blank')}
@@ -2036,7 +2119,7 @@ Return comprehensive operational subsystems, official registration URL, official
             </div>
           )}
 
-          {/* Assistant Modal with Adaptive Subsystem Chips */}
+          {/* Assistant Modal */}
           {activeAppliance && (
             <div
               onClick={() => setActiveAppliance(null)}
@@ -2264,16 +2347,16 @@ Return comprehensive operational subsystems, official registration URL, official
                   </>
                 ) : (
                   <div className="space-y-3 pt-1">
-                    <label className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Enter replacement date (YYYY-MM-DD):</label>
+                    <label className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Enter replacement date (MM/DD/YYYY):</label>
                     <input
                       type="text"
                       inputMode="numeric"
                       className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      placeholder="e.g. 2026-10-14"
-                      value={customReplaceDate || new Date().toISOString().split('T')[0]}
-                      onChange={(e) => setCustomReplaceDate(e.target.value)}
+                      placeholder="e.g. 10/14/2026"
+                      value={customReplaceDate || formatISOToMMDDYYYY(new Date().toISOString())}
+                      onChange={(e) => setCustomReplaceDate(formatToMMDDYYYY(e.target.value))}
                     />
                     <div className="flex gap-2 pt-1">
                       <button onClick={() => setIsPickingDate(false)} className={`flex-1 py-2.5 rounded-2xl text-xs font-bold ${
@@ -2293,7 +2376,7 @@ Return comprehensive operational subsystems, official registration URL, official
 
           {/* ==============================================================
               REORDERED ADD EQUIPMENT SHEET:
-              Brand -> Model -> Product Name (Live Auto) -> Nickname -> Date -> Warranty
+              Brand -> Model -> Product Name (Live Auto) -> Nickname -> Date (MM/DD/YYYY) -> Warranty
               ============================================================== */}
           {isAddOpen && (
             <div
@@ -2410,10 +2493,10 @@ Return comprehensive operational subsystems, official registration URL, official
                     />
                   </div>
 
-                  {/* 5. PURCHASE DATE (TYPED FORMAT) */}
+                  {/* 5. PURCHASE DATE (TYPED MM/DD/YYYY) */}
                   <div>
                     <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      5. Purchase Date (YYYY-MM-DD)
+                      5. Purchase Date (MM/DD/YYYY)
                     </label>
                     <input
                       type="text"
@@ -2421,9 +2504,9 @@ Return comprehensive operational subsystems, official registration URL, official
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      placeholder="e.g. 2026-01-15 (Optional)"
+                      placeholder="MM/DD/YYYY (e.g. 10/14/2026)"
                       value={purchaseDateInput}
-                      onChange={(e) => setPurchaseDateInput(e.target.value)}
+                      onChange={(e) => setPurchaseDateInput(formatToMMDDYYYY(e.target.value))}
                     />
                   </div>
 
@@ -2691,7 +2774,7 @@ Return comprehensive operational subsystems, official registration URL, official
                           <td style={{ padding: '7px 8px' }}>{c.name}</td>
                           <td style={{ padding: '7px 8px', fontFamily: 'monospace' }}>{c.partNumber}</td>
                           <td style={{ padding: '7px 8px' }}>{c.intervalDays} days</td>
-                          <td style={{ padding: '7px 8px' }}>{new Date(c.lastReplaced).toLocaleDateString()}</td>
+                          <td style={{ padding: '7px 8px' }}>{formatISOToMMDDYYYY(c.lastReplaced)}</td>
                         </tr>
                       )))}
                     </tbody>
