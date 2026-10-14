@@ -39,7 +39,6 @@
     const FREE_TOTAL_QUOTA = 5;
     const PRO_WINDOW_QUOTA = 65;
 
-    // Rolling Quota & Offline Message Count Tracker
     const AIQuotaTracker = {
       getStatus(isPaid) {
         if (isPaid) {
@@ -94,7 +93,6 @@
       }
     };
 
-    // Daily Greeting Checker: Only greets once per calendar day
     function shouldSendDailyGreeting() {
       const today = new Date().toISOString().split('T')[0];
       const lastGreetDate = localStorage.getItem('last_daily_greeting_date');
@@ -105,47 +103,152 @@
       return false;
     }
 
-    // Zero-Token Local Manual Lookup Matcher using baked dossier
-    function queryLocalManualDatabase(appliance, rawQuery) {
-      const q = (rawQuery || '').toLowerCase();
-      const dossier = appliance.manualDossier || {};
-
-      if (dossier.errorCodes && typeof dossier.errorCodes === 'object') {
-        for (const [code, desc] of Object.entries(dossier.errorCodes)) {
-          if (q.includes(code.toLowerCase())) {
-            return `Verified Manual Error Code [${code}] for ${appliance.brand} ${appliance.modelNumber}:\n\n${desc}`;
-          }
-        }
-      }
-
-      if (q.includes('reset') || q.includes('reboot') || q.includes('restart')) {
-        if (dossier.resetProcedure) {
-          return `Official Reset Procedure for ${appliance.brand} ${appliance.modelNumber}:\n\n${dossier.resetProcedure}`;
-        }
-        const matchedConsumable = appliance.consumables?.[0];
-        if (matchedConsumable && matchedConsumable.installTips) {
-          return `Local Reset Guidance for ${appliance.brand} ${appliance.modelNumber}:\n\n${matchedConsumable.installTips}`;
-        }
-      }
-
-      if (dossier.commonFixes && typeof dossier.commonFixes === 'object') {
-        for (const [symptomKey, fixDesc] of Object.entries(dossier.commonFixes)) {
-          const cleanKey = symptomKey.replace(/_/g, ' ');
-          if (q.includes(cleanKey) || cleanKey.split(' ').some(w => w.length > 3 && q.includes(w))) {
-            return `Offline Guide for ${appliance.brand} (${appliance.modelNumber}) - ${cleanKey.toUpperCase()}:\n\n${fixDesc}`;
-          }
-        }
-      }
-
-      if (q.includes('filter') || q.includes('cartridge') || q.includes('flapper')) {
-        const c = appliance.consumables?.[0];
-        if (c) {
-          return `Consumable Specifications:\n- Part #: ${c.partNumber}\n- Interval: Every ${c.intervalDays} days\n- Guide: ${c.installTips}`;
-        }
-      }
-
-      return `Owner Documentation Summary: Verified manual documentation for ${appliance.brand} (${appliance.modelNumber}) recommends verifying electrical connections, clearing air/water paths, and resetting power at the main breaker. Full wiring & warranty docs are attached below.`;
+    function compressImageFast(file, maxDimension = 640) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let w = img.width;
+            let h = img.height;
+            if (w > h && w > maxDimension) {
+              h = Math.round((h * maxDimension) / w);
+              w = maxDimension;
+            } else if (h > maxDimension) {
+              w = Math.round((w * maxDimension) / h);
+              h = maxDimension;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d', { alpha: false });
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.55);
+            resolve({ dataUrl, base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
     }
+
+    const ExpertDiagnosticEngine = {
+      SYMPTOM_TAXONOMY: {
+        leakage: ['leak', 'leaking', 'water', 'puddle', 'pooling', 'dripping', 'moisture', 'wet', 'overflow', 'sweating', 'condensation'],
+        temperature_cold: ['warm', 'not cooling', 'not cold', 'spoiling', 'thawing', 'room temp', 'ice melting', 'bad cooling'],
+        temperature_frost: ['frost', 'icing', 'freezing', 'frozen', 'ice buildup', 'snow', 'frosty', 'freezing food'],
+        acoustics: ['noise', 'noisy', 'sound', 'buzz', 'buzzing', 'click', 'clicking', 'hum', 'humming', 'rattle', 'rattling', 'grind', 'grinding', 'squeal', 'whistle'],
+        power: ['dead', 'no power', 'won\'t turn on', 'not turning on', 'shut off', 'black screen', 'no display', 'tripping', 'tripped', 'unresponsive'],
+        reset: ['reset', 'restart', 'reboot', 'filter light', 'indicator', 'clear code', 'factory reset', 'blinking light', 'red light'],
+        smell: ['odor', 'smell', 'stink', 'smelly', 'musty', 'rotten', 'mildew']
+      },
+
+      evaluateQuery(appliance, rawQuery) {
+        const q = (rawQuery || '').toLowerCase().trim();
+        const dossier = appliance.manualDossier || {};
+        const brand = appliance.brand;
+        const model = appliance.modelNumber;
+        const cat = (appliance.category || 'Appliance').toLowerCase();
+
+        if (dossier.errorCodes && typeof dossier.errorCodes === 'object') {
+          for (const [code, desc] of Object.entries(dossier.errorCodes)) {
+            const cleanCode = code.toLowerCase();
+            if (q.includes(cleanCode) || q.replace(/[\s-]/g, '').includes(cleanCode.replace(/[\s-]/g, ''))) {
+              return `Verified Manual Diagnostic for ${brand} ${model} [Error ${code.toUpperCase()}]:\n\n` +
+                     `1. Root Cause: ${desc}\n` +
+                     `2. Action Check: Inspect associated sensor harness connections and reset logic.\n` +
+                     `3. Reset Directive: Disconnect breaker power for 60 seconds to clear residual board fault memory.`;
+            }
+          }
+        }
+
+        if (this.matchesCategory(q, 'reset')) {
+          if (dossier.resetProcedure) {
+            return `Manual Reset Procedure for ${brand} ${model}:\n\n` +
+                   `1. Action: ${dossier.resetProcedure}\n` +
+                   `2. Indication: Wait for audible chime or status LED shift to confirm completion.\n` +
+                   `3. System Recovery: Allow 60 seconds for internal controller logic to re-index.`;
+          }
+          if (appliance.consumables?.[0]?.installTips) {
+            return `Filter / Status Reset for ${brand} ${model}:\n\n` +
+                   `1. Procedure: ${appliance.consumables[0].installTips}\n` +
+                   `2. Maintenance Check: Confirm OEM filter is fully locked into position.`;
+          }
+        }
+
+        if (dossier.commonFixes && typeof dossier.commonFixes === 'object') {
+          let bestMatch = null;
+          let bestScore = 0;
+
+          for (const [symptomKey, solution] of Object.entries(dossier.commonFixes)) {
+            const keyWords = symptomKey.replace(/_/g, ' ').toLowerCase().split(' ');
+            let matches = 0;
+            keyWords.forEach(kw => {
+              if (kw.length > 2 && q.includes(kw)) matches++;
+            });
+            if (matches > bestScore) {
+              bestScore = matches;
+              bestMatch = { key: symptomKey.replace(/_/g, ' '), solution };
+            }
+          }
+
+          if (bestMatch && bestScore > 0) {
+            return `Manual Troubleshooting Matrix for ${brand} ${model} [${bestMatch.key.toUpperCase()}]:\n\n` +
+                   `${bestMatch.solution}\n\n` +
+                   `Spec Verification: Ensure power or supply lines are safely secured before inspecting physical components.`;
+          }
+        }
+
+        if (cat.includes('fridge') || cat.includes('refrigerat')) {
+          if (this.matchesCategory(q, 'leakage')) {
+            return `Manual Guidance for ${brand} ${model} (Defrost Drainage & Leaks):\n\n` +
+                   `1. Defrost Drain Port: Check the drain funnel behind the freezer back panel. Ice obstructions cause meltwater to overflow under vegetable crispers.\n` +
+                   `2. Water Inlet Tube: Inspect rear inlet compression fitting and filter manifold seal for micro-leaks.\n` +
+                   `3. Door Gaskets: Clean bottom door seals with warm soapy water to ensure airtight magnet contact.`;
+          }
+          if (this.matchesCategory(q, 'temperature_cold')) {
+            return `Manual Diagnostic for ${brand} ${model} (Cooling Performance):\n\n` +
+                   `1. Airflow Clearance: Verify food containers are not obstructing the central air damper between freezer and fresh food compartments.\n` +
+                   `2. Condenser Coils: Vacuum rear/bottom coils to ensure unrestricted compressor heat release.\n` +
+                   `3. Evaporator Fan: Confirm the internal fan runs when the door switch is manually depressed.`;
+          }
+          if (this.matchesCategory(q, 'temperature_frost')) {
+            return `Manual Diagnostic for ${brand} ${model} (Excess Frost):\n\n` +
+                   `1. Gasket Seal Test: Close a dollar bill in the door gasket; if it slides out freely, the seal is admitting humid ambient air.\n` +
+                   `2. Defrost Cycle Check: Verify defrost heater and bimetal defrost thermostat continuity if evaporator fins are completely blocked with ice.\n` +
+                   `3. Damper Flap: Ensure the motorized damper door opens and closes without mechanical binding.`;
+          }
+          if (this.matchesCategory(q, 'acoustics')) {
+            return `Manual Diagnostic for ${brand} ${model} (Noise Inspection):\n\n` +
+                   `1. Evaporator Fan Motor: High-pitched clicking or ticking indicates ice buildup contacting rotating fan blades.\n` +
+                   `2. Compressor Vibration: Check rubber isolation grommets beneath the compressor if you hear metallic humming.\n` +
+                   `3. Water Inlet Valve: Loud buzzing for 5-10 seconds indicates the icemaker valve is firing without active water supply.`;
+          }
+        }
+
+        if (cat.includes('purifier') || cat.includes('air')) {
+          if (this.matchesCategory(q, 'acoustics') || this.matchesCategory(q, 'power') || q.includes('fan') || q.includes('light')) {
+            return `Manual Guidance for ${brand} ${model} (Air Quality & Fan):\n\n` +
+                   `1. Particle Sensor Cleaning: Clean the side air quality sensor lens using a dry cotton swab to stop false red light alerts.\n` +
+                   `2. Filter Seating: Verify both pre-filter and True HEPA filters are pushed flush and plastic wrapping is removed.\n` +
+                   `3. Motor Reset: Unplug unit for 2 minutes to discharge filter timer memory before powering back on.`;
+          }
+        }
+
+        const partsSummary = (appliance.replacementParts || []).map(p => `${p.name} (#${p.partNumber})`).join(', ');
+        return `Manual Reference Summary for ${brand} ${model} (${appliance.category}):\n\n` +
+               `1. Power & Logic Reset: Shut off the dedicated circuit breaker or disconnect power cord for 60 seconds to reset controller memory.\n` +
+               `2. Component Access: Verified field-replaceable components: ${partsSummary || 'Refer to attached parts catalog'}.\n` +
+               `3. OEM Documentation: Check the attached paperwork below under Warranty & Documents for full wiring schematics.`;
+      },
+
+      matchesCategory(query, catKey) {
+        const terms = this.SYMPTOM_TAXONOMY[catKey] || [];
+        return terms.some(term => query.includes(term));
+      }
+    };
 
     async function generateAuditVerificationHash(dataString) {
       try {
@@ -196,6 +299,7 @@
       'cooktop': 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80',
       'airmega': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
       'coway': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
+      '1512': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
       'blueair': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
       'purifier': 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=600&q=80',
       'thermostat': 'https://images.unsplash.com/photo-1545259741-2ea3ebf61fa3?auto=format&fit=crop&w=600&q=80',
@@ -215,35 +319,6 @@
         if (q.includes(key)) return url;
       }
       return '';
-    }
-
-    function compressImageFile(file, maxWidth = 1000, quality = 0.65) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let w = img.width;
-            let h = img.height;
-            if (w > maxWidth) {
-              h = Math.round((h * maxWidth) / w);
-              w = maxWidth;
-            }
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, w, h);
-            const dataUrl = canvas.toDataURL('image/jpeg', quality);
-            const base64 = dataUrl.split(',')[1];
-            resolve({ dataUrl, base64, mimeType: 'image/jpeg' });
-          };
-          img.onerror = reject;
-          img.src = e.target.result;
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
     }
 
     const GLYPHS = {
@@ -359,7 +434,6 @@
       window.open(url, '_blank', 'noopener,noreferrer');
     };
 
-    // Primary Dispatcher through Cloudflare Worker
     async function requestDiagnosticFromWorker(prompt, history = [], imagePayload = null, isPaid = false, needsGreeting = false) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -398,7 +472,8 @@
         {
           id: '1',
           unitId: 'unit_apt_25',
-          name: 'Kitchen Fridge',
+          name: 'GE 18.6 Cu. Ft. French-Door Refrigerator',
+          nickname: 'Kitchen Fridge',
           brand: 'GE',
           modelNumber: 'GWE191JMLXFES',
           category: 'Refrigerator',
@@ -423,24 +498,28 @@
           ],
           replacementParts: [
             { id: 'p1', category: 'Doors & Seals', name: 'Fresh Food Door Gasket', partNumber: 'WR14X31558' },
-            { id: 'p2', category: 'Ice & Water', name: 'Water Inlet Valve Assembly', partNumber: 'WR57X30890' }
+            { id: 'p2', category: 'Ice & Water', name: 'Water Inlet Valve Assembly', partNumber: 'WR57X30890' },
+            { id: 'p3', category: 'Motors & Fans', name: 'Evaporator Fan Motor Assembly', partNumber: 'WR60X26866' }
           ],
           manualDossier: {
             resetProcedure: "Press and hold the Water Filter status pad firmly for 3 seconds until the indicator light chimes and switches to green/blue.",
             errorCodes: {
-              "88 88": "Power interruption / surge display code. Disconnect power cord for 60 seconds at the outlet to clear control board logic.",
-              "E2": "Defrost sensor fault. Check freezer thermistor continuity at the main cabinet harness."
+              "88 88": "Power surge / logic lock. Unplug power cord for 60 seconds at outlet to clear control board microprocessor state.",
+              "E2": "Defrost sensor open circuit. Check freezer evaporator thermistor connector harness.",
+              "HRS": "Defrost circuit failure. Inspect defrost bimetal limiter switch and main control harness."
             },
             commonFixes: {
-              "water leaking": "Clear the internal defrost drain tube beneath the evaporator coils; inspect water valve union behind access grill.",
-              "fan noise": "Check for frost obstruction around the evaporator fan motor in the freezer compartment."
+              "water leaking under crisper": "1. Defrost Drain Tube: Locate the funnel beneath the evaporator coil and flush with hot water using a baster.\n2. Drain Valve: Inspect the rubber duckbill grommet behind the lower machine compartment; clear mineral sediment.",
+              "freezer cold but fridge warm": "1. Damper Door: Inspect the motorized airflow damper between compartments; check for mechanical ice jam.\n2. Return Air Vents: Clear food items blocking the lower return grilles on the left interior wall.",
+              "clicking sound near back": "1. Compressor Start Relay: Disconnect power and check the overload relay on the compressor side for scorch marks.\n2. Condenser Fan: Inspect the fan blade next to the compressor for obstructions."
             }
           }
         },
         {
           id: '2',
           unitId: 'unit_apt_25',
-          name: 'Kitchen Cooktop',
+          name: 'GE 30" Built-In Electric Cooktop',
+          nickname: 'Kitchen Cooktop',
           brand: 'GE',
           modelNumber: 'JP3030SWSS',
           category: 'Cooktop',
@@ -453,22 +532,25 @@
           seasonalTasks: [],
           consumables: [],
           replacementParts: [
-            { id: 'p4', category: 'Heating & Elements', name: '8" Radiant Surface Element (2500W)', partNumber: 'WB30T10133' }
+            { id: 'p4', category: 'Heating & Elements', name: '8" Radiant Surface Element (2500W)', partNumber: 'WB30T10133' },
+            { id: 'p5', category: 'Controls & Switches', name: 'Infinite Heat Switch Control', partNumber: 'WB24T10025' }
           ],
           manualDossier: {
             resetProcedure: "Turn all burner knobs to OFF. Trip the dedicated 240V double-pole circuit breaker OFF for 60 seconds, then toggle ON.",
             errorCodes: {},
             commonFixes: {
-              "burner not heating": "Inspect radiant element wiring spade terminals beneath the glass cooktop pan; verify infinite switch contacts."
+              "burner not heating": "1. Circuit Breaker Check: 240V electric cooktops use double-pole breakers. If one pole trips, indicators illuminate while elements stay cold.\n2. Infinite Switch: Inspect switch contacts behind knob control cavity.",
+              "hot surface light stays on": "1. Residual Heat Sensor: The mechanical bimetal sensor in the radiant element rim may be stuck closed. Allow 45 minutes to cool completely before testing."
             }
           }
         },
         {
           id: '3',
           unitId: 'unit_airbnb_4b',
-          name: 'Living Room Purifier',
+          name: 'Coway Airmega AP-1512HH Mighty Air Purifier',
+          nickname: 'Living Room Purifier',
           brand: 'Coway',
-          modelNumber: 'Airmega 350',
+          modelNumber: 'AP-1512HH',
           category: 'Air Purifier',
           imageUrl: MODEL_IMAGE_REGISTRY['airmega'],
           purchaseDate: '',
@@ -494,7 +576,8 @@
             resetProcedure: "Press and hold the Filter Reset button firmly for 3 seconds until the indicator light chimes and turns off.",
             errorCodes: {},
             commonFixes: {
-              "red indicator light": "Clean the particle sensor on the side panel with a damp cotton swab; vacuum pre-filter screen."
+              "red light won't change to blue": "1. Particle Sensor Lens: Open the sensor hatch on the side panel. Wipe the optical lens with a damp cotton swab, then dry.\n2. Pre-filter Screen: Wash the green mesh pre-filter in warm water and dry fully.",
+              "fan making whistling noise": "1. Filter Alignment: Ensure the True HEPA filter is seated completely flat against the perimeter foam gasket with pull-tabs facing outward."
             }
           }
         }
@@ -528,7 +611,6 @@
       const [queryInput, setQueryInput] = useState('');
       const [isLoading, setIsLoading] = useState(false);
 
-      // Passport Export State
       const [isPassportModalOpen, setIsPassportModalOpen] = useState(false);
       const [passportIncludeHistory, setPassportIncludeHistory] = useState(true);
       const [passportSelectedUnits, setPassportSelectedUnits] = useState(['unit_apt_25', 'unit_airbnb_4b', 'unit_main']);
@@ -537,8 +619,9 @@
       const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
       const [auditCertHash, setAuditCertHash] = useState('');
 
-      // Form State
+      // Form State with Separated Name and Optional Nickname
       const [nameInput, setNameInput] = useState('');
+      const [nicknameInput, setNicknameInput] = useState('');
       const [brandInput, setBrandInput] = useState('');
       const [modelInput, setModelInput] = useState('');
       const [groupTextInput, setGroupTextInput] = useState('');
@@ -694,7 +777,7 @@
         const file = e.target.files[0];
         if (!file) return;
         try {
-          const { dataUrl } = await compressImageFile(file, 1200, 0.72);
+          const { dataUrl } = await compressImageFast(file, 900);
           const filePayload = { name: file.name, dataUrl, uploadDate: new Date().toLocaleDateString() };
           setAppliances(appliances.map(app => app.id === applianceId ? { ...app, [docType]: filePayload } : app));
           if (selectedAppliance && selectedAppliance.id === applianceId) {
@@ -703,15 +786,23 @@
         } catch (err) {}
       };
 
+      // Camera OCR: Fast Compression + Commercial Name Population
       const handleCameraScanSticker = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
         setIsAnalyzing(true);
-        setLookupStatus('Inspecting data tag / sticker...');
+        setLookupStatus('Inspecting data tag...');
 
         try {
-          const compressed = await compressImageFile(file, 800, 0.65);
-          const prompt = `Inspect this equipment sticker or rating plate. Extract brand, model number, and primary equipment category (e.g. Refrigerator, Dishwasher, Cooktop, Smart Thermostat, Toilet, Faucet, Water Heater). Return pure JSON only: { "brand": "Brand", "modelNumber": "MODEL123", "category": "Category" }`;
+          const compressed = await compressImageFast(file, 640);
+          const prompt = `Inspect this equipment rating label or manual cover. Identify the brand, the engineering model number (normalize dual or regional codes to primary SKU), the canonical marketing product name, and the category.
+Return PURE JSON ONLY:
+{
+  "brand": "Brand",
+  "modelNumber": "MODEL123",
+  "canonicalName": "Full Commercial Name",
+  "category": "Category"
+}`;
 
           const raw = await requestDiagnosticFromWorker(prompt, [], compressed, isPaidUser, false);
           const cleanText = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -721,41 +812,57 @@
             const parsed = JSON.parse(jsonMatch[0]);
             if (parsed.brand) setBrandInput(parsed.brand);
             if (parsed.modelNumber) setModelInput(parsed.modelNumber);
-            if (!nameInput && parsed.brand) setNameInput(`${parsed.brand} ${parsed.category || 'Equipment'}`);
-            setLookupStatus(`Identified: ${parsed.brand} ${parsed.modelNumber}`);
+            if (parsed.canonicalName) {
+              setNameInput(parsed.canonicalName);
+            } else if (parsed.brand) {
+              setNameInput(`${parsed.brand} ${parsed.category || 'Appliance'}`);
+            }
+            setLookupStatus(`Identified: ${parsed.canonicalName || parsed.modelNumber}`);
           }
         } catch (err) {
-          setLookupStatus(err.message || 'Could not parse sticker.');
+          setLookupStatus('Could not read label. Please enter details manually.');
         } finally {
           setIsAnalyzing(false);
         }
       };
 
-      // Universal Equipment Auto-Discovery with Baked Offline Manual Dossier
+      // Canonical Auto-Discovery with Optional Nickname
       const handleAutoDiscoverAdd = async (e) => {
         e.preventDefault();
         if (!brandInput || !modelInput) return;
 
         setIsAnalyzing(true);
-        setLookupStatus('Analyzing hardware & building offline manual...');
+        setLookupStatus('Querying equipment specifications...');
 
         let discoveredConsumables = [];
         let discoveredParts = [];
         let detectedCategory = 'Home Appliance';
         let componentsReplaceable = true;
         let bakedDossier = {};
+        let resolvedCanonicalName = nameInput.trim();
 
         try {
-          const prompt = `Lookup residential equipment: Brand "${brandInput}", Model "${modelInput}". Works for all appliances, HVAC, thermostats, and plumbing fixtures. Return pure JSON only:
+          const prompt = `Lookup residential equipment: Brand "${brandInput}", Model "${modelInput}".
+Return PURE JSON ONLY:
 {
-  "category": "Refrigerator",
+  "canonicalName": "Official Commercial Name (e.g. Coway Airmega AP-1512HH Mighty Air Purifier)",
+  "category": "Air Purifier",
+  "normalizedModelNumber": "AP-1512HH",
   "areComponentsOfficiallyReplaceable": true,
-  "consumables": [{ "name": "Water Filter", "partNumber": "RPWFE", "intervalDays": 180, "installTips": "Flush 2 gallons" }],
-  "replacementParts": [{ "category": "Doors & Seals", "name": "Fresh Food Door Gasket", "partNumber": "WR14X31558" }],
+  "consumables": [
+    { "name": "True HEPA Filter", "partNumber": "AP-1512HH-FP", "intervalDays": 365, "installTips": "Remove plastic wrapping. Hold Filter Reset for 3 sec." }
+  ],
+  "replacementParts": [
+    // Include 0 to 5 GENUINE, officially distributed OEM wear parts. If none exist or factory sealed, leave array empty [].
+    { "category": "Motors & Fans", "name": "Blower Fan Motor Assembly", "partNumber": "OEM-MOTOR-01" }
+  ],
   "manualDossier": {
-    "resetProcedure": "Hold filter button firmly for 3 seconds",
-    "errorCodes": { "E1": "Sensor disconnected" },
-    "commonFixes": { "leaking": "Check drain tube connection", "not cooling": "Clean condenser coils" }
+    "resetProcedure": "Hold filter button for 3 seconds",
+    "errorCodes": { "E1": "Motor sensor abnormal" },
+    "commonFixes": {
+      "not turning on": "1. Check power cord outlet.\\n2. Ensure front panel safety interlock is clicked tight.",
+      "red light always on": "1. Wipe dust sensor with dry cotton swab.\\n2. Wash pre-filter screen."
+    }
   }
 }`;
           const raw = await requestDiagnosticFromWorker(prompt, [], null, isPaidUser, false);
@@ -763,6 +870,9 @@
           const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
           const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleanText);
 
+          if (parsed.canonicalName && !nameInput.trim()) {
+            resolvedCanonicalName = parsed.canonicalName;
+          }
           if (parsed.category) detectedCategory = parsed.category;
           if (typeof parsed.areComponentsOfficiallyReplaceable === 'boolean') {
             componentsReplaceable = parsed.areComponentsOfficiallyReplaceable;
@@ -793,17 +903,11 @@
         const bLower = brandInput.toLowerCase();
         const mLower = modelInput.toLowerCase();
         if (detectedCategory === 'Home Appliance') {
-          if (bLower.includes('blueair') || bLower.includes('coway') || mLower.includes('air')) {
+          if (bLower.includes('blueair') || bLower.includes('coway') || mLower.includes('air') || mLower.includes('1512')) {
             detectedCategory = 'Air Purifier';
             componentsReplaceable = false;
           } else if (mLower.includes('gwe') || mLower.includes('fridge')) {
             detectedCategory = 'Refrigerator';
-            componentsReplaceable = true;
-          } else if (bLower.includes('ecobee') || bLower.includes('nest') || mLower.includes('thermostat')) {
-            detectedCategory = 'Smart Thermostat';
-            componentsReplaceable = false;
-          } else if (bLower.includes('kohler') || bLower.includes('toto') || mLower.includes('toilet')) {
-            detectedCategory = 'Plumbing Fixture';
             componentsReplaceable = true;
           }
         }
@@ -830,16 +934,15 @@
         const defaultSeasonal = [];
         if (detectedCategory.includes('Fridge') || detectedCategory.includes('Refrigerator')) {
           defaultSeasonal.push({ id: `st_${Date.now()}`, label: 'Vacuum condenser coils to maintain cooling efficiency', intervalMonths: 6, lastCompleted: new Date().toISOString(), dismissed: false });
-        } else if (detectedCategory.includes('Dishwasher')) {
-          defaultSeasonal.push({ id: `st_${Date.now()}`, label: 'Clean bottom filter basket under warm water', intervalMonths: 3, lastCompleted: new Date().toISOString(), dismissed: false });
-        } else if (detectedCategory.includes('Thermostat') || detectedCategory.includes('HVAC')) {
-          defaultSeasonal.push({ id: `st_${Date.now()}`, label: 'Check HVAC return air filter and replace if gray', intervalMonths: 3, lastCompleted: new Date().toISOString(), dismissed: false });
+        } else if (detectedCategory.includes('Purifier') || detectedCategory.includes('Air')) {
+          defaultSeasonal.push({ id: `st_${Date.now()}`, label: 'Wipe air quality particle sensor lens with dry cotton swab', intervalMonths: 2, lastCompleted: new Date().toISOString(), dismissed: false });
         }
 
         const newItem = {
           id: Date.now().toString(),
           unitId: finalUnitId,
-          name: nameInput.trim() || `${brandInput} ${modelInput}`,
+          name: resolvedCanonicalName || `${brandInput} ${modelInput}`,
+          nickname: nicknameInput.trim(),
           brand: brandInput.trim(),
           modelNumber: modelInput.trim(),
           category: detectedCategory,
@@ -848,7 +951,7 @@
           warrantyMonths: purchaseDateInput ? (Number(warrantyMonthsInput) || 12) : 0,
           warrantyDoc: null,
           receiptDoc: null,
-          componentsReplaceable,
+          componentsReplaceable: discoveredParts.length > 0 && componentsReplaceable,
           seasonalTasks: defaultSeasonal,
           consumables: discoveredConsumables,
           replacementParts: discoveredParts,
@@ -859,6 +962,7 @@
 
         setAppliances([newItem, ...appliances]);
         setNameInput('');
+        setNicknameInput('');
         setBrandInput('');
         setModelInput('');
         setGroupTextInput('');
@@ -918,26 +1022,24 @@
 
         const quota = AIQuotaTracker.getStatus(isPaidUser);
 
-        // QUOTA REACHED FOR FREE USER: 100% Zero-Token Offline Manual Lookups
+        // QUOTA REACHED FOR FREE USER: Run Advanced Offline Diagnostic Engine
         if (!isPaidUser && quota.isLocked) {
           const offlineTurnNumber = AIQuotaTracker.incrementOfflineOverQuota();
-          const localManualAnswer = queryLocalManualDatabase(activeAppliance, q);
-          
-          // Friendly text-only reminder every 15 messages (non-intrusive)
+          const smartManualAnswer = ExpertDiagnosticEngine.evaluateQuery(activeAppliance, q);
           const shouldAppend15TurnNudge = offlineTurnNumber % 15 === 0;
 
           const limitCardMsg = {
             id: Date.now().toString(),
             sender: 'assistant',
-            text: localManualAnswer,
-            showUpgradeGate: false, // Do not repeat the big card
+            text: smartManualAnswer,
+            showUpgradeGate: false,
             showInlineNudge: shouldAppend15TurnNudge
           };
           setMessages([...updated, limitCardMsg]);
           return;
         }
 
-        // QUOTA CAP REACHED FOR PRO USER (65 requests in 2 hours)
+        // QUOTA CAP REACHED FOR PRO USER
         if (isPaidUser && quota.isLocked) {
           setMessages([...updated, {
             id: Date.now().toString(),
@@ -964,7 +1066,6 @@
             .trim();
 
           const currentQuotaAfter = AIQuotaTracker.getStatus(isPaidUser);
-          // Show the large Upgrade Card EXACTLY ONCE on the turn that reaches the limit (turn 5)
           const justReachedLimitNow = !isPaidUser && currentQuotaAfter.count === FREE_TOTAL_QUOTA;
 
           const assistantMsg = {
@@ -1111,7 +1212,14 @@
 
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline">
-                    <h2 className="text-[15px] font-bold tracking-tight truncate leading-tight">{item.name}</h2>
+                    <h2 className="text-[15px] font-bold tracking-tight truncate leading-tight">
+                      {item.name}
+                      {item.nickname && (
+                        <span className={`font-medium ml-1.5 ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                          ({item.nickname})
+                        </span>
+                      )}
+                    </h2>
                     {!isSelectMode && <span className={isDark ? "text-zinc-500 text-xs" : "text-[#8E8E93] text-xs font-semibold"}>➔</span>}
                   </div>
                   <p className={`text-xs font-medium mt-0.5 truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{item.brand} • {item.modelNumber}</p>
@@ -1431,8 +1539,15 @@
                   )}
                 </div>
 
-                <h2 className="text-xl font-extrabold tracking-tight mt-1">{selectedAppliance.name}</h2>
-                <p className={`text-xs font-semibold selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.brand} • {selectedAppliance.modelNumber}</p>
+                <h2 className="text-xl font-extrabold tracking-tight mt-1 text-center px-4">
+                  {selectedAppliance.name}
+                  {selectedAppliance.nickname && (
+                    <span className={`block text-xs font-medium mt-0.5 ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                      ({selectedAppliance.nickname})
+                    </span>
+                  )}
+                </h2>
+                <p className={`text-xs font-semibold selectable-text mt-1 ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.brand} • {selectedAppliance.modelNumber}</p>
 
                 {(() => {
                   const daysLeft = getWarrantyRemainingDays(selectedAppliance.purchaseDate, selectedAppliance.warrantyMonths);
@@ -1476,8 +1591,8 @@
                       </button>
                     </div>
 
-                    {selectedAppliance.componentsReplaceable ? (
-                      selectedAppliance.replacementParts?.map(p => (
+                    {selectedAppliance.componentsReplaceable && selectedAppliance.replacementParts?.length > 0 ? (
+                      selectedAppliance.replacementParts.map(p => (
                         <div key={p.id} className={`rounded-2xl p-3.5 flex justify-between items-center border ${
                           isDark ? 'bg-zinc-900/60 border-white/5' : 'bg-white border-black/10 shadow-sm'
                         }`}>
@@ -1628,7 +1743,7 @@
             </div>
           )}
 
-          {/* Assistant Modal with Selectable Text & Monetization Referral Hooks */}
+          {/* Assistant Modal */}
           {activeAppliance && (
             <div
               onClick={() => setActiveAppliance(null)}
@@ -1644,7 +1759,7 @@
                   <div>
                     <h3 className="text-sm font-extrabold">{isPaidUser ? 'Pro Diagnostic Tech' : 'Manual Assistant'}</h3>
                     <p className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
-                      {activeAppliance.brand} {activeAppliance.modelNumber} • {
+                      {activeAppliance.name} • {
                         isPaidUser 
                           ? `${AIQuotaTracker.getStatus(true).count}/65 (2h Window)` 
                           : `${AIQuotaTracker.getStatus(false).count}/5 Free Queries`
@@ -1655,12 +1770,12 @@
                 </div>
 
                 <div className="flex gap-1.5 py-2 overflow-x-auto scrollbar-none">
-                  {['Reset procedure', 'Error code lookup', 'Go Deeper'].map(chip => (
+                  {['Reset procedure', 'Leaking water', 'Not cooling / heating', 'Strange noise'].map(chip => (
                     <button
                       key={chip}
                       onClick={() => sendQuery(chip)}
                       className={`text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap shadow-sm ${
-                        chip === 'Go Deeper'
+                        chip === 'Reset procedure'
                           ? 'bg-amber-600 text-white'
                           : isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E] border border-black/5'
                       }`}
@@ -1681,7 +1796,6 @@
                         {m.text}
                       </div>
 
-                      {/* Friendly 15-message inline suggestion (non-intrusive) */}
                       {m.showInlineNudge && (
                         <div className={`mr-auto max-w-[90%] px-3.5 py-2 rounded-xl text-[11px] flex items-center justify-between border ${
                           isDark ? 'bg-zinc-800/60 border-amber-500/30 text-zinc-300' : 'bg-amber-50 border-amber-200 text-[#1C1C1E]'
@@ -1696,7 +1810,6 @@
                         </div>
                       )}
 
-                      {/* One-Time Upgrade Gate Card upon 5th free query */}
                       {m.showUpgradeGate && (
                         <div 
                           className={`mr-auto max-w-[92%] p-4 rounded-2xl border space-y-2.5 shadow-sm ${
@@ -1718,7 +1831,6 @@
                             Subsequent queries automatically draw from your offline verified manual dossier at zero cost. Upgrade to Pro for deeper adaptive guidance and full multi-unit management.
                           </p>
 
-                          {/* Explicit Safety & Liability Disclaimer */}
                           <p className={`text-[9.5px] leading-tight italic pt-0.5 ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>
                             Notice: All guidance is provided for educational and informational purposes only. Always disconnect power or water before servicing. We assume no liability for DIY maintenance or repairs.
                           </p>
@@ -1727,7 +1839,6 @@
                             <button
                               type="button"
                               onClick={() => {
-                                // Close card and proceed using manual
                                 setMessages(messages.map(msg => msg.id === m.id ? { ...msg, showUpgradeGate: false } : msg));
                               }}
                               className={`text-[10.5px] font-semibold underline ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}
@@ -1746,7 +1857,6 @@
                         </div>
                       )}
 
-                      {/* Contractor Referral Lead Button */}
                       {m.suggestTech && (
                         <div className={`mr-auto max-w-[88%] p-3 rounded-2xl border space-y-2 ${
                           isDark ? 'bg-zinc-950/80 border-amber-500/30' : 'bg-white border-amber-300 shadow-sm'
@@ -1767,7 +1877,6 @@
                         </div>
                       )}
 
-                      {/* Replacement Model Referral Lead Button */}
                       {m.suggestReplacement && (
                         <div className={`mr-auto max-w-[88%] p-3 rounded-2xl border space-y-2 ${
                           isDark ? 'bg-zinc-950/80 border-rose-500/30' : 'bg-white border-rose-300 shadow-sm'
@@ -1799,7 +1908,7 @@
                     }`}
                     placeholder={
                       !isPaidUser && AIQuotaTracker.getStatus(false).isLocked 
-                        ? "Basic Manual Query (Free quota reached)..." 
+                        ? "Offline Manual Search (Free quota reached)..." 
                         : "Ask a question..."
                     }
                     value={queryInput}
@@ -1878,7 +1987,7 @@
             </div>
           )}
 
-          {/* Add Equipment Sheet */}
+          {/* Add Equipment Sheet with Separated Name and Optional Nickname */}
           {isAddOpen && (
             <div
               onClick={() => setIsAddOpen(false)}
@@ -1945,15 +2054,34 @@
                     </div>
                   )}
 
+                  {/* Commercial Product Name */}
                   <div>
-                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Nickname</label>
+                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                      Product Name *
+                    </label>
                     <input
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      placeholder="e.g. Master Bedroom Purifier, Ecobee Hallway"
+                      placeholder="e.g. Coway Airmega AP-1512HH Mighty Air Purifier"
                       value={nameInput}
                       onChange={(e) => setNameInput(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  {/* Optional Custom Nickname */}
+                  <div>
+                    <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                      Nickname (Optional)
+                    </label>
+                    <input
+                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
+                      }`}
+                      placeholder="e.g. Living Room, APT 25 Primary"
+                      value={nicknameInput}
+                      onChange={(e) => setNicknameInput(e.target.value)}
                     />
                   </div>
 
@@ -1964,7 +2092,7 @@
                         className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                           isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                         }`}
-                        placeholder="e.g. GE, Ecobee, Kohler"
+                        placeholder="e.g. Coway, GE"
                         value={brandInput}
                         onChange={(e) => setBrandInput(e.target.value)}
                         required
@@ -1976,7 +2104,7 @@
                         className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                           isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                         }`}
-                        placeholder="e.g. GWE191, EB-STATE6, K-3999"
+                        placeholder="e.g. AP-1512HH, GWE191"
                         value={modelInput}
                         onChange={(e) => setModelInput(e.target.value)}
                         required
@@ -2312,7 +2440,6 @@
                   )}
                 </div>
 
-                {/* Quota & AI Status Display */}
                 <div className={`p-4 rounded-2xl border space-y-1 ${
                   isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
                 }`}>
@@ -2336,7 +2463,6 @@
                   </p>
                 </div>
 
-                {/* Home Appliance Passport Section In Settings */}
                 <div className={`p-4 rounded-2xl border space-y-2.5 ${
                   isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
                 }`}>
@@ -2360,7 +2486,6 @@
                   </button>
                 </div>
 
-                {/* Cloud Sync */}
                 <div className={`p-4 rounded-2xl border space-y-1.5 ${
                   isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
                 }`}>
