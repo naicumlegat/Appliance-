@@ -32,11 +32,17 @@
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
-    const WORKER_ENDPOINT = "https://appliance.naicumlegat.workers.dev/";
+    const WORKER_ENDPOINT = "https://appliance.naicumlegat.workers.dev";
     const PASSPORT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
     const PRO_WINDOW_MS = 2 * 60 * 60 * 1000;
     const FREE_TOTAL_QUOTA = 5;
     const PRO_WINDOW_QUOTA = 65;
+
+    // Strict Tier Limits
+    const FREE_MAX_GROUPS = 1;
+    const FREE_MAX_PER_GROUP = 3;
+    const PRO_MAX_GROUPS = 5;
+    const PRO_MAX_PER_GROUP = 15;
 
     const FREE_CHAT_RETENTION_MS = 24 * 60 * 60 * 1000;
     const PRO_CHAT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -87,10 +93,6 @@
         oemUrl = `https://www.kohler.com/en/search?q=${encodeURIComponent(partNumber)}`;
       } else {
         oemUrl = `https://www.repairclinic.com/Shop-For-Parts?query=${encodeURIComponent(partNumber)}`;
-      }
-
-      if (AFFILIATE_SETTINGS.useSkimlinks && AFFILIATE_SETTINGS.skimlinksPubId && AFFILIATE_SETTINGS.skimlinksPubId !== 'YOUR_SKIMLINKS_ID') {
-        return `https://go.skimlinks.com/?id=${AFFILIATE_SETTINGS.skimlinksPubId}&url=${encodeURIComponent(oemUrl)}`;
       }
       return oemUrl;
     }
@@ -160,81 +162,36 @@
       const nowIso = new Date().toISOString();
 
       if (q.includes('fridge') || q.includes('refrigerat')) {
-        return [
-          { id: `st_${Date.now()}_1`, label: 'Vacuum bottom/rear condenser coils to preserve compressor efficiency and prevent overheating', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }
-        ];
+        return [{ id: `st_${Date.now()}_1`, label: 'Vacuum bottom/rear condenser coils to preserve compressor efficiency and prevent overheating', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }];
       }
       if (q.includes('purifier') || q.includes('air') || q.includes('hepa')) {
-        return [
-          { id: `st_${Date.now()}_1`, label: 'Gently wipe particle sensor lens with dry cotton swab and vacuum mesh pre-filter screen', intervalMonths: 2, lastCompleted: nowIso, dismissed: false }
-        ];
+        return [{ id: `st_${Date.now()}_1`, label: 'Gently wipe particle sensor lens with dry cotton swab and vacuum mesh pre-filter screen', intervalMonths: 2, lastCompleted: nowIso, dismissed: false }];
       }
       if (q.includes('dish') || q.includes('washer')) {
-        return [
-          { id: `st_${Date.now()}_1`, label: 'Twist and rinse lower cylindrical filter basket under hot water to clear food debris', intervalMonths: 1, lastCompleted: nowIso, dismissed: false }
-        ];
+        return [{ id: `st_${Date.now()}_1`, label: 'Twist and rinse lower cylindrical filter basket under hot water to clear food debris', intervalMonths: 1, lastCompleted: nowIso, dismissed: false }];
       }
       if (q.includes('dryer') || q.includes('laundry')) {
-        return [
-          { id: `st_${Date.now()}_1`, label: 'Vacuum exhaust lint chamber and inspect exterior wall vent flap for lint accumulation', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }
-        ];
+        return [{ id: `st_${Date.now()}_1`, label: 'Vacuum exhaust lint chamber and inspect exterior wall vent flap for lint accumulation', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }];
       }
-      if (q.includes('hvac') || q.includes('heat pump') || q.includes('air conditioner') || q.includes('condenser')) {
-        return [
-          { id: `st_${Date.now()}_1`, label: 'Flush condensate drain pan with 1 cup white vinegar to prevent algal drain blockage', intervalMonths: 3, lastCompleted: nowIso, dismissed: false }
-        ];
+      if (q.includes('hvac') || q.includes('heat pump') || q.includes('air conditioner')) {
+        return [{ id: `st_${Date.now()}_1`, label: 'Flush condensate drain pan with 1 cup white vinegar to prevent algal drain blockage', intervalMonths: 3, lastCompleted: nowIso, dismissed: false }];
       }
       if (q.includes('heater') || q.includes('boiler') || q.includes('tank')) {
-        return [
-          { id: `st_${Date.now()}_1`, label: 'Drain 2-3 gallons from bottom drain spigot to purge mineral sediment build-up', intervalMonths: 12, lastCompleted: nowIso, dismissed: false }
-        ];
+        return [{ id: `st_${Date.now()}_1`, label: 'Drain 2-3 gallons from bottom drain spigot to purge mineral sediment build-up', intervalMonths: 12, lastCompleted: nowIso, dismissed: false }];
       }
-      return [
-        { id: `st_${Date.now()}_1`, label: 'Inspect physical connections, intake vents, and power cord for wear or debris', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }
-      ];
+      return [{ id: `st_${Date.now()}_1`, label: 'Inspect physical connections, intake vents, and power cord for wear or debris', intervalMonths: 6, lastCompleted: nowIso, dismissed: false }];
     }
 
     const BRAND_PORTAL_REGISTRY = {
-      ge: {
-        warranty: 'https://products.geappliances.com/appliance/gea-support-search-content?contentId=16851',
-        support: 'https://www.geappliances.com/ge/service-and-support/'
-      },
-      coway: {
-        warranty: 'https://cowaymega.com/pages/warranty-registration',
-        support: 'https://cowaymega.com/pages/contact-us'
-      },
-      moen: {
-        warranty: 'https://www.moen.com/customer-support/register-your-product',
-        support: 'https://www.moen.com/customer-support'
-      },
-      kohler: {
-        warranty: 'https://www.kohler.com/en/my-account/product-registration',
-        support: 'https://www.kohler.com/en/support'
-      },
-      whirlpool: {
-        warranty: 'https://www.whirlpool.com/owners.html',
-        support: 'https://www.whirlpool.com/services/contact-us.html'
-      },
-      samsung: {
-        warranty: 'https://www.samsung.com/us/support/register/',
-        support: 'https://www.samsung.com/us/support/service/'
-      },
-      lg: {
-        warranty: 'https://www.lg.com/us/support/product-registration',
-        support: 'https://www.lg.com/us/support/repair-service/schedule-repair'
-      },
-      bosch: {
-        warranty: 'https://www.bosch-home.com/us/owner-support/product-registration',
-        support: 'https://www.bosch-home.com/us/owner-support/repair-service'
-      },
-      blueair: {
-        warranty: 'https://www.blueair.com/us/warranty.html',
-        support: 'https://www.blueair.com/us/customer-support.html'
-      },
-      ecobee: {
-        warranty: 'https://www.ecobee.com/register/',
-        support: 'https://support.ecobee.com/'
-      }
+      ge: { warranty: 'https://products.geappliances.com/appliance/gea-support-search-content?contentId=16851', support: 'https://www.geappliances.com/ge/service-and-support/' },
+      coway: { warranty: 'https://cowaymega.com/pages/warranty-registration', support: 'https://cowaymega.com/pages/contact-us' },
+      moen: { warranty: 'https://www.moen.com/customer-support/register-your-product', support: 'https://www.moen.com/customer-support' },
+      kohler: { warranty: 'https://www.kohler.com/en/my-account/product-registration', support: 'https://www.kohler.com/en/support' },
+      whirlpool: { warranty: 'https://www.whirlpool.com/owners.html', support: 'https://www.whirlpool.com/services/contact-us.html' },
+      samsung: { warranty: 'https://www.samsung.com/us/support/register/', support: 'https://www.samsung.com/us/support/service/' },
+      lg: { warranty: 'https://www.lg.com/us/support/product-registration', support: 'https://www.lg.com/us/support/repair-service/schedule-repair' },
+      bosch: { warranty: 'https://www.bosch-home.com/us/owner-support/product-registration', support: 'https://www.bosch-home.com/us/owner-support/repair-service' },
+      blueair: { warranty: 'https://www.blueair.com/us/warranty.html', support: 'https://www.blueair.com/us/customer-support.html' }
     };
 
     function resolveOfficialLinks(appliance) {
@@ -272,6 +229,7 @@
             c: category || 'Appliance',
             p: component || null
           });
+
           if (queue.length > 50) queue.shift();
           localStorage.setItem('app_telemetry_queue', JSON.stringify(queue));
           this.flushQueue();
@@ -285,7 +243,7 @@
         if (queue.length === 0) return;
 
         const payload = JSON.stringify({ events: queue });
-        const endpoint = WORKER_ENDPOINT.replace(/\/$/, '') + '/telemetry';
+        const endpoint = WORKER_ENDPOINT + '/telemetry';
 
         if (navigator.sendBeacon) {
           const blob = new Blob([payload], { type: 'application/json' });
@@ -313,6 +271,7 @@
           const raw = localStorage.getItem('pro_ai_window');
           const now = Date.now();
           let data = raw ? JSON.parse(raw) : { count: 0, startTime: now };
+          
           if (now - data.startTime > PRO_WINDOW_MS) {
             data = { count: 0, startTime: now };
             localStorage.setItem('pro_ai_window', JSON.stringify(data));
@@ -320,16 +279,14 @@
           return {
             count: data.count,
             limit: PRO_WINDOW_QUOTA,
-            isLocked: data.count >= PRO_WINDOW_QUOTA,
-            remainingMinutes: Math.max(0, Math.ceil((PRO_WINDOW_MS - (now - data.startTime)) / 60000))
+            isLocked: data.count >= PRO_WINDOW_QUOTA
           };
         } else {
           const used = Number(localStorage.getItem('free_ai_used_count') || 0);
           return {
             count: used,
             limit: FREE_TOTAL_QUOTA,
-            isLocked: used >= FREE_TOTAL_QUOTA,
-            remainingMinutes: 0
+            isLocked: used >= FREE_TOTAL_QUOTA
           };
         }
       },
@@ -338,7 +295,11 @@
         if (isPaid) {
           const raw = localStorage.getItem('pro_ai_window');
           let data = raw ? JSON.parse(raw) : { count: 0, startTime: now };
-          data = (now - data.startTime > PRO_WINDOW_MS) ? { count: 1, startTime: now } : { count: data.count + 1, startTime: data.startTime };
+          if (now - data.startTime > PRO_WINDOW_MS) {
+            data = { count: 1, startTime: now };
+          } else {
+            data.count += 1;
+          }
           localStorage.setItem('pro_ai_window', JSON.stringify(data));
         } else {
           const current = Number(localStorage.getItem('free_ai_used_count') || 0);
@@ -397,10 +358,12 @@
     }
 
     function App() {
-      const [units, setUnits] = useState([
-        { id: 'unit_apt_25', name: 'APT 25', notificationsEnabled: true, collapsed: false },
-        { id: 'unit_main', name: 'Main Residence', notificationsEnabled: true, collapsed: false }
-      ]);
+      const [units, setUnits] = useState(() => {
+        const saved = localStorage.getItem('app_units_catalog');
+        return saved ? JSON.parse(saved) : [
+          { id: 'unit_main', name: 'Main Residence', notificationsEnabled: true, collapsed: false }
+        ];
+      });
 
       const [appliances, setAppliances] = useState(() => {
         const saved = localStorage.getItem('user_appliances_catalog');
@@ -413,33 +376,55 @@
         return saved ? JSON.parse(saved) : null;
       });
       const [isPaidUser, setIsPaidUser] = useState(false);
+      const [userEmail, setUserEmail] = useState('');
 
-      // Auth Modal States
+      // Auth & 60-Second Cooldown
       const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
       const [authStep, setAuthStep] = useState('email');
       const [authEmailInput, setAuthEmailInput] = useState('');
       const [authPinInput, setAuthPinInput] = useState('');
       const [authLoading, setAuthLoading] = useState(false);
       const [devPasscodeNotice, setDevPasscodeNotice] = useState('');
+      const [otpCooldownSeconds, setOtpCooldownSeconds] = useState(0);
 
+      // Sheets & Modals
       const [selectedAppliance, setSelectedAppliance] = useState(null);
       const [detailTab, setDetailTab] = useState('parts');
       const [isAddOpen, setIsAddOpen] = useState(false);
       const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+      const [isSelectMode, setIsSelectMode] = useState(false);
+      const [selectedIds, setSelectedIds] = useState([]);
+      const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
       const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+      const [isSubInfoModalOpen, setIsSubInfoModalOpen] = useState(false);
+      const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+      const [cancelFeedback, setCancelFeedback] = useState('');
+
+      const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false);
+      const [newGroupName, setNewGroupName] = useState('');
+
       const [activeAppliance, setActiveAppliance] = useState(null);
       const [messages, setMessages] = useState([]);
       const [queryInput, setQueryInput] = useState('');
       const [isLoading, setIsLoading] = useState(false);
 
+      const [isPassportModalOpen, setIsPassportModalOpen] = useState(false);
+      const [passportIncludeHistory, setPassportIncludeHistory] = useState(true);
+      const [passportPurchased, setPassportPurchased] = useState(false);
+      const [passportFirstUsedTimestamp, setPassportFirstUsedTimestamp] = useState(null);
+      const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+      // Add Product Form
       const [brandInput, setBrandInput] = useState('');
       const [modelInput, setModelInput] = useState('');
       const [nameInput, setNameInput] = useState('');
       const [nicknameInput, setNicknameInput] = useState('');
       const [purchaseDateInput, setPurchaseDateInput] = useState('');
       const [warrantyMonthsInput, setWarrantyMonthsInput] = useState('12');
-      const [lookupStatus, setLookupStatus] = useState('');
+      const [groupTextInput, setGroupTextInput] = useState('');
+      const [receiptDataUrl, setReceiptDataUrl] = useState('');
       const [isAnalyzing, setIsAnalyzing] = useState(false);
+      const [lookupStatus, setLookupStatus] = useState('');
 
       const isDark = themeMode === 'dark';
 
@@ -448,56 +433,167 @@
       }, [appliances]);
 
       useEffect(() => {
-        setIsPaidUser(Boolean(currentUser?.is_pro));
-        setThemeMode(localStorage.getItem('app_theme') || 'dark');
-        TelemetryEngine.flushQueue();
-      }, [currentUser]);
+        localStorage.setItem('app_units_catalog', JSON.stringify(units));
+      }, [units]);
 
-      // Cloud Push Helper
-      const pushCatalogToCloud = async (appList = appliances) => {
-        if (!currentUser?.email) return;
+      useEffect(() => {
+        const savedUser = localStorage.getItem('app_user_session');
+        if (savedUser) {
+          try {
+            const u = JSON.parse(savedUser);
+            setCurrentUser(u);
+            setIsPaidUser(Boolean(u.is_pro));
+            setUserEmail(u.email);
+          } catch(e) {}
+        } else {
+          setIsPaidUser(localStorage.getItem('app_is_paid_user') === 'true');
+          setUserEmail(localStorage.getItem('app_user_email') || '');
+        }
+        setThemeMode(localStorage.getItem('app_theme') || 'dark');
+
+        const passPurchased = localStorage.getItem('passport_purchased') === 'true';
+        const passFirstUsed = localStorage.getItem('passport_first_used');
+        setPassportPurchased(passPurchased);
+        if (passFirstUsed) setPassportFirstUsedTimestamp(Number(passFirstUsed));
+
+        TelemetryEngine.flushQueue();
+      }, []);
+
+      // 60-Second Cooldown Timer
+      useEffect(() => {
+        if (otpCooldownSeconds <= 0) return;
+        const timer = setInterval(() => {
+          setOtpCooldownSeconds(prev => (prev <= 1 ? 0 : prev - 1));
+        }, 1000);
+        return () => clearInterval(timer);
+      }, [otpCooldownSeconds]);
+
+      // Debounced live brand/model lookup
+      useEffect(() => {
+        const b = brandInput.trim();
+        const m = modelInput.trim();
+        if (!b && !m) return;
+
+        const timer = setTimeout(async () => {
+          if (b && m) {
+            try {
+              setLookupStatus('Identifying product name...');
+              const res = await fetch(WORKER_ENDPOINT + '/api/discover', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  prompt: `Identify clean commercial title for Brand "${b}", Model "${m}". Return JSON: { "canonicalName": "Title" }`,
+                  isPaid: isPaidUser
+                })
+              });
+              const data = await res.json();
+              if (data?.text) {
+                const match = data.text.match(/\{[\s\S]*\}/);
+                if (match) {
+                  const parsed = JSON.parse(match[0]);
+                  if (parsed.canonicalName) {
+                    setNameInput(sanitizeCommercialName(parsed.canonicalName, m));
+                  }
+                }
+              }
+            } catch (err) {}
+            finally {
+              setLookupStatus('');
+            }
+          }
+        }, 650);
+
+        return () => clearTimeout(timer);
+      }, [brandInput, modelInput]);
+
+      // Automatic Background Cloud Sync
+      const autoSyncToCloud = async (appList = appliances, unitsList = units) => {
+        const email = currentUser?.email || userEmail;
+        if (!email) return;
+        const authToken = localStorage.getItem('auth_token');
         try {
-          await fetch(WORKER_ENDPOINT + 'sync-upload', {
+          await fetch(WORKER_ENDPOINT + '/sync-upload', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userEmail: currentUser.email, appliances: appList })
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authToken ? `Bearer ${authToken}` : ''
+            },
+            body: JSON.stringify({
+              userEmail: email,
+              appliances: appList,
+              groups: unitsList.map(u => u.name),
+              passport: {
+                unitName: unitsList[0]?.name || 'Main Residence',
+                totalAppliances: appList.length,
+                updatedAt: Date.now()
+              }
+            })
           });
-        } catch (e) {}
+        } catch (err) {}
       };
 
-      // OTP Login Actions
+      const autoPullFromCloud = async (emailToPull) => {
+        const email = emailToPull || currentUser?.email || userEmail;
+        if (!email) return;
+        try {
+          const res = await fetch(WORKER_ENDPOINT + '/sync-pull', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userEmail: email })
+          });
+          const data = await res.json();
+          if (data.appliances && Array.isArray(data.appliances)) {
+            setAppliances(data.appliances);
+          }
+          if (typeof data.isPro === 'boolean') {
+            setIsPaidUser(data.isPro);
+          }
+        } catch (err) {}
+      };
+
+      // OTP Verification Handlers
       const handleRequestOtp = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
+        if (otpCooldownSeconds > 0) return;
+
         setAuthLoading(true);
         setDevPasscodeNotice('');
         try {
-          const res = await fetch(WORKER_ENDPOINT + 'api/auth/send-otp', {
+          const res = await fetch(WORKER_ENDPOINT + '/api/auth/send-otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: authEmailInput })
+            body: JSON.stringify({ email: authEmailInput.trim().toLowerCase() })
           });
           const data = await res.json();
+          if (res.status === 429) {
+            alert(data.error || "Please wait 60 seconds before requesting another code.");
+            setOtpCooldownSeconds(60);
+            return;
+          }
           if (data.status === 'sent') {
             setAuthStep('otp');
+            setOtpCooldownSeconds(60);
             if (data.devCode) {
-              setDevPasscodeNotice(`Dev Mode Code: ${data.devCode}`);
+              setDevPasscodeNotice(`Dev Code: ${data.devCode}`);
             }
+          } else {
+            alert(data.error || "Could not send verification code.");
           }
         } catch (err) {
-          alert("Could not send code. Check connection.");
+          alert("Network error sending code.");
         } finally {
           setAuthLoading(false);
         }
       };
 
       const handleConfirmOtp = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         setAuthLoading(true);
         try {
-          const res = await fetch(WORKER_ENDPOINT + 'api/auth/verify-otp', {
+          const res = await fetch(WORKER_ENDPOINT + '/api/auth/verify-otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: authEmailInput, pin: authPinInput })
+            body: JSON.stringify({ email: authEmailInput.trim().toLowerCase(), pin: authPinInput.trim() })
           });
           const data = await res.json();
           if (data.token) {
@@ -505,24 +601,14 @@
             localStorage.setItem('app_user_session', JSON.stringify(data.user));
             setCurrentUser(data.user);
             setIsPaidUser(Boolean(data.user.is_pro));
+            setUserEmail(data.user.email);
+            localStorage.setItem('app_user_email', data.user.email);
 
-            // Restore from cloud or push local
-            const pullRes = await fetch(WORKER_ENDPOINT + 'sync-pull', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userEmail: data.user.email })
-            });
-            const pullData = await pullRes.json();
-            if (pullData.appliances && pullData.appliances.length > 0) {
-              setAppliances(pullData.appliances);
-            } else if (appliances.length > 0) {
-              await pushCatalogToCloud(appliances);
-            }
-
+            await autoPullFromCloud(data.user.email);
             setIsAuthModalOpen(false);
             setAuthStep('email');
           } else {
-            alert(data.error || "Invalid code");
+            alert(data.error || "Invalid or expired code.");
           }
         } catch (err) {
           alert("Verification error.");
@@ -536,43 +622,168 @@
         localStorage.removeItem('app_user_session');
         setCurrentUser(null);
         setIsPaidUser(false);
+        setUserEmail('');
+        setIsSettingsOpen(false);
       };
 
-      const handleAddAppliance = async (e) => {
-        e.preventDefault();
-        setIsAnalyzing(true);
-        setLookupStatus('Cataloging equipment specs...');
+      // Add Group (Strict 1 Free / 5 Pro Cap)
+      const handleCreateGroup = (e) => {
+        if (e) e.preventDefault();
+        const trimmed = newGroupName.trim();
+        if (!trimmed) return;
 
-        const effectiveBrand = brandInput.trim();
-        const effectiveModel = modelInput.trim();
-        const effectiveName = nameInput.trim() || `${effectiveBrand} Equipment`;
-        const isoDate = parseMMDDYYYYToISO(purchaseDateInput);
+        const maxGroups = isPaidUser ? PRO_MAX_GROUPS : FREE_MAX_GROUPS;
+        if (units.length >= maxGroups) {
+          alert(`Tier Limit Reached: ${isPaidUser ? `Advanced Manager allows up to ${PRO_MAX_GROUPS} property groups` : `Free Plan is limited to ${FREE_MAX_GROUPS} group`}. Upgrade to expand.`);
+          return;
+        }
+
+        const exists = units.find(u => u.name.toLowerCase() === trimmed.toLowerCase());
+        if (!exists) {
+          const newUnit = {
+            id: `unit_${Date.now()}`,
+            name: trimmed,
+            notificationsEnabled: true,
+            collapsed: false
+          };
+          const updatedUnits = [...units, newUnit];
+          setUnits(updatedUnits);
+          autoSyncToCloud(appliances, updatedUnits);
+        }
+        setNewGroupName('');
+        setIsAddGroupModalOpen(false);
+      };
+
+      const handleReceiptPhotoAttachment = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+          const { dataUrl } = await compressImageFast(file, 800);
+          setReceiptDataUrl(dataUrl);
+        } catch (err) {
+          alert("Could not compress photo.");
+        }
+      };
+
+      // Direct Document Upload from Detail Sheet
+      const handleFileUpload = async (applianceId, docType, e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const { dataUrl } = await compressImageFast(file, 800);
+          const filePayload = { name: file.name, dataUrl, uploadDate: new Date().toLocaleDateString() };
+          const updated = appliances.map(app => app.id === applianceId ? { ...app, [docType]: filePayload, receipt: docType === 'receiptDoc' ? dataUrl : app.receipt } : app);
+          setAppliances(updated);
+          if (selectedAppliance && selectedAppliance.id === applianceId) {
+            setSelectedAppliance({ ...selectedAppliance, [docType]: filePayload, receipt: docType === 'receiptDoc' ? dataUrl : selectedAppliance.receipt });
+          }
+          autoSyncToCloud(updated, units);
+        } catch (err) {}
+      };
+
+      // Add Equipment (Strict 3 per group Free / 15 per group Pro Cap)
+      const handleAutoDiscoverAdd = async (e) => {
+        e.preventDefault();
+        const effectiveBrand = (brandInput || '').trim() || 'Custom';
+        const effectiveModel = (modelInput || '').trim();
+        const effectiveName = (nameInput || '').trim();
+
+        if (!effectiveBrand || (!effectiveModel && !effectiveName)) return;
+
+        let finalUnitId = 'unit_main';
+        if (isPaidUser && groupTextInput.trim()) {
+          const match = units.find(u => u.name.toLowerCase() === groupTextInput.trim().toLowerCase());
+          if (match) {
+            finalUnitId = match.id;
+          } else {
+            if (units.length >= PRO_MAX_GROUPS) {
+              alert(`Group Limit Reached: Advanced Manager supports up to ${PRO_MAX_GROUPS} groups.`);
+              return;
+            }
+            const newU = {
+              id: `unit_${Date.now()}`,
+              name: groupTextInput.trim(),
+              notificationsEnabled: true,
+              collapsed: false
+            };
+            setUnits(prev => [...prev, newU]);
+            finalUnitId = newU.id;
+          }
+        }
+
+        const targetUnit = units.find(u => u.id === finalUnitId) || units[0];
+        const appliancesInThisGroup = appliances.filter(a => a.unitId === targetUnit.id || a.unitName === targetUnit.name);
+        const maxAllowedPerGroup = isPaidUser ? PRO_MAX_PER_GROUP : FREE_MAX_PER_GROUP;
+
+        if (appliancesInThisGroup.length >= maxAllowedPerGroup) {
+          alert(`Tier Limit Reached: "${targetUnit.name}" already has ${appliancesInThisGroup.length} appliances. (${isPaidUser ? `Advanced Manager allows up to ${PRO_MAX_PER_GROUP} per group` : `Free Plan allows up to ${FREE_MAX_PER_GROUP} in 1 group`}).`);
+          return;
+        }
+
+        setIsAnalyzing(true);
+        setLookupStatus('Absorbing specs & cataloging parts...');
+
+        let discoveredConsumables = [];
+        let discoveredParts = [];
+        let detectedCategory = 'Home Fixture';
+        let resolvedCanonicalName = effectiveName;
+
+        try {
+          const res = await fetch(WORKER_ENDPOINT + '/api/discover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: `Extract commercial title, category, and replacement parts for Brand "${effectiveBrand}", Model "${effectiveModel}", Product "${effectiveName}". Return strict JSON only.`,
+              isPaid: isPaidUser
+            })
+          });
+          const data = await res.json();
+          if (data?.text) {
+            const match = data.text.match(/\{[\s\S]*\}/);
+            if (match) {
+              const parsed = JSON.parse(match[0]);
+              resolvedCanonicalName = parsed.canonicalName || resolvedCanonicalName;
+              detectedCategory = parsed.category || detectedCategory;
+              discoveredConsumables = parsed.consumables || [];
+              discoveredParts = parsed.replacementParts || [];
+            }
+          }
+        } catch (err) {}
+
+        const parsedIsoPurchaseDate = parseMMDDYYYYToISO(purchaseDateInput);
 
         const newItem = {
-          id: `app_${Date.now()}`,
-          unitId: 'unit_main',
-          name: effectiveName,
+          id: Date.now().toString(),
+          unitId: targetUnit.id,
+          unitName: targetUnit.name,
+          name: sanitizeCommercialName(resolvedCanonicalName || effectiveName || `${effectiveBrand} Equipment`, effectiveModel),
           nickname: nicknameInput.trim(),
           brand: effectiveBrand,
           modelNumber: effectiveModel,
-          category: 'Appliance',
-          purchaseDate: isoDate,
-          warrantyMonths: isoDate ? Number(warrantyMonthsInput) : 0,
-          consumables: [],
-          replacementParts: [],
-          seasonalTasks: generateSeasonalRemindersForAsset('Appliance', effectiveName, effectiveBrand)
+          category: detectedCategory,
+          purchaseDate: parsedIsoPurchaseDate,
+          warrantyMonths: parsedIsoPurchaseDate ? (Number(warrantyMonthsInput) || 12) : 0,
+          warrantyDoc: null,
+          receiptDoc: receiptDataUrl ? { name: 'Receipt.jpg', dataUrl: receiptDataUrl, uploadDate: new Date().toLocaleDateString() } : null,
+          receipt: receiptDataUrl,
+          componentsReplaceable: discoveredParts.length > 0,
+          consumables: discoveredConsumables,
+          replacementParts: discoveredParts,
+          seasonalTasks: generateSeasonalRemindersForAsset(detectedCategory, resolvedCanonicalName || effectiveName, effectiveBrand)
         };
 
-        const updated = [newItem, ...appliances];
-        setAppliances(updated);
-        TelemetryEngine.recordReliabilityEvent('asset_registered', effectiveModel, 'Appliance');
-        await pushCatalogToCloud(updated);
+        const updatedAppliances = [newItem, ...appliances];
+        setAppliances(updatedAppliances);
+        TelemetryEngine.recordReliabilityEvent('asset_registered', effectiveModel, detectedCategory);
+        autoSyncToCloud(updatedAppliances, units);
 
         setBrandInput('');
         setModelInput('');
         setNameInput('');
         setNicknameInput('');
         setPurchaseDateInput('');
+        setGroupTextInput('');
+        setReceiptDataUrl('');
         setIsAnalyzing(false);
         setIsAddOpen(false);
       };
@@ -582,7 +793,7 @@
         setMessages([{
           id: '1',
           sender: 'assistant',
-          text: `What is going on with your ${item.brand} ${item.name}? Describe symptoms, error codes, or noises.`
+          text: `Ready to diagnose your ${item.brand} ${item.name}. What symptoms, noises, or error codes are you seeing?`
         }]);
       };
 
@@ -595,6 +806,15 @@
           return;
         }
 
+        const quota = AIQuotaTracker.getStatus(isPaidUser);
+        if (quota.isLocked) {
+          alert(isPaidUser 
+            ? "Recent inquiry limit reached (65/65). Window refreshes automatically." 
+            : "Free diagnostic limit reached (5/5). Upgrade to Advanced Manager for unlimited diagnostics."
+          );
+          return;
+        }
+
         const userMsg = { id: Date.now().toString(), sender: 'user', text: q };
         const updated = [...messages, userMsg];
         setMessages(updated);
@@ -604,42 +824,210 @@
         AIQuotaTracker.increment(isPaidUser);
 
         setIsLoading(true);
+        const authToken = localStorage.getItem('auth_token');
         try {
-          const res = await fetch(WORKER_ENDPOINT, {
+          const res = await fetch(WORKER_ENDPOINT + '/', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authToken ? `Bearer ${authToken}` : ''
+            },
             body: JSON.stringify({
-              prompt: `[Context: ${activeAppliance.brand} ${activeAppliance.modelNumber}] Query: ${q}`,
-              history: messages,
+              prompt: `[Context: ${activeAppliance.brand} ${activeAppliance.modelNumber || activeAppliance.name}] Query: ${q}`,
+              history: messages.filter(m => !m.text.includes('{')).slice(-4),
               isPaid: isPaidUser
             })
           });
           const data = await res.json();
           setMessages([...updated, { id: Date.now().toString(), sender: 'assistant', text: data.text || "Diagnostic received." }]);
-        } catch (e) {
+        } catch (err) {
           setMessages([...updated, { id: Date.now().toString(), sender: 'assistant', text: "Service temporarily unreachable." }]);
         } finally {
           setIsLoading(false);
         }
       };
 
+      const getPassportRemainingTimeString = () => {
+        if (!passportFirstUsedTimestamp) return "72 hours left";
+        const remainingMs = PASSPORT_WINDOW_MS - (Date.now() - passportFirstUsedTimestamp);
+        if (remainingMs <= 0) return "Expired";
+        const totalMinutes = Math.ceil(remainingMs / (1000 * 60));
+        if (totalMinutes < 60) return `${totalMinutes} minutes left`;
+        const hours = Math.ceil(totalMinutes / 60);
+        return `${hours} hours left`;
+      };
+
+      const isPassportUnlocked = () => {
+        if (!passportPurchased) return false;
+        if (!passportFirstUsedTimestamp) return true;
+        return (Date.now() - passportFirstUsedTimestamp) < PASSPORT_WINDOW_MS;
+      };
+
+      const handleDownloadPassport = async () => {
+        setIsGeneratingPdf(true);
+        if (!passportFirstUsedTimestamp) {
+          const now = Date.now();
+          setPassportFirstUsedTimestamp(now);
+          localStorage.setItem('passport_first_used', now.toString());
+        }
+
+        try {
+          const html2pdfLib = await loadPdfEngineLazy();
+          const element = document.createElement('div');
+          element.style.padding = '24px';
+          element.style.fontFamily = 'Arial, sans-serif';
+          element.style.color = '#111827';
+          element.style.backgroundColor = '#FFFFFF';
+
+          let passportContent = '<div style="border-bottom: 2px solid #D97706; padding-bottom: 12px; margin-bottom: 16px;">';
+          passportContent += '<h1 style="font-size: 20px; font-weight: bold; margin: 0;">HOME APPLIANCE PASSPORT</h1>';
+          passportContent += '<p style="font-size: 11px; color: #4B5563; margin-top: 4px;">Verified Hardware Inventory & Maintenance Ledger</p>';
+          passportContent += '<p style="font-size: 10px; color: #6B7280;">Account: ' + (userEmail || 'Homeowner') + ' • Generated: ' + new Date().toLocaleDateString() + '</p>';
+          passportContent += '</div>';
+
+          appliances.forEach(app => {
+            passportContent += '<div style="border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px; margin-bottom: 12px; page-break-inside: avoid;">';
+            passportContent += '<div style="display: flex; justify-content: space-between;">';
+            passportContent += '<h3 style="font-size: 14px; font-weight: bold; margin: 0 0 4px 0;">' + app.name + '</h3>';
+            passportContent += '<span style="font-size: 11px; color: #6B7280;">' + (app.unitName || 'Main') + '</span>';
+            passportContent += '</div>';
+            passportContent += '<p style="font-size: 11px; color: #374151; margin: 2px 0;"><strong>Brand:</strong> ' + app.brand + ' | <strong>Model:</strong> ' + (app.modelNumber || 'N/A') + '</p>';
+            passportContent += '<p style="font-size: 11px; color: #374151; margin: 2px 0;"><strong>Purchased:</strong> ' + (app.purchaseDate || 'Not specified') + ' (' + (app.warrantyMonths || 12) + ' Mos Coverage)</p>';
+            passportContent += '</div>';
+          });
+
+          element.innerHTML = passportContent;
+
+          await html2pdfLib().set({
+            margin: 12,
+            filename: `Home_Passport_${Date.now()}.pdf`,
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          }).from(element).save();
+        } catch (err) {
+          alert("Could not generate PDF passport.");
+        } finally {
+          setIsGeneratingPdf(false);
+        }
+      };
+
+      const toggleSelectId = (id) => {
+        setSelectedIds(selectedIds.includes(id) ? selectedIds.filter(item => item !== id) : [...selectedIds, id]);
+      };
+
+      const selectAll = () => {
+        setSelectedIds(selectedIds.length === appliances.length ? [] : appliances.map(a => a.id));
+      };
+
+      const confirmBulkDelete = () => {
+        const filtered = appliances.filter((a) => !selectedIds.includes(a.id));
+        setAppliances(filtered);
+        setSelectedIds([]);
+        setIsSelectMode(false);
+        setIsBulkDeleteModalOpen(false);
+        autoSyncToCloud(filtered, units);
+      };
+
+      const renderApplianceCard = (item) => {
+        const isSelected = selectedIds.includes(item.id);
+
+        return (
+          <div
+            key={item.id}
+            className={`relative rounded-[22px] border transition-all duration-200 overflow-hidden shadow-sm ${
+              isDark ? 'bg-zinc-900/90 border-white/10' : 'bg-white border-black/10 shadow-sm'
+            } ${isSelected ? 'ring-2 ring-amber-500' : ''}`}
+          >
+            <div className="p-4 flex items-center gap-3.5">
+              {isSelectMode && (
+                <div
+                  onClick={() => toggleSelectId(item.id)}
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center cursor-pointer text-xs font-bold shrink-0 ${
+                    isSelected ? 'bg-amber-500 border-amber-500 text-black' : (isDark ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-300 bg-white')
+                  }`}
+                >
+                  {isSelected && '✓'}
+                </div>
+              )}
+
+              <div
+                onClick={() => {
+                  if (isSelectMode) toggleSelectId(item.id);
+                  else { setSelectedAppliance(item); setDetailTab('parts'); }
+                }}
+                className="flex-1 flex items-center gap-3.5 cursor-pointer min-w-0 active:scale-[0.99] transition-transform"
+              >
+                <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center shrink-0 overflow-hidden ${
+                  isDark ? 'bg-black/40 border-white/10' : 'bg-[#E5E5EA] border-black/5'
+                }`}>
+                  {item.receipt ? (
+                    <img src={item.receipt} alt="Receipt" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className={isDark ? 'text-zinc-300' : 'text-[#1C1C1E]'}>{GLYPHS.default}</div>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-baseline">
+                    <h2 className="text-[15px] font-bold tracking-tight truncate leading-tight">
+                      {item.name}
+                      {item.nickname && (
+                        <span className={`font-medium ml-1.5 ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                          ({item.nickname})
+                        </span>
+                      )}
+                    </h2>
+                    {!isSelectMode && <span className={isDark ? "text-zinc-500 text-xs" : "text-[#8E8E93] text-xs font-semibold"}>➔</span>}
+                  </div>
+                  <p className={`text-xs font-medium mt-0.5 truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                    {item.brand}{item.modelNumber ? ` • ${item.modelNumber}` : ''}
+                  </p>
+                  <p className={`text-[11px] mt-0.5 truncate ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>{item.category || 'Appliance'}</p>
+                </div>
+              </div>
+            </div>
+
+            {!isSelectMode && (
+              <div className={`px-4 pb-3.5 pt-2.5 border-t ${
+                isDark ? 'border-white/5 bg-black/20' : 'border-black/5 bg-[#F9F9FB]'
+              }`}>
+                <div className="flex justify-between items-center">
+                  <span className={`text-[10px] font-bold tracking-wider uppercase ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                    Maintenance Schedule
+                  </span>
+                  <button
+                    onClick={() => openAssistant(item)}
+                    className="text-[11px] font-bold text-amber-600 dark:text-amber-500 hover:underline"
+                  >
+                    Ask Manual 💬
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
       return (
         <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
           isDark ? 'bg-black text-white' : 'bg-[#F2F2F7] text-[#1C1C1E]'
         }`}>
-          {/* Header */}
-          <header className={`px-5 pt-12 pb-3.5 sticky top-0 z-20 backdrop-blur-2xl border-b transition-colors ${
+          {/* Header without large "Appliances" word */}
+          <header className={`px-5 pt-12 pb-4 sticky top-0 z-20 backdrop-blur-2xl border-b transition-colors ${
             isDark ? 'bg-black/75 border-white/10' : 'bg-white/80 border-black/10'
           }`}>
-            <div className="flex justify-between items-end">
+            <div className="flex justify-between items-center">
               <div>
-                <p className="text-[12px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500">
-                  {isPaidUser ? 'Pro Manager' : (currentUser ? 'Connected Account' : 'Guest Mode')}
+                <p className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-500">
+                  {isPaidUser ? 'Advanced Manager' : 'Free Plan'}
                 </p>
-                <h1 className="text-3xl font-extrabold tracking-tight">Appliances</h1>
+                <p className={`text-[11px] font-medium mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {appliances.length} {appliances.length === 1 ? 'item registered' : 'items registered'}
+                </p>
               </div>
 
-              <div className="flex items-center gap-2.5 pb-0.5">
+              <div className="flex items-center gap-2.5">
                 <button
                   onClick={() => setIsAddOpen(true)}
                   className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg shadow-sm active:scale-90 transition-transform ${
@@ -664,38 +1052,239 @@
           </header>
 
           {/* Main List */}
-          <main className="flex-1 p-4 space-y-3 pb-28">
-            {appliances.length === 0 ? (
-              <div className={`text-center py-16 px-4 rounded-3xl border ${isDark ? 'bg-zinc-900/40 border-white/5' : 'bg-white border-black/10'}`}>
-                <p className="text-sm font-bold">No appliances added yet</p>
-                <p className={`text-xs mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>Tap + to scan a label or enter details manually.</p>
-              </div>
-            ) : (
-              appliances.map(item => (
-                <div
-                  key={item.id}
-                  className={`rounded-2xl p-4 border transition-all ${
-                    isDark ? 'bg-zinc-900/80 border-white/10' : 'bg-white border-black/10 shadow-sm'
+          <main className="flex-1 p-4 space-y-4 pb-28">
+            <div className="flex justify-between items-center px-1">
+              <span className={`text-[12px] font-bold tracking-wide uppercase ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                {appliances.length} Items ({units.length} / {isPaidUser ? PRO_MAX_GROUPS : FREE_MAX_GROUPS} Groups)
+              </span>
+
+              <div className="flex items-center gap-2">
+                {isPaidUser && isSelectMode && (
+                  <button
+                    onClick={() => setIsAddGroupModalOpen(true)}
+                    className={`text-xs px-2.5 py-1 rounded-full font-bold shadow-sm ${
+                      isDark ? 'bg-zinc-800 text-zinc-200 border border-white/10' : 'bg-[#E5E5EA] text-[#1C1C1E]'
+                    }`}
+                  >
+                    + Add Group
+                  </button>
+                )}
+                <button
+                  onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }}
+                  className={`text-xs px-3 py-1 rounded-full font-bold transition-all ${
+                    isSelectMode ? 'bg-amber-600 text-white shadow-sm' : (isDark ? 'bg-white/10 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]')
                   }`}
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h2 className="text-base font-extrabold truncate">{item.name}</h2>
-                      <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                        {item.brand} {item.modelNumber && `• ${item.modelNumber}`}
-                      </p>
+                  {isSelectMode ? 'Done' : 'Select'}
+                </button>
+              </div>
+            </div>
+
+            {/* Groups */}
+            <div className="space-y-4">
+              {units.map((unit) => {
+                const unitAppliances = appliances.filter(a => a.unitId === unit.id || a.unitName === unit.name);
+
+                return (
+                  <div
+                    key={unit.id}
+                    className={`rounded-[26px] border overflow-hidden shadow-sm ${
+                      isDark ? 'bg-zinc-950/60 border-white/10' : 'bg-[#E5E5EA]/40 border-black/10'
+                    }`}
+                  >
+                    <div className={`p-4 flex items-center justify-between ${
+                      isDark ? 'bg-zinc-900/70 border-b border-white/5' : 'bg-white border-b border-black/5'
+                    }`}>
+                      <div
+                        onClick={() => setUnits(units.map(u => u.id === unit.id ? { ...u, collapsed: !u.collapsed } : u))}
+                        className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
+                      >
+                        <span className="text-xs font-bold text-amber-600 dark:text-amber-500">
+                          {unit.collapsed ? '▶' : '▼'}
+                        </span>
+                        <h3 className="text-base font-extrabold tracking-tight truncate">{unit.name}</h3>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
+                        }`}>
+                          {unitAppliances.length} / {isPaidUser ? PRO_MAX_PER_GROUP : FREE_MAX_PER_GROUP}
+                        </span>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => openAssistant(item)}
-                      className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow-sm active:scale-95 transition-transform"
-                    >
-                      Ask Manual 💬
-                    </button>
+
+                    {!unit.collapsed && (
+                      <div className="p-3 space-y-2.5">
+                        {unitAppliances.length > 0 ? (
+                          unitAppliances.map(item => renderApplianceCard(item))
+                        ) : (
+                          <div className={`p-5 text-center rounded-2xl border ${isDark ? 'text-zinc-400 bg-black/20 border-white/5' : 'text-[#636366] bg-white/60 border-black/5'}`}>
+                            <p className="text-xs font-semibold">No equipment in this group</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))
-            )}
+                );
+              })}
+            </div>
           </main>
+
+          {/* Appliance Detail View */}
+          {selectedAppliance && (
+            <div className="fixed inset-0 z-40 flex flex-col bg-inherit">
+              <div className={`p-6 border-b flex flex-col items-center justify-center relative ${
+                isDark ? 'bg-zinc-950/60 border-white/10' : 'bg-white border-black/10'
+              }`}>
+                <button
+                  onClick={() => setSelectedAppliance(null)}
+                  className={`absolute top-4 left-4 px-4 py-1.5 rounded-full text-xs font-bold shadow-sm ${
+                    isDark ? 'bg-white/10 text-white' : 'bg-[#E5E5EA] text-[#1C1C1E]'
+                  }`}
+                >
+                  Done
+                </button>
+
+                <h2 className="text-xl font-extrabold tracking-tight mt-6 truncate">{selectedAppliance.name}</h2>
+                <p className={`text-xs font-semibold mt-1 ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                  {selectedAppliance.brand}{selectedAppliance.modelNumber ? ` • ${selectedAppliance.modelNumber}` : ''}
+                </p>
+              </div>
+
+              <div className="flex px-4 pt-3 gap-2">
+                {[{ id: 'parts', label: 'Components' }, { id: 'docs', label: 'Warranty & Receipt' }].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setDetailTab(tab.id)}
+                    className={`flex-1 py-2 rounded-full text-xs font-bold transition-all shadow-sm ${
+                      detailTab === tab.id
+                        ? (isDark ? 'bg-white text-black' : 'bg-[#1C1C1E] text-white')
+                        : (isDark ? 'bg-white/10 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]')
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                {detailTab === 'parts' && (
+                  <div className="space-y-3">
+                    {selectedAppliance.replacementParts?.length > 0 ? (
+                      selectedAppliance.replacementParts.map(p => (
+                        <div key={p.id} className={`rounded-2xl p-3.5 flex justify-between items-center border ${
+                          isDark ? 'bg-zinc-900/60 border-white/5' : 'bg-white border-black/10 shadow-sm'
+                        }`}>
+                          <div className="pr-2 min-w-0">
+                            <p className="text-xs font-semibold truncate">{p.name}</p>
+                            <p className={`text-[10px] font-mono ${isDark ? 'text-zinc-400' : 'text-[#8E8E93]'}`}>Part #: {p.partNumber}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => window.open(buildPartPurchaseUrl(selectedAppliance.brand, p, 'oem'), '_blank')}
+                              className={`text-[11px] font-bold px-3 py-1.5 rounded-full border transition-all active:scale-95 ${
+                                isDark ? 'bg-zinc-800 text-zinc-200 border-white/10' : 'bg-[#E5E5EA] text-black border-black/5'
+                              }`}
+                            >
+                              OEM ↗
+                            </button>
+                            <button
+                              onClick={() => window.open(buildPartPurchaseUrl(selectedAppliance.brand, p, 'amazon'), '_blank')}
+                              className="bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-sm"
+                            >
+                              Amazon ↗
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className={`text-xs text-center py-4 ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>No replacement parts listed.</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Restored 2-Card Warranty & Receipt View */}
+                {detailTab === 'docs' && (
+                  <div className="space-y-3">
+                    {/* Manufacturer Warranty Card */}
+                    <div className={`rounded-2xl p-4 border ${isDark ? 'bg-zinc-900/80 border-white/5' : 'bg-white border-black/10 shadow-sm'}`}>
+                      <div className="flex justify-between items-start mb-2.5">
+                        <div className="pr-2">
+                          <h3 className="text-xs font-bold uppercase tracking-wider">Manufacturer Warranty</h3>
+                          <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Activate registration, start claim, or store proof</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => openWarrantyRegistration(selectedAppliance)}
+                            className="bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors shadow-sm"
+                          >
+                            <span>Activate</span>
+                            <span className="text-[9px]">↗</span>
+                          </button>
+
+                          <label className="bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-sm">
+                            <span>Upload</span>
+                            <span className="text-[9px]">↑</span>
+                            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(selectedAppliance.id, 'warrantyDoc', e)} />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className={`pt-2 border-t flex items-center justify-between ${isDark ? 'border-white/5' : 'border-black/5'}`}>
+                        <span className={`text-[10px] ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Need manufacturer repair or file a claim?</span>
+                        <button
+                          onClick={() => openOfficialBrandSupport(selectedAppliance)}
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border flex items-center gap-1 ${
+                            isDark ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700' : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-black border-black/5'
+                          }`}
+                        >
+                          <span>Official Support & Claims</span>
+                          <span className="text-[9px]">↗</span>
+                        </button>
+                      </div>
+
+                      {selectedAppliance.warrantyDoc ? (
+                        <div className={`border rounded-lg p-2.5 mt-3 flex items-center justify-between ${isDark ? 'bg-black/40 border-white/5' : 'bg-stone-50 border-black/5'}`}>
+                          <p className={`text-xs truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.warrantyDoc.name}</p>
+                          <a href={selectedAppliance.warrantyDoc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline font-bold">View</a>
+                        </div>
+                      ) : (
+                        <p className={`text-xs mt-2 ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>No paperwork attached.</p>
+                      )}
+                    </div>
+
+                    {/* Purchase Receipt Card */}
+                    <div className={`rounded-2xl p-4 border ${isDark ? 'bg-zinc-900/80 border-white/5' : 'bg-white border-black/10 shadow-sm'}`}>
+                      <div className="flex justify-between items-center mb-2">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider">Purchase Receipt</p>
+                          <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Proof of purchase & invoice storage</p>
+                        </div>
+                        <label className="bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-sm">
+                          <span>Upload</span>
+                          <span className="text-[9px]">↑</span>
+                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(selectedAppliance.id, 'receiptDoc', e)} />
+                        </label>
+                      </div>
+
+                      {selectedAppliance.receipt && !selectedAppliance.receiptDoc && (
+                        <div className="mt-2 rounded-xl overflow-hidden max-h-56 border border-white/10">
+                          <img src={selectedAppliance.receipt} alt="Receipt" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+
+                      {selectedAppliance.receiptDoc ? (
+                        <div className={`border rounded-lg p-2.5 mt-2 flex items-center justify-between ${isDark ? 'bg-black/40 border-white/5' : 'bg-stone-50 border-black/5'}`}>
+                          <p className={`text-xs truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>{selectedAppliance.receiptDoc.name}</p>
+                          <a href={selectedAppliance.receiptDoc.dataUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline font-bold">View</a>
+                        </div>
+                      ) : !selectedAppliance.receipt && (
+                        <p className={`text-xs ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>No receipt attached.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Add Equipment Sheet */}
           {isAddOpen && (
@@ -714,14 +1303,28 @@
                   <AppleCloseButton isDark={isDark} onClick={() => setIsAddOpen(false)} />
                 </div>
 
-                <form onSubmit={handleAddAppliance} className="space-y-3">
+                <form onSubmit={handleAutoDiscoverAdd} className="space-y-3">
+                  {isPaidUser && (
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Group / Unit Name</label>
+                      <input
+                        className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
+                          isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
+                        }`}
+                        placeholder="e.g. APT 25 or Main Residence"
+                        value={groupTextInput}
+                        onChange={(e) => setGroupTextInput(e.target.value)}
+                      />
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">1. Brand / Maker *</label>
                     <input
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      placeholder="e.g. Coway, GE, Moen"
+                      placeholder="e.g. Coway, GE, Moen, Bosch"
                       value={brandInput}
                       onChange={(e) => setBrandInput(e.target.value)}
                       required
@@ -734,14 +1337,17 @@
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
                       }`}
-                      placeholder="e.g. AP-1512HH"
+                      placeholder="e.g. AP-1512HH, SHXM78Z55N"
                       value={modelInput}
                       onChange={(e) => setModelInput(e.target.value)}
                     />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">3. Product Name *</label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">3. Product Name *</label>
+                      {lookupStatus && <span className="text-[10px] text-amber-500 font-medium animate-pulse">{lookupStatus}</span>}
+                    </div>
                     <input
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                         isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
@@ -754,7 +1360,19 @@
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">4. Purchase Date (MM/DD/YYYY)</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">4. Nickname (Optional)</label>
+                    <input
+                      className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
+                      }`}
+                      placeholder="e.g. Living Room, Upstairs"
+                      value={nicknameInput}
+                      onChange={(e) => setNicknameInput(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">5. Purchase Date (MM/DD/YYYY)</label>
                     <input
                       type="text"
                       className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
@@ -766,163 +1384,75 @@
                     />
                   </div>
 
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Receipt / Warranty Photo (Optional)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleReceiptPhotoAttachment}
+                      className={`w-full text-xs font-medium mt-1 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold ${
+                        isDark ? 'file:bg-zinc-800 file:text-white' : 'file:bg-zinc-200 file:text-black'
+                      }`}
+                    />
+                  </div>
+
                   <button
                     type="submit"
                     disabled={isAnalyzing}
                     className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-md active:scale-98 transition-all"
                   >
-                    Save Equipment
+                    {isAnalyzing ? 'Cataloging Hardware...' : 'Save Equipment'}
                   </button>
                 </form>
               </div>
             </div>
           )}
 
-          {/* Account & Auth Modal */}
-          {isAuthModalOpen && (
+          {/* Add Group Modal */}
+          {isAddGroupModalOpen && (
             <div
-              onClick={() => setIsAuthModalOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-[60] cursor-pointer"
+              onClick={() => setIsAddGroupModalOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 cursor-pointer"
             >
               <div
                 onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-sm rounded-t-[32px] p-6 space-y-4 border-t cursor-default ${
-                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default ${
+                  isDark ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
                 }`}
               >
                 <div className="flex justify-between items-center">
-                  <h3 className="text-base font-extrabold">Account Login / Register</h3>
-                  <AppleCloseButton isDark={isDark} onClick={() => setIsAuthModalOpen(false)} />
+                  <h3 className="text-base font-extrabold tracking-tight">Create New Group</h3>
+                  <AppleCloseButton isDark={isDark} onClick={() => setIsAddGroupModalOpen(false)} />
                 </div>
 
-                {authStep === 'email' ? (
-                  <form onSubmit={handleRequestOtp} className="space-y-3">
-                    <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                      Enter your email to sign in or create an account. We'll send a 6-digit confirmation code.
-                    </p>
-                    <input
-                      type="email"
-                      className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none border ${
-                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                      }`}
-                      placeholder="your@email.com"
-                      value={authEmailInput}
-                      onChange={(e) => setAuthEmailInput(e.target.value)}
-                      required
-                    />
-                    <button
-                      type="submit"
-                      disabled={authLoading}
-                      className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-3 rounded-2xl shadow-sm active:scale-95"
-                    >
-                      {authLoading ? 'Sending...' : 'Send Login Code'}
-                    </button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleConfirmOtp} className="space-y-3">
-                    <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                      Enter the 6-digit PIN sent to {authEmailInput}:
-                    </p>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength="6"
-                      className={`w-full text-center tracking-widest text-lg font-bold rounded-2xl p-3 focus:outline-none border ${
-                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
-                      }`}
-                      placeholder="123456"
-                      value={authPinInput}
-                      onChange={(e) => setAuthPinInput(e.target.value.replace(/\D/g, ''))}
-                      required
-                    />
-                    {devPasscodeNotice && (
-                      <p className="text-[11px] text-amber-500 font-bold text-center">{devPasscodeNotice}</p>
-                    )}
-                    <button
-                      type="submit"
-                      disabled={authLoading}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3 rounded-2xl shadow-sm active:scale-95"
-                    >
-                      {authLoading ? 'Verifying...' : 'Confirm & Log In'}
-                    </button>
+                <form onSubmit={handleCreateGroup} className="space-y-3">
+                  <input
+                    className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none border ${
+                      isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/60 border-black/10 text-black'
+                    }`}
+                    placeholder="e.g. Unit 4B, Basement"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => setAuthStep('email')}
-                      className="w-full text-center text-[11px] text-zinc-500 hover:underline"
+                      onClick={() => setIsAddGroupModalOpen(false)}
+                      className={`flex-1 py-2.5 rounded-2xl text-xs font-bold ${
+                        isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
+                      }`}
                     >
-                      Change Email
+                      Cancel
                     </button>
-                  </form>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Settings Modal */}
-          {isSettingsOpen && (
-            <div
-              onClick={() => setIsSettingsOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer"
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 border-t cursor-default ${
-                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
-                }`}
-              >
-                <div className="flex justify-between items-center pb-2 border-b border-white/10">
-                  <h3 className="text-base font-extrabold">Settings</h3>
-                  <AppleCloseButton isDark={isDark} onClick={() => setIsSettingsOpen(false)} />
-                </div>
-
-                <div className={`p-4 rounded-2xl border space-y-2.5 ${isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10'}`}>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-xs font-extrabold">Account Connection</p>
-                      <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                        {currentUser ? currentUser.email : "Not signed in (Guest Mode)"}
-                      </p>
-                    </div>
-                    {currentUser ? (
-                      <button onClick={handleLogout} className="text-xs text-rose-500 font-bold underline">
-                        Log Out
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => { setIsSettingsOpen(false); setIsAuthModalOpen(true); }}
-                        className="bg-amber-600 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow-sm"
-                      >
-                        Sign In
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className={`p-4 rounded-2xl flex justify-between items-center border ${isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10'}`}>
-                  <div>
-                    <p className="text-xs font-extrabold">Subscription Plan</p>
-                    <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>{isPaidUser ? 'Pro Manager' : 'Free Standard'}</p>
-                  </div>
-                  {!isPaidUser && (
                     <button
-                      onClick={() => {
-                        if (!currentUser) {
-                          setIsSettingsOpen(false);
-                          setIsAuthModalOpen(true);
-                        } else {
-                          setIsPaywallOpen(true);
-                        }
-                      }}
-                      className="bg-amber-600 text-white font-bold text-xs px-3 py-1.5 rounded-xl"
+                      type="submit"
+                      className="flex-1 py-2.5 rounded-2xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-sm"
                     >
-                      Upgrade ($3.99/mo)
+                      Create
                     </button>
-                  )}
-                </div>
-
-                <button onClick={() => setIsSettingsOpen(false)} className="w-full bg-zinc-800 text-white font-bold text-xs py-3 rounded-2xl">
-                  Close
-                </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
@@ -985,6 +1515,451 @@
                   />
                   <button onClick={() => sendQuery()} className="bg-amber-600 text-white font-bold text-xs px-4 rounded-full">
                     Send
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Account Login Modal (with 60-Second Cooldown) */}
+          {isAuthModalOpen && (
+            <div
+              onClick={() => setIsAuthModalOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-[60] cursor-pointer"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={`w-full max-w-sm rounded-t-[32px] p-6 space-y-4 border-t cursor-default ${
+                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+                }`}
+              >
+                <div className="flex justify-between items-center">
+                  <h3 className="text-base font-extrabold">Account Login / Register</h3>
+                  <AppleCloseButton isDark={isDark} onClick={() => setIsAuthModalOpen(false)} />
+                </div>
+
+                {authStep === 'email' ? (
+                  <form onSubmit={handleRequestOtp} className="space-y-3">
+                    <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                      Enter your email to sign in or backup your equipment. We'll send a 6-digit confirmation code.
+                    </p>
+                    <input
+                      type="email"
+                      className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none border ${
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
+                      }`}
+                      placeholder="your@email.com"
+                      value={authEmailInput}
+                      onChange={(e) => setAuthEmailInput(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="submit"
+                      disabled={authLoading || otpCooldownSeconds > 0}
+                      className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs py-3 rounded-2xl shadow-sm active:scale-95 transition-all"
+                    >
+                      {authLoading ? 'Sending...' : (otpCooldownSeconds > 0 ? `Wait ${otpCooldownSeconds}s` : 'Send Login Code')}
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleConfirmOtp} className="space-y-3">
+                    <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                      Enter the 6-digit PIN sent to {authEmailInput}:
+                    </p>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength="6"
+                      className={`w-full text-center tracking-widest text-lg font-bold rounded-2xl p-3 focus:outline-none border ${
+                        isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/70 border-black/10 text-black'
+                      }`}
+                      placeholder="123456"
+                      value={authPinInput}
+                      onChange={(e) => setAuthPinInput(e.target.value.replace(/\D/g, ''))}
+                      required
+                    />
+                    {devPasscodeNotice && (
+                      <p className="text-[11px] text-amber-500 font-bold text-center">{devPasscodeNotice}</p>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={authLoading}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3 rounded-2xl shadow-sm active:scale-95"
+                    >
+                      {authLoading ? 'Verifying...' : 'Confirm & Log In'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAuthStep('email')}
+                      className="w-full text-center text-[11px] text-zinc-500 hover:underline"
+                    >
+                      Change Email
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Settings Modal */}
+          {isSettingsOpen && (
+            <div
+              onClick={() => setIsSettingsOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 shadow-2xl border-t cursor-default ${
+                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+                }`}
+              >
+                {/* Header with Styled Email Bubble */}
+                <div className="flex justify-between items-start pb-2 border-b border-black/10 dark:border-white/10">
+                  <div>
+                    <h3 className="text-base font-extrabold tracking-tight">Account & Settings</h3>
+                    {userEmail ? (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mt-1.5 border bg-amber-500/10 border-amber-500/20 text-amber-500">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                        {userEmail}
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mt-1.5 border bg-zinc-800 text-zinc-400 border-zinc-700">
+                        Guest Mode (Local Storage)
+                      </div>
+                    )}
+                  </div>
+                  <AppleCloseButton isDark={isDark} onClick={() => setIsSettingsOpen(false)} />
+                </div>
+
+                {!currentUser && (
+                  <div className={`p-4 rounded-2xl flex justify-between items-center border ${
+                    isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
+                  }`}>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Cloud Sync</span>
+                      <p className="text-xs font-extrabold">Sign in to backup & sync</p>
+                    </div>
+                    <button
+                      onClick={() => { setIsSettingsOpen(false); setIsAuthModalOpen(true); }}
+                      className="bg-amber-600 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-sm"
+                    >
+                      Sign In
+                    </button>
+                  </div>
+                )}
+
+                {/* Subscription Card */}
+                <div
+                  onClick={() => setIsSubInfoModalOpen(true)}
+                  className={`p-4 rounded-2xl flex justify-between items-center border cursor-pointer active:scale-[0.99] transition-transform ${
+                    isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
+                  }`}
+                >
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Subscription</span>
+                    <p className="text-sm font-extrabold mt-0.5">{isPaidUser ? 'Advanced Manager' : 'Free Plan'}</p>
+                  </div>
+                  <span className="text-xs font-bold text-amber-600 dark:text-amber-500">View ➔</span>
+                </div>
+
+                {/* Advanced Reasoning Usage Card */}
+                <div className={`p-4 rounded-2xl border space-y-1 ${
+                  isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
+                }`}>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Advanced Reasoning Usage</span>
+                  <p className="text-sm font-extrabold mt-0.5">
+                    {isPaidUser 
+                      ? `${AIQuotaTracker.getStatus(true).count} / 65 recent inquiries`
+                      : `${AIQuotaTracker.getStatus(false).count} / 5 recent inquiries`}
+                  </p>
+                  <p className={`text-[10px] leading-tight ${isDark ? 'text-zinc-400' : 'text-[#8E8E93]'}`}>
+                    {isPaidUser 
+                      ? 'Inquiry quota resets automatically on a rolling 2-hour window.'
+                      : 'Free standard inquiries switch to verified offline manual dossiers once reached.'}
+                  </p>
+                </div>
+
+                {/* Home Appliance Passport Card */}
+                <div className={`p-4 rounded-2xl border space-y-2.5 ${
+                  isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs font-extrabold">Home Appliance Passport (PDF)</p>
+                    <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                      $2.99
+                    </span>
+                  </div>
+                  <p className={`text-[10px] leading-tight ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                    One-time export generates a certified PDF audit trail with verification hash for home inspections, move-outs, or sales. Unlimited exports for 3 days after initial use.
+                  </p>
+                  <button
+                    onClick={() => { setIsSettingsOpen(false); setIsPassportModalOpen(true); }}
+                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-2 rounded-xl shadow-sm transition-all active:scale-95"
+                  >
+                    Configure & Export Passport ↗
+                  </button>
+                </div>
+
+                {/* Theme Mode */}
+                <div className={`p-4 rounded-2xl flex justify-between items-center border ${
+                  isDark ? 'bg-zinc-800/80 border-white/5' : 'bg-white border-black/10 shadow-sm'
+                }`}>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Appearance</span>
+                    <p className="text-sm font-extrabold mt-0.5">Theme Mode</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => { setThemeMode('dark'); localStorage.setItem('app_theme', 'dark'); }} className={`px-3.5 py-1.5 rounded-full text-xs font-bold ${isDark ? 'bg-black text-white shadow-sm' : 'bg-[#E5E5EA] text-[#636366]'}`}>Dark</button>
+                    <button onClick={() => { setThemeMode('light'); localStorage.setItem('app_theme', 'light'); }} className={`px-3.5 py-1.5 rounded-full text-xs font-bold ${!isDark ? 'bg-[#1C1C1E] text-white shadow-sm' : 'bg-zinc-800 text-zinc-400'}`}>Light</button>
+                  </div>
+                </div>
+
+                {/* Log Out Button at the Bottom */}
+                {currentUser && (
+                  <button
+                    onClick={handleLogout}
+                    className="w-full py-3 rounded-2xl text-xs font-bold border text-rose-500 border-rose-500/30 hover:bg-rose-500/10 transition-colors"
+                  >
+                    Log Out of {currentUser.email}
+                  </button>
+                )}
+
+                <button onClick={() => setIsSettingsOpen(false)} className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-extrabold text-xs py-3 rounded-2xl shadow-sm">
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Subscription Info Pop-up Modal */}
+          {isSubInfoModalOpen && (
+            <div
+              onClick={() => setIsSubInfoModalOpen(false)}
+              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[70] cursor-pointer"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default ${
+                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500">Subscription Status</span>
+                    <h3 className="text-lg font-extrabold tracking-tight mt-0.5">{isPaidUser ? 'Advanced Manager' : 'Free Plan'}</h3>
+                  </div>
+                  <AppleCloseButton isDark={isDark} onClick={() => setIsSubInfoModalOpen(false)} />
+                </div>
+
+                <div className={`p-4 rounded-2xl border space-y-2 text-xs ${
+                  isDark ? 'bg-zinc-800/80 border-white/5 text-zinc-300' : 'bg-[#E5E5EA]/60 border-black/5 text-[#1C1C1E]'
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-zinc-400">Current Plan</span>
+                    <span className="font-bold">{isPaidUser ? 'Advanced Manager' : 'Free Plan'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-zinc-400">Next Renewal / Expiration</span>
+                    <span className="font-bold">{isPaidUser ? 'November 15, 2026' : '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-zinc-400">Tier Capacity</span>
+                    <span className="font-bold">{isPaidUser ? '15 / group (5 groups max)' : 'Basic Manual troubleshooting. Limited.'}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-1">
+                  {isPaidUser ? (
+                    <button
+                      onClick={() => { setIsSubInfoModalOpen(false); setIsCancelModalOpen(true); }}
+                      className="w-full text-xs font-bold py-2.5 text-rose-500 hover:underline"
+                    >
+                      Cancel Subscription
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { setIsSubInfoModalOpen(false); setIsPaywallOpen(true); }}
+                      className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3 rounded-2xl shadow-sm text-center leading-snug"
+                    >
+                      Upgrade to Advanced Manager<br/>($4.99/month or $49.99/year)
+                    </button>
+                  )}
+                  <button onClick={() => setIsSubInfoModalOpen(false)} className="w-full bg-zinc-800 text-white font-bold text-xs py-2.5 rounded-2xl">
+                    Back
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cleaned Home Appliance Passport Modal */}
+          {isPassportModalOpen && (
+            <div
+              onClick={() => setIsPassportModalOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={`w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 shadow-2xl border-t cursor-default ${
+                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg font-extrabold tracking-tight">Home Appliance Passport</h3>
+                    <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Digital maintenance ledger & equipment audit</p>
+                  </div>
+                  <AppleCloseButton isDark={isDark} onClick={() => setIsPassportModalOpen(false)} />
+                </div>
+
+                <div className={`p-4 rounded-2xl border space-y-2.5 text-xs ${
+                  isDark ? 'bg-zinc-950/80 border-white/5 text-zinc-300' : 'bg-[#F9F9FB] border-black/5 text-[#1C1C1E]'
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <p className="font-bold text-sm">Property Audit PDF</p>
+                    <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                      $2.99 One-Time
+                    </span>
+                  </div>
+                  <p className={`text-[11px] leading-relaxed ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                    Compiles verified model specs, serial numbers, active filter lifespans, OEM maintenance dates, and warranty records into a PDF for real estate transfers, leases, and appraisals.
+                  </p>
+
+                  <div className="pt-2 border-t border-black/5 dark:border-white/5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-xs">Access Status</span>
+                      <span className={`font-bold text-xs ${isPassportUnlocked() ? 'text-emerald-500' : 'text-zinc-400'}`}>
+                        {isPassportUnlocked() ? getPassportRemainingTimeString() : 'Locked'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <div>
+                        <p className="font-semibold text-xs">Include Maintenance History</p>
+                        <p className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-[#8E8E93]'}`}>Attaches replacement timestamps & part numbers</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPassportIncludeHistory(!passportIncludeHistory)}
+                        className={`w-11 h-6 rounded-full transition-colors flex items-center p-0.5 ${
+                          passportIncludeHistory ? 'bg-emerald-500' : (isDark ? 'bg-zinc-800' : 'bg-[#E5E5EA]')
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
+                          passportIncludeHistory ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {isPassportUnlocked() ? (
+                  <button
+                    disabled={isGeneratingPdf}
+                    onClick={handleDownloadPassport}
+                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-md active:scale-98 transition-all disabled:opacity-50"
+                  >
+                    {isGeneratingPdf ? 'Compiling Passport...' : `Download Passport PDF (${getPassportRemainingTimeString()})`}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setPassportPurchased(true); localStorage.setItem('passport_purchased', 'true'); }}
+                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-md active:scale-98 transition-all"
+                  >
+                    Unlock Passport Access ($2.99 • Unlimited 3 Days)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Paywall Modal with Monthly & Annual Options */}
+          {isPaywallOpen && (
+            <div
+              onClick={() => setIsPaywallOpen(false)}
+              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 cursor-pointer"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default ${
+                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500">Advanced Manager</span>
+                    <h3 className="text-lg font-extrabold tracking-tight mt-0.5">Appliance Engine Pro</h3>
+                  </div>
+                  <AppleCloseButton isDark={isDark} onClick={() => setIsPaywallOpen(false)} />
+                </div>
+                <div className={`space-y-2 text-xs p-3.5 rounded-2xl font-medium ${isDark ? 'bg-zinc-800/80 text-zinc-300' : 'bg-[#E5E5EA]/60 text-[#1C1C1E]'}`}>
+                  <p>✓ <strong>15 Appliances Per Group:</strong> Manage up to 5 properties (75 total items).</p>
+                  <p>✓ <strong>65 Diagnostic Inquiries:</strong> Deep step-by-step troubleshooting assistance.</p>
+                  <p>✓ <strong>7-Day Retention:</strong> Diagnostic chats and history preserved for a full week.</p>
+                  <p>✓ <strong>Digital Home Passport:</strong> Full PDF export for escrow, inspection, and tenants.</p>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-1">
+                  <button
+                    onClick={() => { setIsPaidUser(true); localStorage.setItem('app_is_paid_user', 'true'); setIsPaywallOpen(false); }}
+                    className="w-full bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs py-3 rounded-2xl shadow-sm"
+                  >
+                    Upgrade Monthly ($4.99/mo)
+                  </button>
+                  <button
+                    onClick={() => { setIsPaidUser(true); localStorage.setItem('app_is_paid_user', 'true'); setIsPaywallOpen(false); }}
+                    className={`w-full py-3 rounded-2xl text-xs font-bold border transition-colors ${
+                      isDark ? 'bg-zinc-800 hover:bg-zinc-700 text-amber-400 border-amber-500/30' : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-amber-800 border-amber-400'
+                    }`}
+                  >
+                    Upgrade Annually ($49.99/yr • Save 17%)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cancellation Sheet */}
+          {isCancelModalOpen && (
+            <div
+              onClick={() => setIsCancelModalOpen(false)}
+              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[80] cursor-pointer"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={`w-full max-w-sm rounded-[32px] p-6 space-y-3 shadow-2xl border cursor-default ${
+                  isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+                }`}
+              >
+                <h3 className="text-sm font-extrabold">Cancel Advanced Manager?</h3>
+                <p className={`text-xs font-medium leading-relaxed ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                  Your plan remains active until the end of your billing cycle on November 15, 2026.
+                </p>
+                <textarea
+                  rows="2"
+                  className={`w-full rounded-2xl p-2.5 text-xs font-medium focus:outline-none border ${
+                    isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-[#E5E5EA]/60 border-black/10 text-black'
+                  }`}
+                  placeholder="What could we improve? (Optional)"
+                  value={cancelFeedback}
+                  onChange={(e) => setCancelFeedback(e.target.value)}
+                />
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => setIsCancelModalOpen(false)} className={`flex-1 py-2.5 rounded-2xl text-xs font-bold ${
+                    isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
+                  }`}>
+                    Keep Plan
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsPaidUser(false);
+                      localStorage.setItem('app_is_paid_user', 'false');
+                      setIsCancelModalOpen(false);
+                      setIsSubInfoModalOpen(false);
+                    }}
+                    className="flex-1 py-2.5 rounded-2xl text-xs font-bold bg-rose-600 text-white shadow-sm"
+                  >
+                    Confirm Cancel
                   </button>
                 </div>
               </div>
