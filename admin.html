@@ -1,96 +1,62 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>D1 CSV Uploader</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: #121214; color: #ffffff; padding: 24px 16px; display: flex; justify-content: center; }
-    .card { background: #1c1c1e; border: 1px solid #2c2c2e; border-radius: 20px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-    h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
-    p.sub { font-size: 13px; color: #8e8e93; margin-bottom: 24px; }
-    .group { margin-bottom: 20px; }
-    label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #ff9f0a; margin-bottom: 8px; letter-spacing: 0.5px; }
-    input[type="url"], select { width: 100%; padding: 14px; background: #2c2c2e; border: 1px solid #3a3a3c; border-radius: 12px; color: #ffffff; font-size: 14px; outline: none; -webkit-appearance: none; }
-    select { background-image: url('data:image/svg+xml;utf8,<svg fill="%238e8e93" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>'); background-repeat: no-repeat; background-position: right 12px center; }
-    .file-drop { border: 2px dashed #3a3a3c; background: #242426; padding: 20px; border-radius: 14px; text-align: center; cursor: pointer; }
-    input[type="file"] { width: 100%; font-size: 13px; color: #8e8e93; }
-    button.btn { width: 100%; padding: 16px; background: #ff9f0a; border: none; border-radius: 14px; color: #000; font-size: 15px; font-weight: 700; margin-top: 10px; cursor: pointer; }
-    button.btn:disabled { opacity: 0.4; }
-    #status { display: none; margin-top: 20px; padding: 14px; border-radius: 12px; font-size: 13px; line-height: 1.4; word-break: break-word; }
-    .info { background: rgba(255, 159, 10, 0.15); color: #ff9f0a; border: 1px solid rgba(255, 159, 10, 0.3); display: block !important; }
-    .success { background: rgba(52, 199, 89, 0.15); color: #34c759; border: 1px solid rgba(52, 199, 89, 0.3); display: block !important; }
-    .error { background: rgba(255, 69, 58, 0.15); color: #ff453a; border: 1px solid rgba(255, 69, 58, 0.3); display: block !important; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV Upload</title>
 </head>
-<body>
+<body style="font-family: sans-serif; padding: 20px;">
 
-  <div class="card">
-    <h1>Catalog Ingestion</h1>
-    <p class="sub">Upload CSV to Cloudflare D1</p>
+  <h2>Upload CSV to D1</h2>
 
-    <form id="uploadForm">
-      <div class="group">
-        <label>1. Worker Endpoint</label>
-        <input type="url" id="workerUrl" required value="https://appliance.naicumlegat.workers.dev">
-      </div>
+  <form id="uploadForm">
+    <!-- 1. Category -->
+    <p>
+      <label><b>Category:</b></label><br>
+      <select id="category" style="font-size: 16px; padding: 8px; margin-top: 5px;">
+        <option value="Refrigeration">Refrigeration</option>
+        <option value="Dishwashing">Dishwashing</option>
+        <option value="Laundry">Laundry</option>
+        <option value="Cooking">Cooking</option>
+        <option value="Air Quality">Air Quality</option>
+        <option value="HVAC">HVAC</option>
+        <option value="Plumbing Fixture">Plumbing Fixture</option>
+        <option value="Appliance">Appliance</option>
+      </select>
+    </p>
 
-      <div class="group">
-        <label>2. Select Category</label>
-        <select id="category">
-          <option value="Refrigeration">Refrigeration (Fridges, Freezers)</option>
-          <option value="Dishwashing">Dishwashing (Dishwashers)</option>
-          <option value="Laundry">Laundry (Washers, Dryers)</option>
-          <option value="Cooking">Cooking (Ovens, Ranges, Cooktops)</option>
-          <option value="Air Quality">Air Quality (Purifiers, Dehumidifiers)</option>
-          <option value="HVAC">HVAC (AC Units, Heat Pumps)</option>
-          <option value="Plumbing Fixture">Plumbing Fixture (Disposals, Heaters)</option>
-          <option value="Appliance">General Appliance</option>
-        </select>
-      </div>
+    <!-- 2. File -->
+    <p>
+      <label><b>CSV File:</b></label><br>
+      <input type="file" id="csvFile" accept=".csv" required style="font-size: 16px; margin-top: 5px;">
+    </p>
 
-      <div class="group">
-        <label>3. Choose CSV File</label>
-        <div class="file-drop">
-          <input type="file" id="csvFile" accept=".csv,text/csv" required>
-        </div>
-      </div>
+    <br>
+    <button type="submit" id="btn" style="font-size: 18px; padding: 10px 20px;">Upload</button>
+  </form>
 
-      <button type="submit" class="btn" id="submitBtn">Ingest to D1</button>
-      <div id="status"></div>
-    </form>
-  </div>
+  <p id="status" style="font-size: 16px; margin-top: 20px; font-weight: bold;"></p>
 
   <script>
     const form = document.getElementById('uploadForm');
-    const workerUrl = document.getElementById('workerUrl');
     const category = document.getElementById('category');
-    const csvFile = document.getElementById('csvFile');
-    const submitBtn = document.getElementById('submitBtn');
+    const fileInput = document.getElementById('csvFile');
+    const btn = document.getElementById('btn');
     const status = document.getElementById('status');
-
-    function setStatus(msg, type) {
-      status.className = type;
-      status.textContent = msg;
-    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const file = csvFile.files[0];
+      const file = fileInput.files[0];
       if (!file) return;
 
-      const endpoint = `${workerUrl.value.trim().replace(/\/$/, '')}/admin/ingest-csv?category=${encodeURIComponent(category.value)}`;
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Uploading...';
-      setStatus(`Reading ${file.name}...`, 'info');
+      btn.disabled = true;
+      btn.textContent = 'Uploading...';
+      status.textContent = 'Processing file...';
 
       try {
         const text = await file.text();
-        setStatus(`Sending rows to D1 under ${category.value}...`, 'info');
+        const url = `https://appliance.naicumlegat.workers.dev/admin/ingest-csv?category=${encodeURIComponent(category.value)}`;
 
-        const res = await fetch(endpoint, {
+        const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'text/csv' },
           body: text
@@ -98,16 +64,19 @@
 
         const data = await res.json();
         if (res.ok && data.success) {
-          setStatus(`✓ Ingested ${data.count} models into ${category.value}.`, 'success');
-          csvFile.value = '';
+          status.style.color = 'green';
+          status.textContent = `Done! Added ${data.count} models to ${category.value}.`;
+          fileInput.value = '';
         } else {
-          setStatus(`✕ Failed: ${data.error || 'Server error'}`, 'error');
+          status.style.color = 'red';
+          status.textContent = `Error: ${data.error || 'Failed to upload'}`;
         }
       } catch (err) {
-        setStatus(`✕ Network Error: ${err.message}`, 'error');
+        status.style.color = 'red';
+        status.textContent = `Network Error: ${err.message}`;
       } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Ingest to D1';
+        btn.disabled = false;
+        btn.textContent = 'Upload';
       }
     });
   </script>
