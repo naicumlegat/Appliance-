@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>D1 Catalog Ingest Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      font-feature-settings: "tnum";
+    }
+  </style>
+</head>
+<body class="bg-[#09090b] text-zinc-100 font-sans min-h-screen flex flex-col items-center justify-center p-5 selection:bg-amber-500/30">
+
+  <main class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-2xl space-y-6">
+    <!-- Header -->
+    <header class="border-b border-zinc-800 pb-4">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-extrabold uppercase tracking-widest text-amber-500">D1 Database Admin</span>
+        <span class="text-xs px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-mono">v1.0</span>
+      </div>
+      <h1 class="text-xl font-black tracking-tight mt-1">Catalog Ingestion</h1>
+      <p class="text-xs text-zinc-400 mt-1">Direct upload utility to Cloudflare D1</p>
+    </header>
+
+    <form id="ingestForm" class="space-y-4">
+      <!-- Worker Endpoint Override -->
+      <div>
+        <label for="workerUrl" class="block text-[11px] font-bold uppercase tracking-wider text-zinc-400">Worker Endpoint</label>
+        <input 
+          id="workerUrl" 
+          type="url" 
+          required 
+          value="https://appliance.naicumlegat.workers.dev" 
+          class="w-full mt-1.5 px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-2xl text-xs font-mono text-zinc-300 focus:outline-none focus:border-amber-500 transition-colors"
+        />
+      </div>
+
+      <!-- Target Category -->
+      <div>
+        <label for="categorySelect" class="block text-[11px] font-bold uppercase tracking-wider text-amber-500">Appliance Category</label>
+        <select 
+          id="categorySelect" 
+          class="w-full mt-1.5 px-3.5 py-3 bg-zinc-950 border border-zinc-800 rounded-2xl text-xs font-semibold text-zinc-100 focus:outline-none focus:border-amber-500 transition-colors"
+        >
+          <option value="Refrigeration">Refrigeration (Fridges, Freezers, Coolers)</option>
+          <option value="Dishwashing">Dishwashing (Dishwashers)</option>
+          <option value="Laundry">Laundry (Washers, Dryers)</option>
+          <option value="Cooking">Cooking (Ranges, Ovens, Cooktops)</option>
+          <option value="Air Quality">Air Quality (Purifiers, Dehumidifiers)</option>
+          <option value="HVAC">HVAC (AC Units, Heat Pumps)</option>
+          <option value="Plumbing Fixture">Plumbing Fixture (Disposals, Heaters)</option>
+          <option value="Appliance">General Appliance</option>
+        </select>
+      </div>
+
+      <!-- File Picker (iPhone Native Sheet) -->
+      <div>
+        <label for="fileInput" class="block text-[11px] font-bold uppercase tracking-wider text-zinc-400">Choose CSV File</label>
+        <input 
+          id="fileInput" 
+          type="file" 
+          accept=".csv,text/csv" 
+          required 
+          class="w-full mt-1.5 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-2xl text-xs text-zinc-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-zinc-800 file:text-zinc-200"
+        />
+      </div>
+
+      <!-- Real-time Status Box -->
+      <div id="statusBox" class="hidden p-3.5 rounded-2xl text-xs font-medium border leading-relaxed"></div>
+
+      <!-- Submit Button -->
+      <button 
+        type="submit" 
+        id="submitBtn" 
+        class="w-full py-3.5 bg-amber-600 hover:bg-amber-500 active:scale-[0.98] disabled:opacity-50 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-amber-600/20 transition-all cursor-pointer"
+      >
+        Ingest into D1
+      </button>
+    </form>
+  </main>
+
+  <script>
+    const form = document.getElementById('ingestForm');
+    const workerUrlInput = document.getElementById('workerUrl');
+    const categorySelect = document.getElementById('categorySelect');
+    const fileInput = document.getElementById('fileInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const statusBox = document.getElementById('statusBox');
+
+    function updateStatus(message, state = 'info') {
+      statusBox.classList.remove('hidden', 'bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/20',
+                                'bg-rose-500/10', 'text-rose-400', 'border-rose-500/20',
+                                'bg-amber-500/10', 'text-amber-400', 'border-amber-500/20');
+      
+      if (state === 'success') {
+        statusBox.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/20');
+      } else if (state === 'error') {
+        statusBox.classList.add('bg-rose-500/10', 'text-rose-400', 'border-rose-500/20');
+      } else {
+        statusBox.classList.add('bg-amber-500/10', 'text-amber-400', 'border-amber-500/20');
+      }
+      statusBox.textContent = message;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const file = fileInput.files[0];
+      if (!file) {
+        updateStatus('Select a CSV file first.', 'error');
+        return;
+      }
+
+      const baseUrl = workerUrlInput.value.trim().replace(/\/$/, '');
+      const category = categorySelect.value;
+      const targetEndpoint = `${baseUrl}/admin/ingest-csv?category=${encodeURIComponent(category)}`;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Processing File...';
+      updateStatus(`Reading "${file.name}"...`, 'info');
+
+      try {
+        const text = await file.text();
+        updateStatus(`Streaming records to D1 under "${category}"...`, 'info');
+
+        const response = await fetch(targetEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/csv' },
+          body: text
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          updateStatus(`Successfully inserted ${data.count} models into ${category}.`, 'success');
+          fileInput.value = '';
+        } else {
+          updateStatus(`Failed: ${data.error || 'Server rejected CSV'}`, 'error');
+        }
+      } catch (err) {
+        updateStatus(`Network Error: ${err.message}`, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Ingest into D1';
+      }
+    });
+  </script>
+</body>
+</html>
