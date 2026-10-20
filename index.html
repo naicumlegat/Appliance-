@@ -23,6 +23,10 @@
     .scrollbar-none::-webkit-scrollbar {
       display: none;
     }
+    .scrollbar-none {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
     @keyframes pulse-emerald {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.4; transform: scale(0.9); }
@@ -35,11 +39,33 @@
       30% { transform: translateY(-4px); }
     }
     .wave-dot {
-      animation: wave-bounce 1.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+      animation: wave-bounce 2s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
     }
     .wave-dot:nth-child(1) { animation-delay: 0s; }
-    .wave-dot:nth-child(2) { animation-delay: 0.22s; }
-    .wave-dot:nth-child(3) { animation-delay: 0.44s; }
+    .wave-dot:nth-child(2) { animation-delay: 0.25s; }
+    .wave-dot:nth-child(3) { animation-delay: 0.5s; }
+    @keyframes smooth-fade-in {
+      from { opacity: 0; transform: translateY(3px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-smooth-reveal {
+      animation: smooth-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes sheet-spring-up {
+      from { transform: translateY(100%); opacity: 0.8; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .animate-sheet-spring {
+      animation: sheet-spring-up 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes completion-pulse {
+      0% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.02); filter: brightness(1.25); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+    .animate-completion-flash {
+      animation: completion-pulse 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
   </style>
 </head>
 <body class="font-sans antialiased selection:bg-[#FF9500]/30">
@@ -55,7 +81,7 @@
       var box = document.getElementById('runtime-error-box');
       if (box) {
         box.style.display = 'block';
-        box.innerText = 'Runtime Error: ' + msg + ' (Line: ' + line + ', Col: ' + col + ')';
+        box.innerText = 'Runtime Error: ' + msg + ' (Line: ' + line + ', Col: ' + col + ')\n' + (err ? err.stack : '');
       }
     };
   </script>
@@ -126,6 +152,7 @@
         purchasePrice: "$2,199.00",
         vendor: "Best Buy",
         warrantyMonths: 12,
+        warrantyActivated: false,
         consumables: [
           { 
             name: "Water & Ice Filter", 
@@ -169,6 +196,7 @@
         purchasePrice: "$229.00",
         vendor: "Amazon",
         warrantyMonths: 12,
+        warrantyActivated: false,
         consumables: [
           { 
             name: "Activated Carbon Odor Pre-Filter", 
@@ -199,6 +227,7 @@
         purchasePrice: "$8,500.00",
         vendor: "Local Mechanical",
         warrantyMonths: 60,
+        warrantyActivated: false,
         consumables: [
           { 
             name: "Whole-House Media Air Filter", 
@@ -455,7 +484,7 @@
       if (q.includes('dish') || q.includes('washer dish')) return 'Dishwashing';
       if (q.includes('dryer') || q.includes('laundry') || q.includes('wash machine') || q.includes('clothes washer')) return 'Laundry';
       if (q.includes('hvac') || q.includes('heat pump') || q.includes('thermostat') || q.includes('air condition') || q.includes('furnace')) return 'HVAC';
-      if (q.includes('cooktop') || q.includes('range') || q.includes('oven') || q.includes('stove') || q.microwave)) return 'Cooking';
+      if (q.includes('cooktop') || q.includes('range') || q.includes('oven') || q.includes('stove') || q.includes('microwave')) return 'Cooking';
       if (q.includes('faucet') || q.includes('disposal') || q.includes('water heater') || q.includes('tankless') || q.includes('plumb')) return 'Plumbing Fixture';
       return 'Appliance';
     }
@@ -539,6 +568,35 @@
       };
     }
 
+    function calculateApplianceWarrantyStatus(appliance) {
+      if (appliance.warrantyActivated) {
+        return { status: 'active', label: 'Warranty Verified (OEM Active)', isExpired: false, daysRemaining: null };
+      }
+      if (!appliance.purchaseDate || !appliance.purchaseDate.trim()) {
+        return { status: 'unverified', label: 'No Purchase Date (Unverified)', isExpired: false, daysRemaining: null };
+      }
+      const months = appliance.warrantyMonths || 12;
+      const purchaseMs = new Date(appliance.purchaseDate).getTime();
+      if (isNaN(purchaseMs)) {
+        return { status: 'unverified', label: 'No Purchase Date (Unverified)', isExpired: false, daysRemaining: null };
+      }
+      const spanMs = months * 30.4375 * 24 * 60 * 60 * 1000;
+      const expireMs = purchaseMs + spanMs;
+      const remainingMs = expireMs - Date.now();
+      const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+      if (remainingDays <= 0) {
+        return { status: 'expired', label: 'Warranty Expired', isExpired: true, daysRemaining: 0 };
+      }
+      const remainingMonths = Math.ceil(remainingDays / 30.4);
+      return {
+        status: 'active',
+        label: `Warranty Active (~${remainingMonths} mo remaining)`,
+        isExpired: false,
+        daysRemaining: remainingDays,
+        isExpiringSoon: remainingDays <= 30
+      };
+    }
+
     const BRAND_PORTAL_REGISTRY = {
       ge: { warranty: 'https://products.geappliances.com/appliance/gea-support-search-content?contentId=16851', support: 'https://www.geappliances.com/ge/service-and-support/' },
       coway: { warranty: 'https://cowaymega.com/pages/warranty-registration', support: 'https://cowaymega.com/pages/contact-us' },
@@ -598,33 +656,32 @@
       }
     };
 
-    // --- Deterministic Finite State Machine (FSM) Diagnostic Triage Engine ---
     const ExpertDiagnosticEngine = {
       diagnosticTrees: {
         "air_quality_sensor": [
           `Step 1 (Lens Wipe): Open the air quality sensor door on the side or rear. Gently wipe the optical lens with a dry cotton swab (avoid liquid cleaners).\n\nDid cleaning the sensor clear the stuck light?`,
           `Step 2 (Chamber Draft Blowout): Dust often gathers inside the internal sensor chamber. Use a can of compressed air or a soft brush directly over the intake grill for 10 seconds to clear out trapped sediment.\n\nDid the light return to its normal color?`,
-          `Conclusion: The optical particle sensor has drifted out of calibration.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your **Air Quality Particle Sensor** likely needs replacement. If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically.\n\n[RECOMMEND_TECH]`
+          `Conclusion: The optical particle sensor has drifted out of calibration.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your Air Quality Particle Sensor likely needs replacement.\n\n[RECOMMEND_TECH]`
         ],
         "air_quality_fan": [
           `Step 1 (Safety Latch Check): Ensure the front filter cover is snapped shut firmly at both lower retention clips. An unlatched panel disconnects motor power for safety.\n\nDid firmly reseating the panel restore fan operation?`,
           `Step 2 (Free-Spin Test): Unplug the unit for safety. Gently spin the fan blade with your finger. Does it spin smoothly for a couple seconds, or does it feel stiff and catch?`,
-          `Conclusion: The internal motor controller or drive winding is unresponsive.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your **Fan Motor Assembly** likely needs replacement. If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically.\n\n[RECOMMEND_TECH]`
+          `Conclusion: The internal motor controller or drive winding is unresponsive.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your Fan Motor Assembly likely needs replacement.\n\n[RECOMMEND_TECH]`
         ],
         "refrig_temp": [
           `Step 1 (Damper Airflow Check): If the freezer is cold but the fresh food section feels warm, place your hand near the upper rear air vent in the fridge. Can you feel cold air actively blowing through?`,
           `Step 2 (Frost Buildup Inspection): Take a look at the lower back wall inside the freezer compartment. Is there a thick layer of white frost or solid ice building up across the back panel?`,
-          `Conclusion: The automatic defrost system is unable to melt frost off the cooling coils, choking airflow.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your **Defrost Thermostat or Heater** likely needs replacement. If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically.\n\n[RECOMMEND_TECH]`
+          `Conclusion: The automatic defrost system is unable to melt frost off the cooling coils, choking airflow.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your Defrost Thermostat or Heater likely needs replacement.\n\n[RECOMMEND_TECH]`
         ],
         "refrig_relay": [
           `Step 1 (Sound Test): Listen near the bottom rear of the refrigerator. Do you hear the compressor attempt to start with a soft hum, followed by a faint metallic click and silence every few minutes?`,
           `Step 2 (Starter Rattle Check): Unplug the refrigerator for safety, slide the small starter relay box off the side of the compressor, and gently shake it. Does it rattle like loose pebbles inside?`,
-          `Conclusion: The ceramic disk inside the compressor start relay has cracked, preventing the compressor from starting.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your **Compressor Start Relay** likely needs replacement. If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically.\n\n[RECOMMEND_TECH]`
+          `Conclusion: The ceramic disk inside the compressor start relay has cracked, preventing the compressor from starting.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your Compressor Start Relay likely needs replacement.\n\n[RECOMMEND_TECH]`
         ],
         "drain_general": [
           `Step 1 (Filter & Hose Check): Inspect the coin trap or pump filter basket for debris, hairpins, or small objects. Also check that the drain hose is free of kinks.\n\nIs the drain path completely clear of obstructions?`,
           `Step 2 (Impeller Spin): With power disconnected, check the small drain pump impeller with a fingertip. Does it turn freely without grinding or sticking?`,
-          `Conclusion: The drain pump motor is jammed or its internal drive winding has worn out.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your **Drain Pump Assembly** likely needs replacement. If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically.\n\n[RECOMMEND_TECH]`
+          `Conclusion: The drain pump motor is jammed or its internal drive winding has worn out.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your Drain Pump Assembly likely needs replacement.\n\n[RECOMMEND_TECH]`
         ]
       },
 
@@ -694,7 +751,6 @@
 
         const lastAssistantMsg = [...history].reverse().find(m => m.sender === 'assistant')?.text || '';
 
-        // 1. Critical Electrical/Thermal Hazard Intercept
         const hazardKeywords = ['smoke', 'burning smell', 'spark', 'sparks', 'fire', 'shock', 'arcing'];
         if (hazardKeywords.some(k => q.includes(k))) {
           return `⚠️ **CRITICAL ELECTRICAL HAZARD DETECTED**\n\n` +
@@ -708,12 +764,11 @@
             return `Breaker disconnect confirmed.\n\n` +
                    `Because an active thermal or electrical hazard occurred, inspecting internal high-voltage components carries risk.\n\n` +
                    `We've tried every troubleshooting step I can think of for this issue.\n\n` +
-                   `Based on what I could assess, an internal wiring harness or electronic relay likely needs replacement. If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically.\n\n` +
+                   `Based on what I could assess, an internal wiring harness or electronic relay likely needs replacement.\n\n` +
                    `[RECOMMEND_TECH]`;
           }
         }
 
-        // 2. Sequential State Machine Advancement
         const activeTreeKey = this.identifyActiveTree(history);
         if (activeTreeKey && this.isNegativeFeedback(q)) {
           const nextIdx = this.findNextStepIndex(activeTreeKey, history);
@@ -724,19 +779,16 @@
           }
         }
 
-        // 3. Overdue Consumable Notice
         const overdue = this.checkOverdueConsumables(appliance);
         if (overdue && (q.includes('smell') || q.includes('odor') || q.includes('air') || q.includes('flow') || q.includes('not cooling')) && history.filter(m => m.sender === 'user').length <= 1) {
-          return `Quick check: Your **${overdue.name}** is currently **${overdue.timeRemainingText}**.\n\nA saturated filter restricts normal airflow and can cause these exact symptoms.\n\n1. Inspect or replace the overdue filter first before opening access panels.\n2. Is the filter housing clean and seated flush?`;
+          return `Quick check: Your ${overdue.name} is currently ${overdue.timeRemainingText}.\n\nA saturated filter restricts normal airflow and can cause these exact symptoms.\n\n1. Inspect or replace the overdue filter first before opening access panels.\n2. Is the filter housing clean and seated flush?`;
         }
 
-        // 4. Error Code Lookup via IndexedDB Catalog
         const errMatch = await this.lookupErrorCode(category, rawQuery);
         if (errMatch) {
           return `Fault code **${errMatch.code}** confirmed for this equipment: ${errMatch.desc}\n\nBefore ordering replacement sensors, inspect the wiring harness plug for loose pins or dust.`;
         }
 
-        // 5. Initial Symptom Routing to Diagnostic Trees
         if (category === 'Air Quality' || cleanTitle.toLowerCase().includes('purifier')) {
           if (q.includes('red') || q.includes('orange') || q.includes('sensor') || q.includes('ring')) {
             return this.diagnosticTrees['air_quality_sensor'][0];
@@ -759,7 +811,6 @@
           return this.diagnosticTrees['drain_general'][0];
         }
 
-        // 6. Generic Safe Reset Fallback
         return `Safe inspection checks for your ${cleanTitle}:\n\n` +
                `1. Power Reset: Disconnect power at the breaker or plug for 60 seconds to allow microprocessors to reset.\n` +
                `2. Safety Latches: Check that all access panels, filters, and doors close completely flush.\n` +
@@ -824,7 +875,7 @@
             valuedCount++;
           }
         }
-        if (it.warrantyDoc || (it.warrantyMonths && it.warrantyMonths > 0)) {
+        if (it.warrantyDoc || it.warrantyActivated || (it.warrantyMonths && it.warrantyMonths > 0)) {
           documentedWarranties++;
         }
       });
@@ -930,6 +981,19 @@
       }, []);
 
       const [isActivelySyncing, setIsActivelySyncing] = useState(false);
+      const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+      const [hasSyncFailed, setHasSyncFailed] = useState(false);
+
+      useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+          window.removeEventListener('online', handleOnline);
+          window.removeEventListener('offline', handleOffline);
+        };
+      }, []);
 
       const [units, setUnits] = useState(() => {
         try {
@@ -952,10 +1016,21 @@
           return list.map(item => ({
             ...item,
             unitId: item.unitId || "unit_main",
+            warrantyActivated: Boolean(item.warrantyActivated),
             updatedAt: item.updatedAt || Date.now()
           }));
         } catch(e) { return MOCK_INITIAL_APPLIANCES; }
       });
+
+      const [activeCategoryFilter, setActiveCategoryFilter] = useState('All');
+      const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+      const [acknowledgedAlertKeys, setAcknowledgedAlertKeys] = useState(() => {
+        try {
+          const saved = localStorage.getItem('acknowledged_alert_keys');
+          return saved ? JSON.parse(saved) : [];
+        } catch(e) { return []; }
+      });
+      const [pendingWarrantyAppliance, setPendingWarrantyAppliance] = useState(null);
 
       const [appearanceSetting, setAppearanceSetting] = useState(() => {
         return localStorage.getItem('app_appearance_setting') || 'system';
@@ -1023,6 +1098,7 @@
       const [newGroupName, setNewGroupName] = useState('');
 
       const [activeConsumableSheet, setActiveConsumableSheet] = useState(null);
+      const [isConsumableJustReplaced, setIsConsumableJustReplaced] = useState(false);
 
       const [passportPurchased, setPassportPurchased] = useState(false);
       const [passportFirstUsedTimestamp, setPassportFirstUsedTimestamp] = useState(null);
@@ -1052,6 +1128,33 @@
 
       const chatContainerRef = useRef(null);
       const placardFileInputRef = useRef(null);
+
+      // BODY BACKGROUND SCROLL LOCK (Zero leakage)
+      const isAnyModalActive = Boolean(
+        isSettingsOpen ||
+        isAddOpen ||
+        isNotificationsOpen ||
+        selectedAppliance ||
+        activeAppliance ||
+        activeConsumableSheet ||
+        pendingWarrantyAppliance ||
+        isPaywallOpen ||
+        isAddGroupModalOpen ||
+        deleteTargetGroup ||
+        isBulkDeleteModalOpen ||
+        isLogoutModalOpen ||
+        inlinePdfViewerData
+      );
+
+      useEffect(() => {
+        if (isAnyModalActive) {
+          const originalStyle = window.getComputedStyle(document.body).overflow;
+          document.body.style.overflow = 'hidden';
+          return () => {
+            document.body.style.overflow = originalStyle;
+          };
+        }
+      }, [isAnyModalActive]);
 
       const scrollToChatBottom = (smooth = true) => {
         if (!chatContainerRef.current) return;
@@ -1103,9 +1206,16 @@
       const [devPasscodeNotice, setDevPasscodeNotice] = useState('');
       const [otpCooldownSeconds, setOtpCooldownSeconds] = useState(0);
 
+      // SWIPE STATE MACHINES (Direction-locked spring physics)
       const [swipeOffsets, setSwipeOffsets] = useState({});
-      const touchStartXRef = useRef(null);
+      const touchStartPosRef = useRef({ x: 0, y: 0 });
+      const touchIsHorizontalRef = useRef(null);
       const activeSwipingIdRef = useRef(null);
+
+      const [notifSwipeOffsets, setNotifSwipeOffsets] = useState({});
+      const notifTouchStartPosRef = useRef({ x: 0, y: 0 });
+      const notifTouchIsHorizontalRef = useRef(null);
+      const notifActiveSwipingKeyRef = useRef(null);
 
       useEffect(() => {
         if (!window.matchMedia) return;
@@ -1184,14 +1294,14 @@
 
         const email = currentUser?.email || userEmail;
         if (!email) {
-          setTimeout(() => setIsActivelySyncing(false), 800);
+          setTimeout(() => setIsActivelySyncing(false), 600);
           return;
         }
 
         if (window.__syncTimer) clearTimeout(window.__syncTimer);
         window.__syncTimer = setTimeout(async () => {
           try {
-            await fetch(`${WORKER_ENDPOINT}/api/backup`, {
+            const res = await fetch(`${WORKER_ENDPOINT}/api/backup`, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json',
@@ -1199,8 +1309,15 @@
               },
               body: JSON.stringify({ appliances: nextAppliances, groups: nextUnits })
             });
-            isDirtySync = false;
-          } catch (e) {}
+            if (res.ok) {
+              isDirtySync = false;
+              setHasSyncFailed(false);
+            } else {
+              setHasSyncFailed(true);
+            }
+          } catch (e) {
+            setHasSyncFailed(true);
+          }
           finally {
             setIsActivelySyncing(false);
           }
@@ -1235,7 +1352,10 @@
             setUnits(data.groups);
             localStorage.setItem('app_units_catalog', JSON.stringify(data.groups));
           }
-        } catch (e) {}
+          setHasSyncFailed(false);
+        } catch (e) {
+          setHasSyncFailed(true);
+        }
         finally {
           setIsActivelySyncing(false);
         }
@@ -1262,17 +1382,28 @@
 
       useEffect(() => {
         const handleVisibilityChange = () => {
-          if (document.visibilityState === 'visible' && (currentUser?.email || userEmail)) {
-            const now = Date.now();
-            if (now - lastPullTime > 300000) {
-              lastPullTime = now;
-              autoPullFromCloud();
+          if (document.visibilityState === 'visible') {
+            const pendingWarrantyId = sessionStorage.getItem('pending_warranty_appliance_id');
+            if (pendingWarrantyId) {
+              sessionStorage.removeItem('pending_warranty_appliance_id');
+              const target = appliances.find(a => a.id === pendingWarrantyId);
+              if (target && !target.warrantyActivated) {
+                setPendingWarrantyAppliance(target);
+              }
+            }
+
+            if (currentUser?.email || userEmail) {
+              const now = Date.now();
+              if (now - lastPullTime > 300000) {
+                lastPullTime = now;
+                autoPullFromCloud();
+              }
             }
           }
         };
-        window.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => window.removeEventListener('visibilitychange', handleVisibilityChange);
-      }, [currentUser, userEmail]);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }, [currentUser, userEmail, appliances]);
 
       useEffect(() => {
         if (otpCooldownSeconds <= 0) return;
@@ -1312,27 +1443,31 @@
       }, [addForm.brand, addForm.model]);
 
       const handleMarkConsumableReplacedToday = (applianceId, consumableIndex) => {
+        setIsConsumableJustReplaced(true);
         const todayIso = new Date().toISOString();
-        const updated = appliances.map(app => {
-          if (app.id !== applianceId) return app;
-          const nextConsumables = [...(app.consumables || [])];
-          if (nextConsumables[consumableIndex]) {
-            const existingHistory = Array.isArray(nextConsumables[consumableIndex].replacementHistory) 
-              ? nextConsumables[consumableIndex].replacementHistory 
-              : [];
-            
-            nextConsumables[consumableIndex] = {
-              ...nextConsumables[consumableIndex],
-              lastReplaced: todayIso,
-              replacementHistory: [...existingHistory, todayIso]
-            };
-          }
-          return { ...app, consumables: nextConsumables, updatedAt: Date.now() };
-        });
-        setAppliances(updated);
-        triggerDebouncedSync(updated, units);
-        setActiveConsumableSheet(null);
-        showToast("Maintenance recorded successfully");
+        setTimeout(() => {
+          const updated = appliances.map(app => {
+            if (app.id !== applianceId) return app;
+            const nextConsumables = [...(app.consumables || [])];
+            if (nextConsumables[consumableIndex]) {
+              const existingHistory = Array.isArray(nextConsumables[consumableIndex].replacementHistory) 
+                ? nextConsumables[consumableIndex].replacementHistory 
+                : [];
+              
+              nextConsumables[consumableIndex] = {
+                ...nextConsumables[consumableIndex],
+                lastReplaced: todayIso,
+                replacementHistory: [...existingHistory, todayIso]
+              };
+            }
+            return { ...app, consumables: nextConsumables, updatedAt: Date.now() };
+          });
+          setAppliances(updated);
+          triggerDebouncedSync(updated, units);
+          setIsConsumableJustReplaced(false);
+          setActiveConsumableSheet(null);
+          showToast("Maintenance recorded successfully");
+        }, 320);
       };
 
       const handleFileUpload = async (applianceId, docType, e) => {
@@ -1468,6 +1603,7 @@
         const finalNormalizedCategory = normalizeApplianceCategory(detectedCategory, resolvedCanonicalName || fallbackTitle, effectiveBrand);
         const newId = Date.now().toString();
 
+        // STRICT MANUAL PURCHASE DATE ENFORCEMENT: Never substitute creation timestamp
         const parsedIsoPurchaseDate = parseMMDDYYYYToISO(addForm.purchaseDate);
         const resolvedFinalModel = effectiveModel || '';
 
@@ -1484,6 +1620,7 @@
           purchasePrice: addForm.purchasePrice.trim(),
           vendor: addForm.vendor.trim(),
           warrantyMonths: parsedIsoPurchaseDate ? 12 : 0,
+          warrantyActivated: false,
           warrantyDoc: null,
           receiptDoc: addForm.receiptDataUrl ? { name: addForm.receiptFileName || 'Receipt.jpg', dataUrl: addForm.receiptDataUrl, uploadDate: new Date().toLocaleDateString() } : null,
           receipt: addForm.receiptDataUrl,
@@ -1519,7 +1656,6 @@
         setIsAddOpen(false);
         showToast("Equipment registered");
       };
-
       const openAssistant = (item) => {
         setActiveAppliance(item);
         setNeedsPlacardVerification(false);
@@ -1548,7 +1684,8 @@
 
       const executeStreamingAnswer = (finalText, isFifthNotice = false, isPeriodicNotice = false) => {
         const hasRecommendTechToken = finalText.includes('[RECOMMEND_TECH]');
-        const cleanedText = finalText.replace('[RECOMMEND_TECH]', '').trim();
+        let cleanedText = finalText.replace('[RECOMMEND_TECH]', '').trim();
+        cleanedText = cleanedText.replace(/If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically\.?/gi, '').trim();
 
         const words = cleanedText.split(' ');
         let idx = 0;
@@ -1578,7 +1715,7 @@
           idx = Math.min(words.length, idx + 2);
           setStreamingText(words.slice(0, idx).join(' '));
           scrollToChatBottom(false);
-        }, 55);
+        }, 115);
       };
 
       const sendQuery = async (text) => {
@@ -1667,7 +1804,7 @@
           setActiveAppliance(updatedAppliance);
           triggerDebouncedSync(updatedFleet, units);
 
-          const postAuditNotice = `✓ Model verified: **${formatApplianceTitle(activeAppliance.brand, entered)}**.\n\n` +
+          const postAuditNotice = `✓ Model verified: ${formatApplianceTitle(activeAppliance.brand, entered)}.\n\n` +
             `Notice: On this model, verify that the bottom access cover clicks shut firmly. A slight misplacement can disconnect the motor power switch.`;
           executeStreamingAnswer(postAuditNotice, false, false);
           setPlacardVerifyInput('');
@@ -1965,10 +2102,68 @@
         }
       };
 
+      const handleConfirmWarrantyActivation = (applianceId, isActivated) => {
+        const updated = appliances.map(app => {
+          if (app.id !== applianceId) return app;
+          return {
+            ...app,
+            warrantyActivated: isActivated,
+            updatedAt: Date.now()
+          };
+        });
+        setAppliances(updated);
+        triggerDebouncedSync(updated, units);
+        setPendingWarrantyAppliance(null);
+        showToast(isActivated ? "Warranty activation confirmed" : "Warranty status remains unverified");
+      };
+
+      // COMPUTED MAINTENANCE NOTIFICATIONS (Internal acknowledgement tracking)
+      const allDueNotifications = [];
+      appliances.forEach(app => {
+        (app.consumables || []).forEach((c, idx) => {
+          const status = calculateConsumableStatus(c, app);
+          if (status.badgeType === 'past_due' || status.badgeType === 'due_now') {
+            const key = `notif_${app.id}_${idx}_${c.lastReplaced || app.purchaseDate || 'initial'}`;
+            allDueNotifications.push({
+              key,
+              appliance: app,
+              consumable: c,
+              index: idx,
+              status
+            });
+          }
+        });
+      });
+
+      const unacknowledgedNotifications = allDueNotifications.filter(n => !acknowledgedAlertKeys.includes(n.key));
+      const unreadAlertCount = unacknowledgedNotifications.length;
+
+      const acknowledgeAlert = (key) => {
+        if (!acknowledgedAlertKeys.includes(key)) {
+          const updated = [...acknowledgedAlertKeys, key];
+          setAcknowledgedAlertKeys(updated);
+          localStorage.setItem('acknowledged_alert_keys', JSON.stringify(updated));
+        }
+      };
+
+      const availableCategories = ['All', 'Filter Due', ...Array.from(new Set(appliances.map(a => a.category || 'Appliance')))];
+
+      const isApplianceMatchingFilter = (item) => {
+        if (activeCategoryFilter === 'All') return true;
+        if (activeCategoryFilter === 'Filter Due') {
+          return (item.consumables || []).some(c => {
+            const st = calculateConsumableStatus(c, item);
+            return st.badgeType === 'past_due' || st.badgeType === 'due_now';
+          });
+        }
+        return (item.category || 'Appliance') === activeCategoryFilter;
+      };
+
       const renderApplianceCard = (item) => {
         const isSelected = selectedIds.includes(item.id);
         const currentOffset = swipeOffsets[item.id] || 0;
         const consumablesList = item.consumables || [];
+        const revealProgress = Math.min(1, Math.abs(currentOffset) / 80);
 
         return (
           <div key={item.id} className="relative overflow-hidden rounded-[20px]">
@@ -1977,36 +2172,74 @@
                 onClick={(e) => { e.stopPropagation(); handleDeleteSingleAppliance(item.id); }}
                 className="w-full h-full flex flex-col items-center justify-center text-white active:bg-rose-700 transition-colors"
               >
+                <svg
+                  style={{
+                    transform: `scale(${0.75 + revealProgress * 0.25})`,
+                    opacity: 0.4 + revealProgress * 0.6
+                  }}
+                  className="w-4 h-4 mb-0.5 transition-all"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
                 <span className="text-[10px] font-bold uppercase tracking-wider">Delete</span>
               </button>
             </div>
 
             <div
               onTouchStart={(e) => {
-                touchStartXRef.current = e.touches[0].clientX;
+                touchStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                touchIsHorizontalRef.current = null;
                 activeSwipingIdRef.current = item.id;
               }}
               onTouchMove={(e) => {
-                if (touchStartXRef.current === null || activeSwipingIdRef.current !== item.id) return;
-                const deltaX = e.touches[0].clientX - touchStartXRef.current;
-                setSwipeOffsets(prev => ({ ...prev, [item.id]: deltaX < 0 ? Math.max(-96, deltaX) : 0 }));
+                if (activeSwipingIdRef.current !== item.id) return;
+                const deltaX = e.touches[0].clientX - touchStartPosRef.current.x;
+                const deltaY = e.touches[0].clientY - touchStartPosRef.current.y;
+
+                if (touchIsHorizontalRef.current === null) {
+                  if (Math.abs(deltaX) > Math.abs(deltaY) + 6) {
+                    touchIsHorizontalRef.current = true;
+                  } else if (Math.abs(deltaY) > Math.abs(deltaX) + 6) {
+                    touchIsHorizontalRef.current = false;
+                  }
+                }
+
+                if (!touchIsHorizontalRef.current) return;
+
+                // Logarithmic rubber-banding curve
+                const damped = deltaX < 0
+                  ? Math.max(-96, deltaX)
+                  : Math.min(24, Math.sign(deltaX) * Math.pow(Math.abs(deltaX), 0.7));
+
+                setSwipeOffsets(prev => ({ ...prev, [item.id]: damped }));
               }}
               onTouchEnd={() => {
-                if (touchStartXRef.current === null || activeSwipingIdRef.current !== item.id) return;
+                if (activeSwipingIdRef.current !== item.id) return;
+                if (!touchIsHorizontalRef.current) {
+                  activeSwipingIdRef.current = null;
+                  return;
+                }
                 const finalOffset = swipeOffsets[item.id] || 0;
                 setSwipeOffsets(prev => ({ ...prev, [item.id]: finalOffset < -48 ? -96 : 0 }));
-                touchStartXRef.current = null;
+                touchIsHorizontalRef.current = null;
                 activeSwipingIdRef.current = null;
               }}
               style={{
                 transform: `translateX(${currentOffset}px)`,
-                transition: activeSwipingIdRef.current === item.id ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                transition: activeSwipingIdRef.current === item.id ? 'none' : 'transform 0.32s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
               className={`relative rounded-[20px] border overflow-hidden shadow-xs ${
                 isDark ? 'bg-zinc-900 border-white/10' : 'bg-white border-black/10'
               } ${isSelected ? 'ring-2 ring-[#FF9500]' : ''}`}
             >
-              <div className="p-3.5 flex items-start gap-3">
+              <div className="p-3 flex items-start gap-3">
                 {isSelectMode && (
                   <div
                     onClick={() => toggleSelectId(item.id)}
@@ -2066,7 +2299,7 @@
               </div>
 
               {!isSelectMode && (
-                <div className={`px-3.5 pb-3 pt-2 border-t space-y-2 ${
+                <div className={`px-3 pb-2.5 pt-1.5 border-t space-y-1.5 ${
                   isDark ? 'border-white/5 bg-black/20' : 'border-black/5 bg-[#F9F9FB]'
                 }`}>
                   <div className="flex justify-between items-center">
@@ -2094,12 +2327,12 @@
                               e.stopPropagation();
                               setActiveConsumableSheet({ appliance: item, consumable: cons, index: cIdx });
                             }}
-                            className={`rounded-xl border p-2 cursor-pointer active:scale-[0.98] transition-all shadow-2xs ${
+                            className={`rounded-xl border px-3 pt-2 pb-2.5 cursor-pointer active:scale-[0.98] transition-all shadow-2xs ${
                               isDark ? 'bg-zinc-800/90 border-white/5 hover:bg-zinc-800' : 'bg-white border-black/10 hover:bg-zinc-50'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <p className={`text-xs font-bold truncate flex-1 ${isDark ? 'text-zinc-100' : 'text-[#1C1C1E]'}`}>
+                              <p className={`text-xs font-bold truncate flex-1 leading-tight ${isDark ? 'text-zinc-100' : 'text-[#1C1C1E]'}`}>
                                 {cons.name}
                               </p>
 
@@ -2119,7 +2352,7 @@
                               )}
                             </div>
 
-                            <div className={`mt-1.5 w-full h-[5px] rounded-full overflow-hidden ${isDark ? 'bg-zinc-700/60' : 'bg-black/5'}`}>
+                            <div className={`mt-2 mb-0.5 w-full h-[5px] rounded-full overflow-hidden ${isDark ? 'bg-zinc-700/60' : 'bg-black/5'}`}>
                               <div
                                 style={{
                                   width: `${status.displayPercent}%`,
@@ -2144,7 +2377,6 @@
         );
       };
 
-      // Telemetry calculations
       const totalGroupsUsed = units.length;
       const maxGroups = isPaidUser ? PRO_MAX_GROUPS : FREE_MAX_GROUPS;
       const totalItemsUsed = appliances.length;
@@ -2152,6 +2384,22 @@
       const aiQuotaStatus = AIQuotaTracker.getStatus(isPaidUser);
       const aiUsed = aiQuotaStatus.count;
       const aiMax = aiQuotaStatus.limit;
+
+      const renderSyncDot = () => {
+        if (!currentUser?.email) {
+          return <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-zinc-400 dark:bg-zinc-600" title="Local storage only"></span>;
+        }
+        if (!isOnline) {
+          return <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500" title="Device Offline"></span>;
+        }
+        if (hasSyncFailed) {
+          return <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500 animate-pulse" title="Sync connection failed"></span>;
+        }
+        if (isActivelySyncing) {
+          return <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500 animate-pulse" title="Synchronizing..."></span>;
+        }
+        return <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" title="Synchronized"></span>;
+      };
 
       return (
         <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
@@ -2178,7 +2426,7 @@
             </div>
           )}
 
-          <header className={`pl-[30px] pr-5 pt-12 pb-4 sticky top-0 z-20 backdrop-blur-2xl border-b transition-colors ${
+          <header className={`pl-[30px] pr-5 pt-12 pb-3 sticky top-0 z-20 backdrop-blur-2xl border-b transition-colors ${
             isDark ? 'bg-black/75 border-white/10' : 'bg-white/80 border-black/10'
           }`}>
             <div className="flex justify-between items-center">
@@ -2192,7 +2440,7 @@
                     onClick={handleDevToggleTier}
                     className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all shadow-xs border ${
                       isPaidUser 
-                        ? 'bg-amber-500/20 text-[#FF9500] border-[#FF9500]/40' 
+                        ? 'bg-[#FF9500]/15 text-[#FF9500] border-[#FF9500]/30' 
                         : 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30'
                     }`}
                     title="Tap to toggle Pro/Free mode"
@@ -2218,7 +2466,8 @@
                 </p>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              {/* TOP HEADER ACTION CLUSTER: [ + ] [ Bell ] [ Avatar ] */}
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsAddOpen(true)}
                   className={`w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-sm active:scale-90 transition-transform ${
@@ -2231,6 +2480,24 @@
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                   </svg>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsNotificationsOpen(true)}
+                  className={`relative w-9 h-9 rounded-full flex items-center justify-center transition-transform active:scale-90 shadow-sm ${
+                    isDark ? 'bg-white/10 text-white' : 'bg-[#E5E5EA] text-[#1C1C1E]'
+                  }`}
+                  title="Maintenance Alerts"
+                >
+                  <svg className="w-4 h-4 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                  </svg>
+                  {unreadAlertCount > 0 && (
+                    <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#E11D48] ring-2 ring-black/40"></span>
+                  )}
+                </button>
+
                 <button
                   onClick={() => { setSettingsSubView('root'); setIsSettingsOpen(true); }}
                   className={`w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-sm ${
@@ -2244,6 +2511,26 @@
                   </svg>
                 </button>
               </div>
+            </div>
+
+            {/* MODULAR CATEGORY FILTER BAR */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-2.5">
+              {availableCategories.map(cat => {
+                const isSelected = activeCategoryFilter === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategoryFilter(cat)}
+                    className={`px-2.5 py-1 rounded-full text-[10.5px] font-bold whitespace-nowrap transition-all ${
+                      isSelected
+                        ? (isDark ? 'bg-white text-black shadow-xs' : 'bg-[#1C1C1E] text-white shadow-xs')
+                        : (isDark ? 'bg-zinc-800/80 text-zinc-400 hover:text-zinc-200' : 'bg-[#E5E5EA]/70 text-[#636366] hover:text-[#1C1C1E]')
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
             </div>
           </header>
 
@@ -2277,7 +2564,7 @@
 
             <div className="space-y-4">
               {units.map((unit) => {
-                const unitAppliances = appliances.filter(a => a.unitId === unit.id);
+                const unitAppliances = appliances.filter(a => a.unitId === unit.id && isApplianceMatchingFilter(a));
 
                 return (
                   <div
@@ -2343,7 +2630,9 @@
                           unitAppliances.map(item => renderApplianceCard(item))
                         ) : (
                           <div className={`p-4 text-center rounded-2xl border ${isDark ? 'text-zinc-400 bg-black/20 border-white/5' : 'text-[#636366] bg-white/60 border-black/5'}`}>
-                            <p className="text-xs font-semibold">No equipment registered in this group</p>
+                            <p className="text-xs font-semibold">
+                              {activeCategoryFilter === 'All' ? 'No equipment registered in this group' : `No items in "${activeCategoryFilter}" filter`}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -2384,12 +2673,12 @@
             const { appliance, consumable, index } = activeConsumableSheet;
             const status = calculateConsumableStatus(consumable, appliance);
             return (
-              <div onClick={() => setActiveConsumableSheet(null)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer">
-                <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-t-[32px] p-6 space-y-4 border-t cursor-default ${
+              <div onClick={() => setActiveConsumableSheet(null)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer transition-opacity">
+                <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-t-[32px] p-6 space-y-4 border-t cursor-default animate-sheet-spring ${
                   isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
                 }`}>
                   <div className="flex justify-between items-start pb-2 border-b border-black/10 dark:border-white/10">
-                    <div className="min-w-0 pr-3">
+                    <div className="min-w-0 pr-3 pl-4">
                       <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#FF9500]">
                         {appliance.brand} • {appliance.name}
                       </p>
@@ -2449,7 +2738,9 @@
                     <button
                       type="button"
                       onClick={() => handleMarkConsumableReplacedToday(appliance.id, index)}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3 rounded-2xl shadow-sm active:scale-95 transition-transform"
+                      className={`w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3 rounded-2xl shadow-sm active:scale-95 transition-all ${
+                        isConsumableJustReplaced ? 'animate-completion-flash' : ''
+                      }`}
                     >
                       ✓ Mark Replaced Today
                     </button>
@@ -2567,14 +2858,26 @@
                 {detailTab === 'docs' && (
                   <div className="space-y-3">
                     <div className={`p-4 rounded-2xl border space-y-2.5 ${isDark ? 'bg-zinc-950/80 border-white/5' : 'bg-[#F9F9FB] border-black/5'}`}>
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-start">
                         <div>
                           <p className="text-xs font-black">Manufacturer Warranty</p>
-                          <p className={`text-[10px] font-semibold leading-tight ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>Activate registration or upload proof</p>
+                          {(() => {
+                            const wInfo = calculateApplianceWarrantyStatus(selectedAppliance);
+                            return (
+                              <p className={`text-[10px] font-semibold leading-tight mt-0.5 ${
+                                wInfo.status === 'active' ? 'text-emerald-500 font-bold' : (wInfo.isExpired ? 'text-rose-500 font-bold' : (isDark ? 'text-zinc-400' : 'text-[#636366]'))
+                              }`}>
+                                {wInfo.label}
+                              </p>
+                            );
+                          })()}
                         </div>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => window.open(resolveOfficialLinks(selectedAppliance).warranty, '_blank')}
+                            onClick={() => {
+                              sessionStorage.setItem('pending_warranty_appliance_id', selectedAppliance.id);
+                              window.open(resolveOfficialLinks(selectedAppliance).warranty, '_blank');
+                            }}
                             className="bg-[#FF9500] hover:bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm whitespace-nowrap active:scale-95"
                           >
                             Activate
@@ -2657,14 +2960,12 @@
           {/* 3. ADD EQUIPMENT MODAL */}
           {isAddOpen && (
             <div onClick={() => setIsAddOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer">
-              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 border-t cursor-default ${
+              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 border-t cursor-default animate-sheet-spring ${
                 isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
               }`}>
-                <div className="relative flex items-center justify-center pb-2 border-b border-black/10 dark:border-white/10">
-                  <h3 className="text-base font-black tracking-tight text-center">Add Equipment</h3>
-                  <div className="absolute right-0 top-0">
-                    <AppleCloseButton isDark={isDark} onClick={() => setIsAddOpen(false)} />
-                  </div>
+                <div className="flex justify-between items-center pb-2 border-b border-black/10 dark:border-white/10 pl-3.5">
+                  <h3 className="text-base font-black tracking-tight text-[#FF9500]">Add Equipment</h3>
+                  <AppleCloseButton isDark={isDark} onClick={() => setIsAddOpen(false)} />
                 </div>
 
                 <div className="flex gap-1.5 p-1 rounded-xl bg-black/5 dark:bg-white/5">
@@ -2750,7 +3051,7 @@
                 ) : (
                   <form onSubmit={handleAddEquipmentSubmit} className="space-y-3.5">
                     <div>
-                      <label className="text-[10px] font-black uppercase tracking-wider text-[#FF9500]">Brand / Maker</label>
+                      <label className={`text-[10px] font-extrabold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-[#3A3A3C]'}`}>Brand / Maker</label>
                       <input
                         className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
                           isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-black/10 text-black shadow-xs'
@@ -2814,7 +3115,7 @@
                           <button
                             type="button"
                             onClick={() => setAddForm(prev => ({ ...prev, groupMode: prev.groupMode === 'existing' ? 'custom' : 'existing' }))}
-                            className="text-[10px] font-bold text-[#FF9500] hover:underline"
+                            className="text-[10px] font-bold text-[#FF9500]"
                           >
                             {addForm.groupMode === 'existing' ? '+ New Group' : 'Choose Existing'}
                           </button>
@@ -2822,19 +3123,26 @@
                       </div>
 
                       {addForm.groupMode === 'existing' || !isPaidUser ? (
-                        <select
-                          value={addForm.selectedUnitId}
-                          onChange={(e) => setAddForm(prev => ({ ...prev, selectedUnitId: e.target.value }))}
-                          className={`w-full rounded-2xl p-3 text-xs font-semibold border focus:outline-none mt-1 ${
-                            isDark ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-black/10 text-black shadow-xs'
-                          }`}
-                        >
-                          {(units || []).map(u => (
-                            <option key={u?.id || Math.random()} value={u?.id || 'unit_main'}>
-                              {u?.name || 'Main Residence'}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="relative mt-1">
+                          <select
+                            value={addForm.selectedUnitId}
+                            onChange={(e) => setAddForm(prev => ({ ...prev, selectedUnitId: e.target.value }))}
+                            className={`w-full appearance-none rounded-xl py-2 pl-3 pr-8 text-xs font-bold border focus:outline-none ${
+                              isDark ? 'bg-zinc-800 border-zinc-700 text-zinc-100' : 'bg-white border-black/10 text-zinc-900 shadow-xs'
+                            }`}
+                          >
+                            {(units || []).map(u => (
+                              <option key={u?.id || Math.random()} value={u?.id || 'unit_main'} className={isDark ? 'bg-zinc-800 text-white' : 'bg-white text-black'}>
+                                {u?.name || 'Main Residence'}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5">
+                            <svg className={`w-3.5 h-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                          </div>
+                        </div>
                       ) : (
                         <input
                           className={`w-full rounded-2xl p-3 text-xs font-semibold mt-1 focus:outline-none border ${
@@ -3021,18 +3329,17 @@
               }} 
               className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer"
             >
-              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 shadow-2xl border-t cursor-default ${
+              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 shadow-2xl border-t cursor-default animate-sheet-spring ${
                 isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
               }`}>
                 
                 {settingsSubView === 'root' && (
-                  <div className="space-y-4">
-                    {/* Consistent Account & Backup Card */}
+                  <div className="space-y-3">
                     <div className={`p-4 rounded-2xl border space-y-3 ${isDark ? 'bg-zinc-950/80 border-white/5' : 'bg-[#F9F9FB] border-black/5'}`}>
                       <div className="flex justify-between items-start">
                         <div className="min-w-0 flex-1 pr-2">
-                          <div className="flex items-baseline gap-2 mb-1 flex-wrap">
-                            <h3 className="text-sm font-black uppercase tracking-wider text-[#FF9500]">Account &amp; Backup</h3>
+                          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                            <h3 className="text-base font-black tracking-tight leading-tight">Account &amp; Backup</h3>
 
                             {currentUser?.email ? (
                               isEditingProfileName ? (
@@ -3057,20 +3364,20 @@
                                   </button>
                                 </form>
                               ) : (
-                                <div className="inline-flex items-center gap-1.5">
+                                <div className="inline-flex items-center gap-1.5 translate-y-[1.5px]">
                                   <span className="text-zinc-400 text-xs">•</span>
                                   <span 
                                     onClick={() => {
                                       setProfileNameInput(userDisplayName || currentUser.email.split('@')[0]);
                                       setIsEditingProfileName(true);
                                     }}
-                                    className="relative inline-flex items-center cursor-pointer hover:opacity-80 transition-opacity"
+                                    className="relative inline-flex items-center cursor-pointer transition-colors"
                                     title="Edit display name"
                                   >
-                                    <span className="text-sm font-black tracking-tight text-zinc-900 dark:text-white">
+                                    <span className="text-lg font-black tracking-tight text-[#FF9500] hover:text-amber-500 leading-none">
                                       {userDisplayName || currentUser.email.split('@')[0]}
                                     </span>
-                                    <svg className="w-2.5 h-2.5 ml-1 opacity-60 self-start -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg className="w-2 h-2 ml-1 opacity-70 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
                                       <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                                     </svg>
                                   </span>
@@ -3091,11 +3398,7 @@
                               </span>
 
                               <span className="relative flex h-1.5 w-1.5 shrink-0 mx-0.5">
-                                {currentUser?.email ? (
-                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500 animate-emerald-dot"></span>
-                                ) : (
-                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-zinc-400 dark:bg-zinc-600"></span>
-                                )}
+                                {renderSyncDot()}
                               </span>
 
                               <p className={`text-[11px] font-medium truncate max-w-[190px] ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
@@ -3119,15 +3422,14 @@
                       </div>
                     </div>
 
-                    {/* Plan Tier Card with 3-Pill Dashboard */}
-                    <div className={`p-4 rounded-2xl border space-y-3 ${isDark ? 'bg-zinc-950/80 border-white/5' : 'bg-[#F9F9FB] border-black/5'}`}>
-                      <div className="flex justify-between items-center">
+                    <div className={`p-4 rounded-2xl border space-y-3.5 ${isDark ? 'bg-zinc-950/80 border-white/5' : 'bg-[#F9F9FB] border-black/5'}`}>
+                      <div className="flex items-center gap-2">
                         <p className="text-xs font-black">Plan Tier</p>
-                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider transition-all ${
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider transition-all ${
                           isPaidUser 
                             ? (isDark 
-                                ? 'bg-[#FF9500]/15 text-[#FF9500] border border-[#FF9500]/30 shadow-[0_0_12px_rgba(255,149,0,0.15)]' 
-                                : 'bg-[#FF9500]/10 text-[#D97706] border border-[#FF9500]/25')
+                                ? 'bg-[#FF9500]/15 text-[#FF9500] border border-[#FF9500]/30' 
+                                : 'bg-[#FF9500]/10 text-[#FF9500] border border-[#FF9500]/25')
                             : (isDark 
                                 ? 'bg-white/10 text-zinc-200 border border-white/10' 
                                 : 'bg-black/5 text-[#1C1C1E] border border-black/5')
@@ -3136,36 +3438,56 @@
                         </span>
                       </div>
 
-                      {/* 3-Pill Live Telemetry Dashboard */}
-                      <div className="grid grid-cols-3 gap-2 py-0.5">
-                        <div className={`p-2 rounded-xl border text-center ${isDark ? 'bg-zinc-900 border-white/5' : 'bg-white border-black/5 shadow-2xs'}`}>
-                          <span className="text-[9px] font-extrabold uppercase tracking-wider block text-zinc-400 dark:text-zinc-500">Groups</span>
-                          <span className={`text-xs font-mono font-bold ${totalGroupsUsed >= maxGroups ? 'text-amber-500' : ''}`}>
-                            {totalGroupsUsed} / {maxGroups}
-                          </span>
+                      {/* CONCEPT C: MICRO-LINEAR HAIRLINE GAUGES */}
+                      <div className="space-y-2 py-0.5">
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
+                            <span>Groups</span>
+                            <span className="font-mono text-zinc-300 dark:text-zinc-300">{totalGroupsUsed} / {maxGroups}</span>
+                          </div>
+                          <div className={`w-full h-[3px] rounded-full overflow-hidden ${isDark ? 'bg-white/10' : 'bg-black/5'}`}>
+                            <div 
+                              style={{ width: `${Math.min(100, Math.round((totalGroupsUsed / maxGroups) * 100))}%` }}
+                              className="h-full bg-[#FF9500] rounded-full transition-all duration-500 ease-out"
+                            />
+                          </div>
                         </div>
 
-                        <div className={`p-2 rounded-xl border text-center ${isDark ? 'bg-zinc-900 border-white/5' : 'bg-white border-black/5 shadow-2xs'}`}>
-                          <span className="text-[9px] font-extrabold uppercase tracking-wider block text-zinc-400 dark:text-zinc-500">Items</span>
-                          <span className={`text-xs font-mono font-bold ${totalItemsUsed >= maxItems ? 'text-amber-500' : ''}`}>
-                            {totalItemsUsed} / {maxItems}
-                          </span>
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
+                            <span>Appliances</span>
+                            <span className="font-mono text-zinc-300 dark:text-zinc-300">{totalItemsUsed} / {maxItems}</span>
+                          </div>
+                          <div className={`w-full h-[3px] rounded-full overflow-hidden ${isDark ? 'bg-white/10' : 'bg-black/5'}`}>
+                            <div 
+                              style={{ width: `${Math.min(100, Math.round((totalItemsUsed / maxItems) * 100))}%` }}
+                              className="h-full bg-[#FF9500] rounded-full transition-all duration-500 ease-out"
+                            />
+                          </div>
                         </div>
 
-                        <div className={`p-2 rounded-xl border text-center ${isDark ? 'bg-zinc-900 border-white/5' : 'bg-white border-black/5 shadow-2xs'}`}>
-                          <span className="text-[9px] font-extrabold uppercase tracking-wider block text-zinc-400 dark:text-zinc-500">
-                            {isPaidUser ? 'AI (2h)' : 'AI (Free)'}
-                          </span>
-                          <span className={`text-xs font-mono font-bold ${aiUsed >= aiMax ? 'text-rose-500' : ''}`}>
-                            {aiUsed} / {aiMax}
-                          </span>
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
+                            <span>Advanced Reasoning</span>
+                            <span className="font-mono text-zinc-300 dark:text-zinc-300">
+                              {isPaidUser ? `${aiUsed} / ${aiMax}` : `${aiUsed} / ${FREE_TOTAL_QUOTA}`}
+                            </span>
+                          </div>
+                          <div className={`w-full h-[3px] rounded-full overflow-hidden ${isDark ? 'bg-white/10' : 'bg-black/5'}`}>
+                            <div 
+                              style={{ width: `${Math.min(100, Math.round((aiUsed / (isPaidUser ? aiMax : FREE_TOTAL_QUOTA)) * 100))}%` }}
+                              className={`h-full rounded-full transition-all duration-500 ease-out ${
+                                aiQuotaStatus.isLocked ? 'bg-amber-500' : 'bg-[#FF9500]'
+                              }`}
+                            />
+                          </div>
                         </div>
                       </div>
 
                       <button
                         type="button"
                         onClick={() => setSettingsSubView('subscription')}
-                        className={`w-full py-2 rounded-xl text-xs font-bold transition-all border shadow-xs active:scale-95 flex items-center justify-center ${
+                        className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all border shadow-xs active:scale-95 flex items-center justify-center ${
                           isPaidUser 
                             ? (isDark ? 'bg-zinc-800 text-zinc-300 border-white/10 hover:bg-zinc-700' : 'bg-[#E5E5EA] text-black border-black/5 hover:bg-[#D1D1D6]')
                             : 'bg-[#FF9500] hover:bg-amber-500 text-white border-transparent'
@@ -3175,7 +3497,7 @@
                       </button>
                     </div>
 
-                    <div className={`p-4 rounded-2xl border space-y-2.5 ${isDark ? 'bg-zinc-950/80 border-white/5' : 'bg-[#F9F9FB] border-black/5'}`}>
+                    <div className={`p-4 rounded-2xl border space-y-3 ${isDark ? 'bg-zinc-950/80 border-white/5' : 'bg-[#F9F9FB] border-black/5'}`}>
                       <div className="flex justify-between items-center">
                         <div>
                           <p className="text-xs font-black">Home Appliance Passport (PDF)</p>
@@ -3198,14 +3520,14 @@
                           if (isPassportUnlocked()) setSettingsSubView('passport');
                           else setSettingsSubView('passport_checkout');
                         }}
-                        className="w-full bg-[#FF9500] hover:bg-amber-500 text-white font-bold text-xs py-2 rounded-xl shadow-xs transition-all active:scale-95"
+                        className="w-full bg-[#FF9500] hover:bg-amber-500 text-white font-bold text-xs py-2.5 rounded-xl shadow-xs transition-all active:scale-95"
                       >
                         {isPassportUnlocked() ? `Create & Export PDF (${getPassportRemainingTimeString()}) ➔` : 'Get 72-Hour Pass ($2.99) ➔'}
                       </button>
                       {savedPassports.length > 0 && (
                         <button
                           onClick={() => setSettingsSubView('exports')}
-                          className={`w-full py-2 rounded-xl text-xs font-bold transition-all border ${
+                          className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all border ${
                             isDark ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-white/5' : 'bg-[#E5E5EA] hover:bg-[#D1D1D6] text-black border-black/5'
                           }`}
                         >
@@ -3214,7 +3536,7 @@
                       )}
                     </div>
 
-                    <div className={`p-4 rounded-2xl border space-y-2.5 ${isDark ? 'bg-zinc-950/80 border-white/5' : 'bg-[#F9F9FB] border-black/5'}`}>
+                    <div className={`p-4 rounded-2xl border space-y-3 ${isDark ? 'bg-zinc-950/80 border-white/5' : 'bg-[#F9F9FB] border-black/5'}`}>
                       <div className="flex justify-between items-center">
                         <div>
                           <p className="text-xs font-black">Appearance</p>
@@ -3316,7 +3638,7 @@
                       ) : (
                         <button
                           onClick={() => setIsPaywallOpen(true)}
-                          className="w-full bg-[#FF9500] hover:bg-amber-500 text-white font-bold text-xs py-2 rounded-xl shadow-xs active:scale-95 transition-transform"
+                          className="w-full bg-[#FF9500] hover:bg-amber-500 text-white font-bold text-xs py-2.5 rounded-xl shadow-xs active:scale-95 transition-transform"
                         >
                           Upgrade to Advanced Manager ↗
                         </button>
@@ -3634,6 +3956,157 @@
             </div>
           )}
 
+          {/* NOTIFICATION CENTER DRAWER */}
+          {isNotificationsOpen && (
+            <div onClick={() => setIsNotificationsOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer transition-opacity">
+              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-t-[32px] p-6 space-y-4 border-t cursor-default animate-sheet-spring ${
+                isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+              }`}>
+                <div className="flex justify-between items-start pb-2 border-b border-black/10 dark:border-white/10 -mt-1">
+                  <div className="min-w-0 pr-3 pl-3.5">
+                    <h3 className="text-base font-black tracking-tight leading-tight">Maintenance Alerts</h3>
+                    <p className={`text-[11px] font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                      {allDueNotifications.length === 0 
+                        ? 'No new alerts' 
+                        : (allDueNotifications.length === 1 
+                            ? '1 item requires your attention' 
+                            : `${allDueNotifications.length} items require your attention`)}
+                    </p>
+                  </div>
+                  <AppleCloseButton isDark={isDark} onClick={() => setIsNotificationsOpen(false)} />
+                </div>
+
+                <div className="max-h-[60vh] overflow-y-auto space-y-2 py-1 scrollbar-none">
+                  {allDueNotifications.length > 0 ? (
+                    allDueNotifications.map((notif) => {
+                      const notifOffset = notifSwipeOffsets[notif.key] || 0;
+                      const notifProgress = Math.min(1, Math.abs(notifOffset) / 70);
+
+                      return (
+                        <div key={notif.key} className="relative overflow-hidden rounded-2xl">
+                          <div className="absolute inset-y-0 right-0 w-20 bg-zinc-700 flex items-center justify-center rounded-r-2xl">
+                            <span
+                              style={{
+                                transform: `scale(${0.75 + notifProgress * 0.25})`,
+                                opacity: 0.4 + notifProgress * 0.6
+                              }}
+                              className="text-[10px] font-bold text-white uppercase tracking-wider"
+                            >
+                              Dismiss
+                            </span>
+                          </div>
+
+                          <div
+                            onTouchStart={(e) => {
+                              notifTouchStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                              notifTouchIsHorizontalRef.current = null;
+                              notifActiveSwipingKeyRef.current = notif.key;
+                            }}
+                            onTouchMove={(e) => {
+                              if (notifActiveSwipingKeyRef.current !== notif.key) return;
+                              const deltaX = e.touches[0].clientX - notifTouchStartPosRef.current.x;
+                              const deltaY = e.touches[0].clientY - notifTouchStartPosRef.current.y;
+
+                              if (notifTouchIsHorizontalRef.current === null) {
+                                if (Math.abs(deltaX) > Math.abs(deltaY) + 6) {
+                                  notifTouchIsHorizontalRef.current = true;
+                                } else if (Math.abs(deltaY) > Math.abs(deltaX) + 6) {
+                                  notifTouchIsHorizontalRef.current = false;
+                                }
+                              }
+
+                              if (!notifTouchIsHorizontalRef.current) return;
+                              const damped = deltaX < 0 ? Math.max(-80, deltaX) : 0;
+                              setNotifSwipeOffsets(prev => ({ ...prev, [notif.key]: damped }));
+                            }}
+                            onTouchEnd={() => {
+                              if (notifActiveSwipingKeyRef.current !== notif.key) return;
+                              if (!notifTouchIsHorizontalRef.current) {
+                                notifActiveSwipingKeyRef.current = null;
+                                return;
+                              }
+                              const finalOffset = notifSwipeOffsets[notif.key] || 0;
+                              if (finalOffset < -50) {
+                                acknowledgeAlert(notif.key);
+                              }
+                              setNotifSwipeOffsets(prev => ({ ...prev, [notif.key]: 0 }));
+                              notifTouchIsHorizontalRef.current = null;
+                              notifActiveSwipingKeyRef.current = null;
+                            }}
+                            style={{
+                              transform: `translateX(${notifOffset}px)`,
+                              transition: notifActiveSwipingKeyRef.current === notif.key ? 'none' : 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                            }}
+                            onClick={() => {
+                              acknowledgeAlert(notif.key);
+                              setIsNotificationsOpen(false);
+                              setActiveConsumableSheet({ appliance: notif.appliance, consumable: notif.consumable, index: notif.index });
+                            }}
+                            className={`p-3 rounded-2xl border cursor-pointer active:scale-98 transition-all flex items-center justify-between ${
+                              isDark ? 'bg-zinc-800/80 border-white/5 hover:bg-zinc-800' : 'bg-white border-black/10 hover:bg-zinc-50 shadow-xs'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1 pr-2">
+                              <p className="text-[10px] font-black uppercase text-[#FF9500] truncate">
+                                {notif.appliance.brand} • {notif.appliance.name}
+                                {notif.appliance.nickname ? ` (${notif.appliance.nickname})` : ''}
+                              </p>
+                              <p className="text-xs font-bold truncate mt-0.5">{notif.consumable.name}</p>
+                              <p className="text-[11px] font-medium text-rose-500 mt-0.5 font-mono">{notif.status.timeRemainingText}</p>
+                            </div>
+                            <span className="text-xs font-bold text-zinc-400">➔</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-6 text-zinc-400 text-xs font-semibold">
+                      All consumables and maintenance schedules are currently up to date.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* WARRANTY RETURN CONFIRMATION POPUP */}
+          {pendingWarrantyAppliance && (
+            <div onClick={() => setPendingWarrantyAppliance(null)} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[95] cursor-pointer">
+              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-[32px] p-6 space-y-3.5 shadow-2xl border text-center cursor-default animate-sheet-spring ${
+                isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
+              }`}>
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#FF9500]">Warranty Portal</span>
+                  <AppleCloseButton isDark={isDark} onClick={() => setPendingWarrantyAppliance(null)} />
+                </div>
+                <h3 className="text-base font-black tracking-tight leading-snug">
+                  Were you able to activate your warranty for {formatApplianceTitle(pendingWarrantyAppliance.brand, pendingWarrantyAppliance.name)}?
+                </h3>
+                <p className={`text-xs font-medium leading-relaxed ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
+                  Confirming will record active coverage on this hardware ledger.
+                </p>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmWarrantyActivation(pendingWarrantyAppliance.id, false)}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${
+                      isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-[#E5E5EA] text-[#1C1C1E]'
+                    }`}
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmWarrantyActivation(pendingWarrantyAppliance.id, true)}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2.5 rounded-xl shadow-sm active:scale-95"
+                  >
+                    Yes, Activated
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 5. PAYWALL MODAL */}
           {isPaywallOpen && (
             <div 
@@ -3646,7 +4119,7 @@
             >
               <div 
                 onClick={(e) => e.stopPropagation()} 
-                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default ${
+                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default animate-sheet-spring ${
                   isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
                 }`}
               >
@@ -3732,7 +4205,7 @@
           {/* 6. GROUP CREATION & DELETION MODALS */}
           {isAddGroupModalOpen && (
             <div onClick={() => setIsAddGroupModalOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 cursor-pointer">
-              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default ${
+              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default animate-sheet-spring ${
                 isDark ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
               }`}>
                 <div className="flex justify-between items-center">
@@ -3762,7 +4235,7 @@
 
           {deleteTargetGroup && (
             <div onClick={() => setDeleteTargetGroup(null)} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[75] cursor-pointer">
-              <div onClick={(e) => e.stopPropagation()} className={`border rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default ${
+              <div onClick={(e) => e.stopPropagation()} className={`border rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default animate-sheet-spring ${
                 isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
               }`}>
                 <h3 className="text-base font-black">Delete "{deleteTargetGroup.name}"?</h3>
@@ -3782,7 +4255,7 @@
           {/* 7. BULK DELETION CONFIRMATION */}
           {isBulkDeleteModalOpen && (
             <div onClick={() => setIsBulkDeleteModalOpen(false)} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[70] cursor-pointer">
-              <div onClick={(e) => e.stopPropagation()} className={`border rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default ${
+              <div onClick={(e) => e.stopPropagation()} className={`border rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default animate-sheet-spring ${
                 isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
               }`}>
                 <h3 className="text-base font-black">Delete {selectedIds.length} Items?</h3>
@@ -3806,7 +4279,7 @@
               }} 
               className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[90] cursor-pointer"
             >
-              <div onClick={(e) => e.stopPropagation()} className={`border rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default ${
+              <div onClick={(e) => e.stopPropagation()} className={`border rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default animate-sheet-spring ${
                 isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
               }`}>
                 <h3 className="text-base font-black">Log Out of {currentUser?.email}?</h3>
@@ -3840,7 +4313,7 @@
               }} 
               className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-[60] cursor-pointer"
             >
-              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-t-[32px] p-6 space-y-4 border-t cursor-default ${
+              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-t-[32px] p-6 space-y-4 border-t cursor-default animate-sheet-spring ${
                 isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
               }`}>
                 <div className="flex justify-between items-center">
@@ -3933,20 +4406,17 @@
           {/* 10. DIAGNOSTIC ASSISTANT OVERLAY BOTTOM-SHEET */}
           {activeAppliance && (
             <div onClick={() => setActiveAppliance(null)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-[80] cursor-pointer">
-              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-md h-[82vh] rounded-t-[32px] p-5 flex flex-col border-t cursor-default ${
+              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-md h-[82vh] rounded-t-[32px] p-5 flex flex-col border-t cursor-default animate-sheet-spring ${
                 isDark ? 'bg-zinc-900 border-white/10 text-white' : 'bg-white border-black/10 text-[#1C1C1E]'
               }`}>
-                {/* Centered Appliance Name & Subtitle */}
-                <div className="relative flex items-center justify-center pb-2.5 border-b border-black/10 dark:border-white/10">
-                  <div className="px-10 text-center min-w-0">
-                    <h3 className="text-sm font-black truncate">{formatApplianceTitle(activeAppliance.brand, activeAppliance.name)}</h3>
+                <div className="flex justify-between items-start pb-2.5 border-b border-black/10 dark:border-white/10">
+                  <div className="min-w-0 flex-1 pr-3">
+                    <h3 className="text-sm font-black truncate leading-tight">{formatApplianceTitle(activeAppliance.brand, activeAppliance.name)}</h3>
                     <p className={`text-[11px] font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-[#636366]'}`}>
                       {getAssistantTierLabel()}
                     </p>
                   </div>
-                  <div className="absolute right-0 top-0">
-                    <AppleCloseButton isDark={isDark} onClick={() => setActiveAppliance(null)} />
-                  </div>
+                  <AppleCloseButton isDark={isDark} onClick={() => setActiveAppliance(null)} />
                 </div>
 
                 <div className="flex gap-1.5 py-2 overflow-x-auto scrollbar-none">
@@ -3975,15 +4445,17 @@
                         {m.text}
                       </div>
 
-                      {/* Friendly Humanized Diagnostic Conclusion & Referral Fork */}
                       {m.showReferralFork && (
-                        <div className={`mr-auto max-w-[94%] p-4 rounded-2xl border space-y-3 shadow-md ${
+                        <div className={`mx-auto max-w-[92%] p-4 rounded-2xl border space-y-3 shadow-md ${
                           isDark ? 'bg-zinc-950 border-white/10 text-zinc-200' : 'bg-white border-black/10 text-zinc-900 shadow-sm'
                         }`}>
-                          <div className="border-b border-black/5 dark:border-white/5 pb-1">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-[#FF9500]">
+                          <div className="border-b border-black/5 dark:border-white/5 pb-2 text-center">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-[#FF9500] block">
                               Recommended Next Steps
                             </span>
+                            <p className="text-[11px] font-medium leading-relaxed text-zinc-500 dark:text-zinc-400 mt-1">
+                              If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically.
+                            </p>
                           </div>
 
                           <div className="grid grid-cols-2 gap-2 pt-0.5">
@@ -4062,20 +4534,18 @@
                     </div>
                   ))}
 
-                  {/* Compact wave-bounce thinking dots */}
                   {isThinking && (
                     <div className={`p-3 rounded-2xl w-fit mr-auto flex items-center gap-1.5 ${
                       isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-[#E5E5EA] text-[#636366]'
                     }`}>
-                      <span className="w-1.25 h-1.25 rounded-full bg-zinc-400 dark:bg-zinc-500 wave-dot"></span>
-                      <span className="w-1.25 h-1.25 rounded-full bg-zinc-400 dark:bg-zinc-500 wave-dot"></span>
-                      <span className="w-1.25 h-1.25 rounded-full bg-zinc-400 dark:bg-zinc-500 wave-dot"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 wave-dot"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 wave-dot"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 wave-dot"></span>
                     </div>
                   )}
 
-                  {/* Word-chunk ambient fade-up reveal */}
                   {streamingText && (
-                    <div className={`p-3 rounded-2xl max-w-[85%] mr-auto whitespace-pre-line font-medium leading-relaxed animate-in fade-in duration-150 ${
+                    <div className={`p-3 rounded-2xl max-w-[85%] mr-auto whitespace-pre-line font-medium leading-relaxed animate-smooth-reveal ${
                       isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-[#E5E5EA] text-black'
                     }`}>
                       {streamingText}
@@ -4156,7 +4626,7 @@
 
           {/* 11. INLINE PDF VIEWER */}
           {inlinePdfViewerData && (
-            <div className="fixed inset-0 z-[95] flex flex-col bg-zinc-950 text-white">
+            <div className="fixed inset-0 z-[95] flex flex-col bg-zinc-950 text-white animate-sheet-spring">
               <div className="p-4 pt-12 border-b border-white/10 flex justify-between items-center bg-zinc-900/90 backdrop-blur-md">
                 <button
                   onClick={() => {
