@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Appliance Engine" />
-  <meta name="theme-color" content="#000000" />
+  <meta name="theme-color" content="#000000" id="theme-color-meta" />
   <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22Appliance%20Engine%22%2C%22short_name%22%3A%22Appliances%22%2C%22start_url%22%3A%22%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23000000%22%2C%22theme_color%22%3A%22%23000000%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%2520viewBox%3D%270%25200%2520100%2520100%27%253E%253Crect%2520width%3D%27100%27%2520height%3D%27100%27%2520rx%3D%2720%27%2520fill%3D%27%23FF9500%27%2F%253E%253Cpath%2520d%3D%27M30%252050%2520h40M50%252030%2520v40%27%2520stroke%3D%27white%27%2520stroke-width%3D%2710%27%2520stroke-linecap%3D%27round%27%2F%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D" />
 
   <script src="https://cdn.tailwindcss.com"></script>
@@ -374,7 +374,7 @@
       );
     }
 
-    // Direct Calendar Event Download (.ics) - Prompts Native Calendar Directly
+    // Direct Calendar Event Download (.ics) with Room Location Binding
     function exportConsumableToIcs(appliance, consumable) {
       triggerHaptic('success');
       const intervalMonths = consumable.intervalMonths || 6;
@@ -389,6 +389,7 @@
 
       const title = `Replace ${consumable.name} (${appliance.brand} ${appliance.name})`;
       const desc = `Scheduled replacement for OEM Part #${consumable.partNumber || 'Standard'}. Tracked via Appliance Engine.`;
+      const locationText = appliance.nickname || appliance.unitName || 'Main Residence';
 
       const icsString = [
         "BEGIN:VCALENDAR",
@@ -402,6 +403,7 @@
         `DTSTART:${datestamp}`,
         `SUMMARY:${title}`,
         `DESCRIPTION:${desc}`,
+        `LOCATION:${locationText}`,
         "STATUS:CONFIRMED",
         "BEGIN:VALARM",
         "TRIGGER:-P1D",
@@ -1543,6 +1545,19 @@
         return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
       });
 
+      const isDark = appearanceSetting === 'system' ? systemIsDark : appearanceSetting === 'dark';
+
+      // Dynamic System Keyboard & iOS Status Bar Synchronization
+      useEffect(() => {
+        if (typeof document !== 'undefined') {
+          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+          const metaTheme = document.getElementById('theme-color-meta');
+          if (metaTheme) {
+            metaTheme.setAttribute('content', isDark ? '#000000' : '#F2F2F7');
+          }
+        }
+      }, [isDark]);
+
       const [currentUser, setCurrentUser] = useState(() => {
         try {
           const saved = localStorage.getItem('app_user_session');
@@ -1620,6 +1635,8 @@
       const [pendingDeleteReceiptApplianceId, setPendingDeleteReceiptApplianceId] = useState(null);
 
       const [isAddOpen, setIsAddOpen] = useState(false);
+      const [addFormSubmitted, setAddFormSubmitted] = useState(false);
+      const [isCapacityModalOpen, setIsCapacityModalOpen] = useState(false);
       const addEquipmentModalRef = useRef(null);
 
       const [isPaywallOpen, setIsPaywallOpen] = useState(false);
@@ -1740,6 +1757,7 @@
       const isAnyModalActive = Boolean(
         isSettingsOpen ||
         isAddOpen ||
+        isCapacityModalOpen ||
         isNotificationsOpen ||
         selectedAppliance ||
         activeAppliance ||
@@ -1772,6 +1790,7 @@
       useEffect(() => {
         if (isAddOpen && addEquipmentModalRef.current) {
           addEquipmentModalRef.current.scrollTop = 0;
+          setAddFormSubmitted(false);
         }
       }, [isAddOpen]);
 
@@ -1843,8 +1862,6 @@
         return () => mediaQuery.removeEventListener('change', handler);
       }, []);
 
-      const isDark = appearanceSetting === 'system' ? systemIsDark : appearanceSetting === 'dark';
-
       useEffect(() => {
         (async () => {
           runAutomatedStorageMaintenance(isPaidUser);
@@ -1912,9 +1929,10 @@
             headers: { 'X-User-Email': email }
           });
           const data = await res.json();
-          if (data.fleet && Array.isArray(data.fleet) && data.fleet.length > 0) {
+          const incomingAppliances = data.appliances || data.fleet || [];
+          if (Array.isArray(incomingAppliances) && incomingAppliances.length > 0) {
             setAppliances(prev => {
-              const cloudMap = new Map(data.fleet.map(a => [a.id, a]));
+              const cloudMap = new Map(incomingAppliances.map(a => [a.id, a]));
               const merged = prev.map(localItem => {
                 const cloudItem = cloudMap.get(localItem.id);
                 if (!cloudItem) return localItem;
@@ -2079,12 +2097,12 @@
           updatedAt: Date.now()
         };
 
-        const updatedFleet = appliances.map(a => a.id === updatedAppliance.id ? updatedAppliance : a);
-        setAppliances(updatedFleet);
+        const updatedList = appliances.map(a => a.id === updatedAppliance.id ? updatedAppliance : a);
+        setAppliances(updatedList);
         setSelectedAppliance(updatedAppliance);
         setIsEditingApplianceSpecs(false);
         setEditApplianceForm(null);
-        triggerDebouncedSync(updatedFleet, units);
+        triggerDebouncedSync(updatedList, units);
         showToast("Appliance specifications updated");
       };
 
@@ -2273,17 +2291,15 @@
       const handleAddEquipmentSubmit = async (e) => {
         e.preventDefault();
         triggerHaptic('light');
+        setAddFormSubmitted(true);
+
         const effectiveName = (addForm.name || '').trim();
         const effectiveBrand = (addForm.brand || '').trim();
         const effectiveModel = (addForm.model || '').trim();
 
-        if (!effectiveBrand) {
-          showToast("Please specify Brand / Maker");
-          return;
-        }
-
-        if (!effectiveName && !effectiveModel) {
-          showToast("Please provide Product Name or Model #");
+        if (!effectiveBrand || (!effectiveName && !effectiveModel)) {
+          triggerHaptic('warn');
+          showToast("Please enter Brand and Model or Name");
           return;
         }
 
@@ -2304,8 +2320,11 @@
 
         const itemsInGroup = appliances.filter(a => a.unitId === finalUnit.id);
         const maxAllowedPerGroup = isPaidUser ? PRO_MAX_PER_GROUP : FREE_MAX_PER_GROUP;
+        
+        // Friendly Capacity Modal Intercept (Free Tier limit reached)
         if (itemsInGroup.length >= maxAllowedPerGroup) {
-          showToast(`Property limit reached (${itemsInGroup.length} appliances)`);
+          triggerHaptic('warn');
+          setIsCapacityModalOpen(true);
           return;
         }
 
@@ -2317,12 +2336,18 @@
         let detectedCategory = '';
         let resolvedCanonicalName = fallbackTitle;
 
+        // AbortController with 4-second timeout to prevent indefinite loading freezes
+        const abortCtrl = new AbortController();
+        const timeoutId = setTimeout(() => abortCtrl.abort(), 4000);
+
         try {
           const res = await fetch(`${WORKER_ENDPOINT}/api/discover`, {
             method: 'POST',
+            signal: abortCtrl.signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ brand: effectiveBrand, modelOrQuery: effectiveModel || effectiveName })
           });
+          clearTimeout(timeoutId);
           const data = await res.json();
           if (data?.appliance) {
             const parsed = data.appliance;
@@ -2336,7 +2361,9 @@
             }));
             discoveredParts = parsed.replacementParts || [];
           }
-        } catch (err) {}
+        } catch (err) {
+          clearTimeout(timeoutId);
+        }
 
         const finalNormalizedCategory = normalizeApplianceCategory(detectedCategory, resolvedCanonicalName || fallbackTitle, effectiveBrand);
         const newId = Date.now().toString();
@@ -2390,6 +2417,7 @@
 
         setIsAnalyzing(false);
         setLookupStatus('');
+        setAddFormSubmitted(false);
         setIsAddOpen(false);
         triggerHaptic('success');
         showToast("Appliance registered");
@@ -2551,10 +2579,10 @@
             name: `${activeAppliance.brand} Protect ${entered}`
           };
 
-          const updatedFleet = appliances.map(a => a.id === updatedAppliance.id ? updatedAppliance : a);
-          setAppliances(updatedFleet);
+          const updatedList = appliances.map(a => a.id === updatedAppliance.id ? updatedAppliance : a);
+          setAppliances(updatedList);
           setActiveAppliance(updatedAppliance);
-          triggerDebouncedSync(updatedFleet, units);
+          triggerDebouncedSync(updatedList, units);
 
           const postAuditNotice = `✓ Model verified: ${formatApplianceTitle(activeAppliance.brand, entered)}.\n\n` +
             `Notice: On this model, verify that the bottom access cover clicks shut firmly. A slight misplacement can disconnect the internal power switch.`;
@@ -2704,7 +2732,7 @@
           });
 
           const selectedScopeName = passportScopeUnitId === 'all'
-            ? 'Complete Fleet'
+            ? 'All Properties & Appliances'
             : (units.find(u => u.id === passportScopeUnitId)?.name || 'Main Residence');
 
           const passportMeta = {
@@ -2764,7 +2792,7 @@
         }
 
         const selectedScopeName = passportScopeUnitId === 'all'
-          ? 'Complete Fleet'
+          ? 'All Properties & Appliances'
           : (units.find(u => u.id === passportScopeUnitId)?.name || 'Main Residence');
 
         const verificationHash = 'HAP-' + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -3187,7 +3215,7 @@
                     <p className={`text-[11px] font-semibold mt-0.5 truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                       {item.brand}{item.modelNumber ? ` • ${item.modelNumber}` : ''}
                     </p>
-                    <p className={`text-[10px] mt-0.5 truncate font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-400'}`}>{item.category || 'Appliance'}</p>
+                    <p className={`text-[10.5px] mt-0.5 truncate font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-400'}`}>{item.category || 'Appliance'}</p>
                   </div>
                 </div>
               </div>
@@ -3197,13 +3225,13 @@
                   isDark ? 'bg-zinc-950/40 border-t border-black/10' : 'border-t border-black/[0.04] bg-[#FAFAFC]'
                 }`}>
                   <div className="flex justify-between items-center pb-1">
-                    <span className={`text-[9.5px] font-extrabold tracking-wider uppercase pl-2 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    <span className={`text-[10.5px] font-extrabold tracking-wider uppercase pl-2 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                       Consumables
                     </span>
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); openAssistant(item); }}
-                      className={`text-[10.5px] font-bold ${UI_ACCENT.text} hover:opacity-80 cursor-pointer flex items-center gap-1 active:scale-95 transition-transform`}
+                      className={`text-[11px] font-bold ${UI_ACCENT.text} hover:opacity-80 cursor-pointer flex items-center gap-1 active:scale-95 transition-transform`}
                     >
                       <span>Ask Manual</span>
                       <span className="text-[10px]">💬</span>
@@ -3237,7 +3265,7 @@
                               </p>
 
                               {status.badgeType && (
-                                <span className={`h-5 px-2 rounded-full inline-flex items-center gap-1.5 text-[10px] font-bold tracking-tight ${
+                                <span className={`h-5 px-2 rounded-full inline-flex items-center gap-1.5 text-[10.5px] font-bold tracking-tight ${
                                   isDark ? 'bg-zinc-700/60 text-zinc-200' : 'bg-black/[0.04] border border-black/5 text-zinc-700'
                                 }`}>
                                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
@@ -3266,7 +3294,7 @@
                       })}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between text-[10.5px] py-1 text-zinc-400 pl-2">
+                    <div className="flex items-center justify-between text-[11px] py-1 text-zinc-400 pl-2">
                       <span>No periodic consumables cataloged.</span>
                     </div>
                   )}
@@ -3333,10 +3361,13 @@
             </div>
           )}
 
-          {/* APP HEADER */}
-          <header className={`pl-[30px] pr-5 pt-12 pb-3.5 sticky top-0 z-20 backdrop-blur-2xl transition-colors ${
-            isDark ? 'bg-black/80' : 'bg-white/80 border-b border-black/[0.04]'
-          }`}>
+          {/* APP HEADER: Dynamic Island / Notch Safe Area Clearance */}
+          <header 
+            style={{ paddingTop: 'max(16px, calc(env(safe-area-inset-top, 20px) + 8px))' }}
+            className={`pl-[30px] pr-5 pb-3.5 sticky top-0 z-20 backdrop-blur-2xl transition-colors ${
+              isDark ? 'bg-black/80' : 'bg-white/80 border-b border-black/[0.04]'
+            }`}
+          >
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-xs font-extrabold uppercase tracking-wider text-[#FF9500]">
@@ -3716,7 +3747,7 @@
             </div>
           )}
 
-          {/* 1. CONSUMABLE ACTION DRAWER */}
+          {/* 1. CONSUMABLE ACTION DRAWER: Centered Upward Popover & Home Bar Safe-Area Inset */}
           {activeConsumableSheet && (() => {
             const { appliance, consumable, index, openedFromNotifications } = activeConsumableSheet;
             const status = calculateConsumableStatus(consumable, appliance);
@@ -3734,9 +3765,13 @@
 
             return (
               <div onClick={handleCloseConsumableSheet} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer transition-opacity">
-                <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-t-[32px] px-5 py-4 space-y-3.5 cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
-                }`}>
+                <div 
+                  onClick={(e) => e.stopPropagation()} 
+                  style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
+                  className={`w-full max-w-sm rounded-t-[32px] px-5 pt-4 space-y-3.5 cursor-default animate-sheet-spring ${
+                    isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
+                  }`}
+                >
                   <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
                     <div className="min-w-0 pr-3 pl-1 text-left">
                       <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#FF9500]">
@@ -3788,24 +3823,24 @@
                       </p>
                     </div>
 
-                    {/* Fluid Action Pair with Identical h-8 Pill Heights & Matched Arrow Glyph ▼ */}
+                    {/* Centered Button Layout & Upward-Opening Popover */}
                     <div className="pt-1.5 flex items-center justify-between gap-2.5">
                       <div className="relative flex-1">
                         <button
                           type="button"
                           onClick={() => { triggerHaptic('light'); setIsIntervalPopoverOpen(!isIntervalPopoverOpen); }}
-                          className={`w-full h-8 inline-flex items-center justify-between px-3 text-[11px] font-bold rounded-xl transition-transform active:scale-95 ${
+                          className={`w-full h-8 inline-flex items-center justify-center gap-1.5 px-3 text-[11px] font-bold rounded-xl transition-transform active:scale-95 ${
                             isDark ? 'bg-zinc-700/80 text-zinc-100 hover:bg-zinc-700' : 'bg-white text-zinc-800 border border-black/10 hover:bg-zinc-50 shadow-2xs'
                           }`}
                         >
                           <span>Adjust Interval</span>
-                          <span className="text-xs font-bold text-[#FF9500] flex items-center justify-center">▼</span>
+                          <span className="text-[10px] font-black text-[#FF9500] leading-none">▲</span>
                         </button>
 
                         {isIntervalPopoverOpen && (
                           <>
                             <div className="fixed inset-0 z-30" onClick={() => setIsIntervalPopoverOpen(false)} />
-                            <div className={`absolute left-0 top-9.5 w-full min-w-[140px] rounded-2xl shadow-2xl p-1 z-40 text-left animate-in fade-in zoom-in-95 duration-100 ${
+                            <div className={`absolute left-0 bottom-full mb-1.5 w-full min-w-[140px] rounded-2xl shadow-2xl p-1 z-40 text-left animate-in fade-in zoom-in-95 duration-100 ${
                               isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/10 text-zinc-900'
                             }`}>
                               {[3, 6, 12].map(m => (
@@ -3922,6 +3957,7 @@
             >
               <div 
                 onClick={(e) => e.stopPropagation()} 
+                style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
                 className={`w-full max-w-md h-[88vh] max-h-[88vh] rounded-t-[32px] flex flex-col cursor-default overflow-hidden animate-sheet-spring ${
                   isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
                 }`}
@@ -4012,6 +4048,7 @@
                             Property
                           </label>
                           <select
+                            style={{ colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4372,13 +4409,14 @@
             </div>
           )}
 
-          {/* 3. ADD APPLIANCE MODAL */}
+          {/* 3. ADD APPLIANCE MODAL: Aligned Insets, Validated Highlight Rings, and Safe-Area Spacing */}
           {isAddOpen && (
             <div onClick={() => setIsAddOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer">
               <div 
                 ref={addEquipmentModalRef}
                 onClick={(e) => e.stopPropagation()} 
-                className={`w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 cursor-default animate-sheet-spring ${
+                style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
+                className={`w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[32px] px-6 pt-6 space-y-4 cursor-default animate-sheet-spring ${
                   isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
                 }`}
               >
@@ -4423,7 +4461,9 @@
                         Brand *
                       </label>
                       <input
-                        className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                        className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
+                          addFormSubmitted && !addForm.brand.trim() ? 'ring-2 ring-rose-500' : ''
+                        } ${
                           isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                         }`}
                         placeholder="e.g. GE, Coway"
@@ -4437,7 +4477,9 @@
                         Model #
                       </label>
                       <input
-                        className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                        className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
+                          addFormSubmitted && !addForm.model.trim() && !addForm.name.trim() ? 'ring-1 ring-amber-500/70' : ''
+                        } ${
                           isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                         }`}
                         placeholder="e.g. AP-1512HH"
@@ -4452,7 +4494,9 @@
                       Product Name
                     </label>
                     <input
-                      className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                      className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
+                        addFormSubmitted && !addForm.name.trim() && !addForm.model.trim() ? 'ring-1 ring-amber-500/70' : ''
+                      } ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                       }`}
                       placeholder="e.g. Profile 27.9 Cu. Ft. Smart Fridge"
@@ -4480,6 +4524,7 @@
                       Property Group
                     </label>
                     <select
+                      style={{ colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                       }`}
@@ -4503,10 +4548,10 @@
                         triggerHaptic('light');
                         setAddForm(prev => ({ ...prev, isPassportDetailsOpen: !prev.isPassportDetailsOpen }));
                       }}
-                      className={`text-xs font-bold ${UI_ACCENT.text} flex items-center justify-between w-full py-1`}
+                      className={`text-xs font-bold ${UI_ACCENT.text} flex items-center justify-between w-full py-1 pl-2.5 pr-1`}
                     >
                       <span>Passport & Warranty Details (Optional)</span>
-                      <span>{addForm.isPassportDetailsOpen ? '▲' : '▼'}</span>
+                      <span className="text-[10px]">{addForm.isPassportDetailsOpen ? '▲' : '▼'}</span>
                     </button>
 
                     {addForm.isPassportDetailsOpen && (
@@ -4586,7 +4631,63 @@
             </div>
           )}
 
-          {/* 4. SETTINGS BOTTOM-SHEET: App-Wide High-Contrast Readability & Aligned Subviews */}
+          {/* CAPACITY REACHED MODAL: Friendly & Persuasive Upgrade Intercept */}
+          {isCapacityModalOpen && (
+            <div 
+              onClick={() => setIsCapacityModalOpen(false)} 
+              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[99] cursor-pointer"
+            >
+              <div 
+                onClick={(e) => e.stopPropagation()} 
+                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl cursor-default animate-sheet-spring text-center ${
+                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                }`}
+              >
+                <div className="w-12 h-12 rounded-full bg-[#FF9500]/15 text-[#FF9500] mx-auto flex items-center justify-center text-xl font-black">
+                  ⬡
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="text-base font-black tracking-tight">Ready to Add More?</h3>
+                  <p className={`text-xs font-medium leading-relaxed px-2 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                    You've reached the free limit of 3 appliances for Main Residence.
+                  </p>
+                  <p className={`text-xs font-medium leading-relaxed px-1 pt-1 ${isDark ? 'text-zinc-200' : 'text-zinc-700'}`}>
+                    Upgrade to Advanced Manager to keep your entire home protected — track up to 75 appliances across 5 properties with deep diagnostic guidance.
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setIsCapacityModalOpen(false);
+                      setIsPaywallOpen(true);
+                    }}
+                    className={`w-full ${UI_ACCENT.solid} font-bold text-xs py-3 rounded-xl shadow-xs active:scale-95 transition-transform`}
+                  >
+                    Unlock Advanced Manager ↗
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setIsCapacityModalOpen(false);
+                    }}
+                    className={`w-full py-2 rounded-xl text-xs font-bold transition-colors ${
+                      isDark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'
+                    }`}
+                  >
+                    Maybe later
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 4. SETTINGS BOTTOM-SHEET: Spaced Plan Tier, High-Contrast Text & Aligned Guides */}
           {isSettingsOpen && (
             <div 
               onClick={() => {
@@ -4596,9 +4697,13 @@
               }} 
               className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer"
             >
-              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] p-6 space-y-4 shadow-2xl cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
-              }`}>
+              <div 
+                onClick={(e) => e.stopPropagation()} 
+                style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
+                className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] px-6 pt-6 space-y-4 shadow-2xl cursor-default animate-sheet-spring ${
+                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
+                }`}
+              >
                 
                 {settingsSubView === 'root' && (
                   <div className="space-y-4">
@@ -4688,7 +4793,7 @@
                       </div>
                     </div>
 
-                    {/* CARD 1: PLAN TIER */}
+                    {/* CARD 1: PLAN TIER (Generous Vertical Gap) */}
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'bg-white border border-black/[0.06] light-card-elevation'}`}>
                       <div>
                         <div className="flex items-center gap-2">
@@ -4702,7 +4807,7 @@
                           </span>
                         </div>
 
-                        <p className={`text-[10px] font-semibold leading-tight mt-0.5 truncate ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                        <p className={`text-[11px] font-semibold leading-normal mt-1.5 truncate ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
                           {isPaidUser 
                             ? `Using ${totalItemsUsed}/${maxItems} Appliances • ${totalGroupsUsed}/${maxGroups} Properties • ${aiUsed} Advanced Inquiries`
                             : `Using ${totalItemsUsed}/${maxItems} Appliances • ${totalGroupsUsed}/${maxGroups} Properties • ${aiQuotaStatus.isLocked ? 'Standard Diagnostics' : `${aiUsed}/${FREE_TOTAL_QUOTA} Advanced Inquiries`}`}
@@ -4722,13 +4827,13 @@
                       </button>
                     </div>
 
-                    {/* CARD 2: PASSPORT */}
+                    {/* CARD 2: PASSPORT (Generous Vertical Gap & High-Contrast Orange $2.99) */}
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'bg-white border border-black/[0.06] light-card-elevation'}`}>
                       <div>
                         <div className="flex justify-between items-center">
                           <div>
                             <p className="text-xs font-black tracking-tight">Home Appliance Passport (PDF &amp; CSV)</p>
-                            <p className={`text-[10px] font-semibold leading-tight mt-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                            <p className={`text-[11px] font-semibold leading-normal mt-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
                               Verified Home Appliance &amp; Maintenance Ledger
                             </p>
                           </div>
@@ -4737,7 +4842,7 @@
                               Active
                             </span>
                           ) : (
-                            <span className="text-[11px] font-bold text-[#FF9500] shrink-0 ml-3">
+                            <span className="text-[11px] font-black text-[#FF9500] shrink-0 ml-3">
                               $2.99
                             </span>
                           )}
@@ -4842,7 +4947,7 @@
                   </div>
                 )}
 
-                {/* NOTIFICATIONS SUBVIEW: Aligned with pl-4 Left Edge */}
+                {/* NOTIFICATIONS SUBVIEW: Aligned Left Edge */}
                 {settingsSubView === 'notifications' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -4954,7 +5059,7 @@
                   </div>
                 )}
 
-                {/* PRIVACY & HELP SUBVIEW: Aligned with pl-4 Left Edge */}
+                {/* PRIVACY & HELP SUBVIEW: Aligned Left Edge */}
                 {settingsSubView === 'privacy_help' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -4992,7 +5097,7 @@
                               `• App: v1.0.4 (PWA Standalone)\n` +
                               `• User: ${currentUser?.email || 'Guest'}\n` +
                               `• Tier: ${isPaidUser ? 'Advanced Manager' : 'Free'}\n` +
-                              `• Fleet: ${appliances.length} Appliances • ${units.length} Properties`
+                              `• Total: ${appliances.length} Appliances • ${units.length} Properties`
                             );
                             window.location.href = `mailto:support@applianceengine.app?subject=${subject}&body=${body}`;
                           }}
@@ -5046,7 +5151,7 @@
                   </div>
                 )}
 
-                {/* FAQ SUBVIEW: Aligned with pl-4 Left Edge */}
+                {/* FAQ SUBVIEW: Aligned Left Edge */}
                 {settingsSubView === 'faq' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -5082,7 +5187,7 @@
                   </div>
                 )}
 
-                {/* REQUEST MISSING MANUAL SUBVIEW: Aligned with pl-2.5 */}
+                {/* REQUEST MISSING MANUAL SUBVIEW: Aligned with Form Insets */}
                 {settingsSubView === 'request_manual' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -5156,7 +5261,7 @@
                   </div>
                 )}
 
-                {/* TERMS OF SERVICE & PRIVACY POLICY: Aligned with pl-4 */}
+                {/* TERMS OF SERVICE & PRIVACY POLICY: Aligned Left Edge */}
                 {settingsSubView === 'terms_privacy' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -5365,7 +5470,7 @@
                   </div>
                 )}
 
-                {/* PASSPORT CHECKOUT: High-Contrast Orange $2.99 */}
+                {/* PASSPORT CHECKOUT: Centered & High-Contrast Orange $2.99 */}
                 {settingsSubView === 'passport_checkout' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -5468,13 +5573,14 @@
                           Included Properties
                         </label>
                         <select
+                          style={{ colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl py-1.5 px-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
                           value={passportScopeUnitId}
                           onChange={(e) => setPassportScopeUnitId(e.target.value)}
                         >
-                          <option value="all">All Properties</option>
+                          <option value="all">All Properties &amp; Appliances</option>
                           {units.map(u => (
                             <option key={u.id} value={u.id}>{u.name}</option>
                           ))}
@@ -5486,6 +5592,7 @@
                           Document Purpose
                         </label>
                         <select
+                          style={{ colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl py-1.5 px-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
@@ -5731,9 +5838,13 @@
           {/* NOTIFICATION CENTER DRAWER */}
           {isNotificationsOpen && (
             <div onClick={() => setIsNotificationsOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer transition-opacity">
-              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-md rounded-t-[32px] p-6 space-y-4 cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
-              }`}>
+              <div 
+                onClick={(e) => e.stopPropagation()} 
+                style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
+                className={`w-full max-w-md rounded-t-[32px] px-6 pt-6 space-y-4 cursor-default animate-sheet-spring ${
+                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
+                }`}
+              >
                 <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
                   <div className="min-w-0 pr-2 pl-1">
                     <h3 className="text-base font-black tracking-tight leading-tight text-zinc-900 dark:text-zinc-50">
@@ -5834,7 +5945,7 @@
                               setActiveConsumableSheet({ appliance: notif.appliance, consumable: notif.consumable, index: notif.index, openedFromNotifications: true });
                             }}
                             className={`relative z-10 py-2.5 px-3.5 rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-between ${
-                              isDark ? 'bg-zinc-800/80 hover:bg-zinc-800 shadow-2xs' : 'bg-white border border-black/[0.06] light-card-elevation hover:bg-zinc-50'
+                              isDark ? 'bg-zinc-800/80 hover:bg-zinc-800 shadow-2xs' : 'bg-white border border-black/[0.04] light-card-elevation hover:bg-zinc-50'
                             }`}
                           >
                             <div className="min-w-0 flex-1 pr-2">
@@ -6042,7 +6153,7 @@
             >
               <div 
                 onClick={(e) => e.stopPropagation()} 
-                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl cursor-default animate-sheet-spring ${
+                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default animate-sheet-spring ${
                   isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
                 }`}
               >
@@ -6193,9 +6304,13 @@
               }} 
               className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-[60] cursor-pointer"
             >
-              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-t-[32px] p-6 space-y-4 cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
-              }`}>
+              <div 
+                onClick={(e) => e.stopPropagation()} 
+                style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
+                className={`w-full max-w-sm rounded-t-[32px] px-6 pt-6 space-y-4 cursor-default animate-sheet-spring ${
+                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
+                }`}
+              >
                 <div className="flex justify-between items-center">
                   <h3 className="text-base font-black">Account Login</h3>
                   <AppleCloseButton 
@@ -6285,9 +6400,10 @@
                 style={{ 
                   overscrollBehavior: 'contain',
                   maxHeight: viewportHeight ? `${Math.min(viewportHeight * 0.88, viewportHeight - 16)}px` : '85dvh',
-                  height: viewportHeight ? `${Math.min(viewportHeight * 0.88, viewportHeight - 16)}px` : '85dvh'
+                  height: viewportHeight ? `${Math.min(viewportHeight * 0.88, viewportHeight - 16)}px` : '85dvh',
+                  paddingBottom: 'max(20px, calc(env(safe-area-inset-bottom, 0px) + 8px))'
                 }}
-                className={`w-full max-w-md rounded-t-[32px] p-5 flex flex-col cursor-default animate-sheet-spring ${
+                className={`w-full max-w-md rounded-t-[32px] px-5 pt-5 flex flex-col cursor-default animate-sheet-spring ${
                   isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
                 }`}
               >
@@ -6565,7 +6681,10 @@
           {/* 12. INLINE PDF VIEWER */}
           {inlinePdfViewerData && (
             <div className="fixed inset-0 z-[95] flex flex-col bg-zinc-950 text-white animate-sheet-spring">
-              <div className="p-4 pt-12 border-b border-white/10 flex justify-between items-center bg-zinc-900/90 backdrop-blur-md">
+              <div 
+                style={{ paddingTop: 'max(16px, calc(env(safe-area-inset-top, 20px) + 8px))' }}
+                className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900/90 backdrop-blur-md"
+              >
                 <button
                   onClick={() => {
                     triggerHaptic('light');
