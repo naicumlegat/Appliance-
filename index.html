@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Appliance Engine</title>
 
-  <!-- PWA & Mobile Meta Tags -->
+  <!-- PWA & Mobile Meta Tags: default style eliminates WebKit status-bar fog -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Appliance Engine" />
   <meta name="theme-color" content="#000000" id="theme-color-meta" />
+  <meta name="color-scheme" content="dark light" id="color-scheme-meta" />
   <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22Appliance%20Engine%22%2C%22short_name%22%3A%22Appliances%22%2C%22start_url%22%3A%22%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23000000%22%2C%22theme_color%22%3A%22%23000000%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%2520viewBox%3D%270%25200%2520100%2520100%27%253E%253Crect%2520width%3D%27100%27%2520height%3D%27100%27%2520rx%3D%2720%27%2520fill%3D%27%23FF9500%27%2F%253E%253Cpath%2520d%3D%27M30%252050%2520h40M50%252030%2520v40%27%2520stroke%3D%27white%27%2520stroke-width%3D%2710%27%2520stroke-linecap%3D%27round%27%2F%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D" />
 
   <script src="https://cdn.tailwindcss.com"></script>
@@ -19,7 +20,7 @@
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
   <style>
-    /* iOS Standard Body Scale Baseline (17px) */
+    /* iOS Standard Root Scale Baseline */
     html {
       font-size: 17px;
     }
@@ -30,7 +31,13 @@
       font-feature-settings: "tnum";
       overscroll-behavior-y: none;
     }
-    input, textarea, select, .selectable-text {
+    /* 16px Font Lock: Physically disables iOS Safari 120% input auto-zoom */
+    input, textarea, select {
+      font-size: 16px !important;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+    }
+    .selectable-text {
       user-select: text !important;
       -webkit-user-select: text !important;
     }
@@ -42,12 +49,14 @@
       scrollbar-width: none;
     }
 
-    /* Calibrated Physical Elevation Shadows */
-    .light-card-elevation {
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 8px 24px rgba(0, 0, 0, 0.04);
+    /* Apple Native Elevation Shadows (No dirty borders, zero height shifts) */
+    .apple-card-light {
+      background-color: #FFFFFF;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 4px 14px rgba(0, 0, 0, 0.04);
     }
-    .light-drawer-elevation {
-      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.03), 0 -12px 32px rgba(0, 0, 0, 0.06);
+    .apple-drawer-light {
+      background-color: #FFFFFF;
+      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.03), 0 -12px 30px rgba(0, 0, 0, 0.06);
     }
 
     /* SVG Ambient Celestial Animations */
@@ -121,7 +130,7 @@
     /* Typing Dots */
     @keyframes imessage-wave {
       0%, 100% { opacity: 0.35; transform: scale(0.85); }
-      50% { opacity: 1; transform: scale(1); }
+      50% { transform: scale(1); }
     }
     .imessage-dot {
       animation: imessage-wave 1.2s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
@@ -182,7 +191,7 @@
     const { useState, useEffect, useRef, useCallback } = React;
 
     const UI_ACCENT = {
-      badge: 'bg-[#FF9500]/10 text-amber-700 border border-[#FF9500]/25 dark:bg-[#FF9500]/15 dark:text-[#FF9500] dark:border-transparent',
+      badge: 'bg-[#FF9500]/15 text-amber-700 dark:text-[#FF9500]',
       solid: 'bg-[#FF9500] hover:bg-amber-500 text-white',
       text: 'text-[#FF9500]',
       button: 'bg-[#FF9500] hover:bg-amber-500 text-white'
@@ -296,83 +305,94 @@
       };
     }
 
-    // Category Silhouettes - Proportional 56px Thumbnail Box
+    // Refined Apple SF Symbols-Grade Silhouettes (Consistent 1.8px weight & squircle curves)
     function CategorySilhouette({ category = '', isDark }) {
       const cat = (category || '').toLowerCase();
-      const baseClass = `w-full h-full rounded-2xl flex items-center justify-center transition-colors ${
-        isDark ? 'bg-zinc-800/80 text-zinc-300' : 'bg-black/[0.03] text-zinc-700'
+      const strokeClass = "stroke-[1.8] stroke-linecap-round stroke-linejoin-round";
+      
+      const containerClass = `w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+        isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-black/[0.04] text-zinc-700'
       }`;
 
+      // French Door Refrigerator: Soft body squircle, dual door seam, subtle recessed handles
       if (cat.includes('refrigerat') || cat.includes('fridge') || cat.includes('freezer')) {
         return (
-          <div className={baseClass}>
-            <svg className="w-6 h-6 stroke-[1.9]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="5" y="2" width="14" height="20" rx="2" />
-              <line x1="5" y1="10" x2="19" y2="10" />
-              <line x1="8" y1="6" x2="8" y2="8" />
-              <line x1="8" y1="13" x2="8" y2="16" />
+          <div className={containerClass}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="5" y="2.5" width="14" height="19" rx="3" className={strokeClass} />
+              <line x1="5" y1="13.5" x2="19" y2="13.5" className={strokeClass} />
+              <line x1="12" y1="2.5" x2="12" y2="13.5" className={strokeClass} />
+              <line x1="10" y1="7" x2="10" y2="9.5" className={strokeClass} />
+              <line x1="14" y1="7" x2="14" y2="9.5" className={strokeClass} />
+              <line x1="9" y1="17" x2="15" y2="17" className={strokeClass} />
             </svg>
           </div>
         );
       }
 
-      if (cat.includes('hvac') || cat.includes('heat') || cat.includes('air cond') || cat.includes('furnace')) {
-        return (
-          <div className={baseClass}>
-            <svg className="w-6 h-6 stroke-[1.9]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <circle cx="12" cy="12" r="5" />
-              <line x1="12" y1="9" x2="12" y2="15" />
-              <line x1="9" y1="12" x2="15" y2="12" />
-            </svg>
-          </div>
-        );
-      }
-
+      // Air Purifier / Air Quality: Cylindrical body with concentric intake core
       if (cat.includes('air') || cat.includes('purif') || cat.includes('dehumid')) {
         return (
-          <div className={baseClass}>
-            <svg className="w-6 h-6 stroke-[1.9]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-              <circle cx="12" cy="10" r="3" />
-              <line x1="8" y1="17" x2="16" y2="17" />
-              <line x1="9" y1="19" x2="15" y2="19" />
+          <div className={containerClass}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M6 5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5z" className={strokeClass} />
+              <circle cx="12" cy="10" r="3.2" className={strokeClass} />
+              <circle cx="12" cy="10" r="1.2" fill="currentColor" stroke="none" />
+              <line x1="9" y1="16" x2="15" y2="16" className={strokeClass} />
+              <line x1="10" y1="18.5" x2="14" y2="18.5" className={strokeClass} />
             </svg>
           </div>
         );
       }
 
+      // HVAC Heat Pump / Condenser: Squircle chassis with radial turbine fan
+      if (cat.includes('hvac') || cat.includes('heat') || cat.includes('air cond')) {
+        return (
+          <div className={containerClass}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="3.5" y="3.5" width="17" height="17" rx="3.5" className={strokeClass} />
+              <circle cx="12" cy="12" r="5" className={strokeClass} />
+              <path d="M12 7.5v9M7.5 12h9" className={strokeClass} />
+            </svg>
+          </div>
+        );
+      }
+
+      // Dishwasher: Washer body, top digital control fascia, lower wash arm
       if (cat.includes('dish')) {
         return (
-          <div className={baseClass}>
-            <svg className="w-6 h-6 stroke-[1.9]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="4" y="3" width="16" height="18" rx="2" />
-              <line x1="4" y1="8" x2="20" y2="8" />
-              <circle cx="7" cy="5.5" r="0.8" fill="currentColor" />
-              <line x1="10" y1="14" x2="14" y2="14" />
+          <div className={containerClass}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="4.5" y="3" width="15" height="18" rx="2.5" className={strokeClass} />
+              <line x1="4.5" y1="7.5" x2="19.5" y2="7.5" className={strokeClass} />
+              <circle cx="8" cy="5.25" r="0.8" fill="currentColor" stroke="none" />
+              <circle cx="10.5" cy="5.25" r="0.8" fill="currentColor" stroke="none" />
+              <line x1="8.5" y1="14" x2="15.5" y2="14" className={strokeClass} />
             </svg>
           </div>
         );
       }
 
+      // Laundry: Tub enclosure with circular door portal and viewing window
       if (cat.includes('laundry') || cat.includes('washer') || cat.includes('dryer')) {
         return (
-          <div className={baseClass}>
-            <svg className="w-6 h-6 stroke-[1.9]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="4" y="2" width="16" height="20" rx="2" />
-              <circle cx="12" cy="13" r="5" />
-              <circle cx="12" cy="13" r="2" />
-              <line x1="8" y1="5.5" x2="10" y2="5.5" />
+          <div className={containerClass}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="4.5" y="2.5" width="15" height="19" rx="3" className={strokeClass} />
+              <circle cx="12" cy="13" r="5" className={strokeClass} />
+              <circle cx="12" cy="13" r="2.5" className={strokeClass} />
+              <line x1="7.5" y1="5.5" x2="11" y2="5.5" className={strokeClass} />
             </svg>
           </div>
         );
       }
 
+      // Default Equipment: Precision gear badge
       return (
-        <div className={baseClass}>
-          <svg className="w-6 h-6 stroke-[1.9]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 7v5l3 3" />
+        <div className={containerClass}>
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="3" className={strokeClass} />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" className={strokeClass} />
           </svg>
         </div>
       );
@@ -821,7 +841,6 @@
       return html2pdfLoadingPromise;
     }
 
-    // Exact-Match Quoting & Schematic Clearinghouse Routing
     function buildPartPurchaseUrl(brand, partItem, targetStore = 'amazon', applianceModel = '') {
       const cleanBrand = (brand || '').trim();
       const partNumber = (partItem?.partNumber || '').trim();
@@ -1290,7 +1309,7 @@
           }`}
           title="Close"
         >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="w-4 h-4 stroke-[2] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
@@ -1558,6 +1577,10 @@
           if (metaTheme) {
             metaTheme.setAttribute('content', isDark ? '#000000' : '#F2F2F7');
           }
+          let metaScheme = document.getElementById('color-scheme-meta');
+          if (metaScheme) {
+            metaScheme.setAttribute('content', isDark ? 'dark' : 'light');
+          }
         }
       }, [isDark]);
 
@@ -1586,7 +1609,6 @@
         } catch(e) { return ''; }
       });
 
-      // Display Name State with Clean Native Inline Editor (No Underline)
       const [userDisplayName, setUserDisplayName] = useState(() => {
         try {
           const saved = localStorage.getItem('app_user_session');
@@ -1777,15 +1799,23 @@
         pendingDeleteReceiptApplianceId
       );
 
+      // Hard iOS Scroll Lock: Freezes background scroll when any sheet is open
       useEffect(() => {
         if (isAnyModalActive) {
           if (!isAddGroupModalOpen && !deleteTargetGroup && !isBulkDeleteModalOpen) {
             closeEditMode();
           }
-          const originalStyle = window.getComputedStyle(document.body).overflow;
+          const scrollY = window.scrollY;
+          document.body.style.position = 'fixed';
+          document.body.style.top = `-${scrollY}px`;
+          document.body.style.width = '100%';
           document.body.style.overflow = 'hidden';
           return () => {
-            document.body.style.overflow = originalStyle;
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.width = '';
+            document.body.style.overflow = '';
+            window.scrollTo(0, scrollY);
           };
         }
       }, [isAnyModalActive, isAddGroupModalOpen, deleteTargetGroup, isBulkDeleteModalOpen]);
@@ -2041,7 +2071,6 @@
         }
       }, [addForm.brand, addForm.model]);
 
-      // Neutral High-Contrast Copy Feedback (Neutral Black/Dark Grey, Not Green)
       const handleCopyPartSku = (sku) => {
         if (!sku) return;
         triggerHaptic('light');
@@ -2324,7 +2353,6 @@
         const itemsInGroup = appliances.filter(a => a.unitId === finalUnit.id);
         const maxAllowedPerGroup = isPaidUser ? PRO_MAX_PER_GROUP : FREE_MAX_PER_GROUP;
         
-        // Friendly Capacity Modal Intercept (Free Tier limit reached)
         if (itemsInGroup.length >= maxAllowedPerGroup) {
           triggerHaptic('warn');
           setIsCapacityModalOpen(true);
@@ -2339,7 +2367,6 @@
         let detectedCategory = '';
         let resolvedCanonicalName = fallbackTitle;
 
-        // AbortController with 4-second timeout to prevent indefinite loading freezes
         const abortCtrl = new AbortController();
         const timeoutId = setTimeout(() => abortCtrl.abort(), 4000);
 
@@ -2515,7 +2542,6 @@
         setIsThinking(true);
         const quota = AIQuotaTracker.getStatus(isPaidUser);
 
-        // Free tier past trial (Runs 100% locally on device)
         if (!isPaidUser && quota.isLocked) {
           let standardCount = Number(localStorage.getItem('standard_ai_count') || 0) + 1;
           localStorage.setItem('standard_ai_count', standardCount.toString());
@@ -2531,7 +2557,6 @@
           return;
         }
 
-        // Advanced Diagnostics (Worker Edge AI)
         AIQuotaTracker.increment(isPaidUser);
         const quotaAfter = AIQuotaTracker.getStatus(isPaidUser);
 
@@ -3083,6 +3108,7 @@
         return (item.category || 'Appliance') === activeCategoryFilter;
       };
 
+      // Main Appliance Card: Slim 1-row title, zero dirty borders, 4px progress line
       const renderApplianceCard = (item) => {
         const isSelected = selectedIds.includes(item.id);
         const currentOffset = swipeOffsets[item.id] || 0;
@@ -3090,8 +3116,8 @@
         const revealProgress = Math.min(1, Math.abs(currentOffset) / 80);
 
         return (
-          <div key={item.id} className="relative overflow-hidden rounded-[22px]">
-            <div className="absolute inset-y-0 right-0 w-24 bg-rose-600 flex items-center justify-center rounded-r-[22px]">
+          <div key={item.id} className="relative overflow-hidden rounded-[20px]">
+            <div className="absolute inset-y-0 right-0 w-24 bg-rose-600 flex items-center justify-center rounded-r-[20px]">
               <button
                 onClick={(e) => { e.stopPropagation(); handleDeleteSingleAppliance(item.id); }}
                 className="w-full h-full flex flex-col items-center justify-center text-white active:bg-rose-700 transition-colors"
@@ -3105,7 +3131,7 @@
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.2"
+                  strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
@@ -3158,11 +3184,11 @@
                 transform: `translateX(${currentOffset}px)`,
                 transition: activeSwipingIdRef.current === item.id ? 'none' : 'transform 0.32s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
-              className={`relative rounded-[22px] overflow-hidden ${
-                isDark ? 'bg-zinc-900 shadow-xs' : 'bg-white border border-black/[0.06] light-card-elevation'
+              className={`relative rounded-[20px] overflow-hidden ${
+                isDark ? 'bg-zinc-900' : 'apple-card-light'
               } ${isSelected ? 'ring-2 ring-[#FF9500]' : ''}`}
             >
-              <div className="px-4 pt-3.5 pb-2.5 flex items-center gap-3.5">
+              <div className="px-3.5 pt-3 pb-2 flex items-center gap-3">
                 {isSelectMode && (
                   <div
                     onClick={() => toggleSelectId(item.id)}
@@ -3192,57 +3218,52 @@
                       setDetailTab('parts'); 
                     }
                   }}
-                  className="flex-1 flex items-start gap-3.5 cursor-pointer min-w-0 active:scale-[0.99] transition-transform"
+                  className="flex-1 flex items-center gap-3 cursor-pointer min-w-0 active:scale-[0.99] transition-transform"
                 >
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden ${
-                    isDark ? 'bg-zinc-800/80 text-zinc-300' : 'bg-black/[0.03] text-zinc-700 border border-black/[0.04]'
-                  }`}>
-                    <CategorySilhouette category={item.category} isDark={isDark} />
-                  </div>
+                  <CategorySilhouette category={item.category} isDark={isDark} />
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-1">
-                      <div className="min-w-0 flex-1">
-                        <h2 className={`text-[15px] font-black tracking-tight line-clamp-2 leading-snug ${isDark ? 'text-white' : 'text-zinc-900'}`}>
-                          {item.name}
-                          {item.nickname && (
-                            <span className={`font-normal ml-1.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                              ({item.nickname})
-                            </span>
-                          )}
-                        </h2>
-                      </div>
-                      {!isSelectMode && <span className={`text-sm font-semibold shrink-0 ml-1 ${isDark ? "text-zinc-400" : "text-zinc-400"}`}>➔</span>}
+                  <div className="flex-1 min-w-0 pr-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <h4 className={`text-sm font-semibold tracking-tight truncate leading-normal ${isDark ? 'text-white' : 'text-zinc-900'}`}>
+                        {item.name}
+                        {item.nickname && (
+                          <span className={`font-normal ml-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                            ({item.nickname})
+                          </span>
+                        )}
+                      </h4>
+                      {!isSelectMode && (
+                        <span className="text-xs text-zinc-400 font-semibold shrink-0 ml-1.5">➔</span>
+                      )}
                     </div>
 
-                    <p className={`text-xs font-semibold mt-0.5 truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                    <p className={`text-xs font-medium mt-0.5 truncate selectable-text ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                       {item.brand}{item.modelNumber ? ` • ${item.modelNumber}` : ''}
                     </p>
-                    <p className={`text-[11px] mt-0.5 truncate font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-400'}`}>{item.category || 'Appliance'}</p>
                   </div>
                 </div>
               </div>
 
               {!isSelectMode && (
-                <div className={`px-4 pt-2.5 pb-3 ${
-                  isDark ? 'bg-zinc-950/40 border-t border-black/10' : 'border-t border-black/[0.04] bg-[#FAFAFC]'
+                <div className={`px-3.5 pt-2 pb-2.5 ${
+                  isDark ? 'bg-zinc-950/40 border-t border-white/5' : 'bg-[#FAFAFC] border-t border-black/[0.03]'
                 }`}>
-                  <div className="flex justify-between items-center pb-1.5">
-                    <span className={`text-[11px] font-extrabold tracking-wider uppercase pl-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  <div className="flex justify-between items-center pb-1">
+                    <span className={`text-[10px] font-bold tracking-wider uppercase pl-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                       Consumables
                     </span>
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); openAssistant(item); }}
-                      className={`text-xs font-bold ${UI_ACCENT.text} hover:opacity-80 cursor-pointer flex items-center gap-1 active:scale-95 transition-transform`}
+                      className={`text-[11px] font-bold ${UI_ACCENT.text} hover:opacity-80 cursor-pointer flex items-center gap-1 active:scale-95 transition-transform`}
                     >
                       <span>Ask Manual</span>
-                      <span className="text-xs">💬</span>
+                      <span className="text-[11px]">💬</span>
                     </button>
                   </div>
 
                   {consumablesList.length > 0 ? (
-                    <div className="space-y-2 pt-0.5">
+                    <div className="space-y-1.5 pt-0.5">
                       {consumablesList.map((cons, cIdx) => {
                         const status = calculateConsumableStatus(cons, item);
                         return (
@@ -3256,20 +3277,20 @@
                               setIsIntervalPopoverOpen(false);
                               setActiveConsumableSheet({ appliance: item, consumable: cons, index: cIdx, openedFromNotifications: false });
                             }}
-                            className={`rounded-2xl px-3.5 py-2.5 cursor-pointer active:scale-[0.98] transition-all ${
+                            className={`rounded-xl px-3 py-1.5 cursor-pointer active:scale-[0.98] transition-all ${
                               isDark 
-                                ? 'bg-zinc-800/80 hover:bg-zinc-800 shadow-2xs' 
-                                : 'bg-white border border-black/[0.04] hover:bg-zinc-50 shadow-2xs'
+                                ? 'bg-zinc-800/80 hover:bg-zinc-800' 
+                                : 'bg-white hover:bg-zinc-50 shadow-xs'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <p className={`text-xs font-bold truncate flex-1 leading-normal ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                              <p className={`text-xs font-semibold truncate flex-1 leading-normal ${isDark ? 'text-zinc-100' : 'text-zinc-800'}`}>
                                 {cons.name}
                               </p>
 
                               {status.badgeType && (
-                                <span className={`h-5 px-2 rounded-full inline-flex items-center gap-1.5 text-[11px] font-bold tracking-tight ${
-                                  isDark ? 'bg-zinc-700/60 text-zinc-200' : 'bg-black/[0.04] border border-black/5 text-zinc-700'
+                                <span className={`h-4.5 px-2 rounded-full inline-flex items-center gap-1 text-[10px] font-bold tracking-tight ${
+                                  isDark ? 'bg-zinc-700/60 text-zinc-200' : 'bg-black/[0.04] text-zinc-700'
                                 }`}>
                                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                                     status.badgeType === 'past_due' ? 'bg-[#E11D48]' :
@@ -3283,7 +3304,7 @@
                               )}
                             </div>
 
-                            <div className={`mt-2 mb-0.5 w-full h-[6px] rounded-full overflow-hidden ${isDark ? 'bg-zinc-700/60' : 'bg-black/5'}`}>
+                            <div className={`mt-1.5 mb-0.5 w-full h-[4px] rounded-full overflow-hidden ${isDark ? 'bg-zinc-700/60' : 'bg-black/5'}`}>
                               <div
                                 style={{
                                   width: `${status.displayPercent}%`,
@@ -3297,7 +3318,7 @@
                       })}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between text-xs py-1 text-zinc-400 pl-1">
+                    <div className="flex items-center justify-between text-xs py-1 text-zinc-400 pl-0.5">
                       <span>No periodic consumables cataloged.</span>
                     </div>
                   )}
@@ -3364,11 +3385,11 @@
             </div>
           )}
 
-          {/* APP HEADER: Solid Non-Blur Surface & Scaled 44px Navigation Touch Targets */}
+          {/* APP HEADER: Solid Surface (Zero Fog Scrim), Calibrated 38px Buttons */}
           <header 
             style={{ paddingTop: 'max(16px, calc(env(safe-area-inset-top, 20px) + 8px))' }}
-            className={`pl-[30px] pr-5 pb-3.5 sticky top-0 z-20 transition-colors ${
-              isDark ? 'bg-black' : 'bg-[#F2F2F7] border-b border-black/[0.04]'
+            className={`pl-[22px] pr-3.5 pb-3 sticky top-0 z-20 transition-colors ${
+              isDark ? 'bg-black' : 'bg-[#F2F2F7]'
             }`}
           >
             <div className="flex justify-between items-center">
@@ -3379,7 +3400,7 @@
 
                 <div className={`text-xs font-bold mt-0.5 flex items-center animate-greeting-reveal ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                   {greetingInfo.iconType === 'morning' && (
-                    <svg className="w-4 h-4 inline-block mr-1.5 align-[-1.5px] shrink-0 text-amber-500 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-4 h-4 inline-block mr-1.5 align-[-1.5px] shrink-0 text-amber-500 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="4" fill="currentColor" fillOpacity="0.15"/>
                       <g className="animate-solar-rays">
                         <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
@@ -3387,7 +3408,7 @@
                     </svg>
                   )}
                   {greetingInfo.iconType === 'afternoon' && (
-                    <svg className="w-4 h-4 inline-block mr-1.5 align-[-1.5px] shrink-0 text-amber-500 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-4 h-4 inline-block mr-1.5 align-[-1.5px] shrink-0 text-amber-500 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <g className="animate-ambient-sun">
                         <circle cx="12" cy="12" r="4.2" fill="currentColor" fillOpacity="0.15"/>
                         <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
@@ -3395,7 +3416,7 @@
                     </svg>
                   )}
                   {greetingInfo.iconType === 'evening' && (
-                    <svg className="w-4 h-4 inline-block mr-1.5 align-[-1.5px] shrink-0 text-amber-400 dark:text-amber-300 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-4 h-4 inline-block mr-1.5 align-[-1.5px] shrink-0 text-amber-400 dark:text-amber-300 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor" fillOpacity="0.2"/>
                       <circle cx="17.5" cy="5.5" r="1.2" fill="currentColor" stroke="none" className="animate-twinkle-a"/>
                       <circle cx="19.5" cy="10.5" r="0.9" fill="currentColor" stroke="none" className="animate-twinkle-b"/>
@@ -3405,15 +3426,16 @@
                 </div>
               </div>
 
+              {/* Action Buttons: Calibrated 38px Circles with SF Symbols Unified 1.8px Stroke */}
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => { closeEditMode(); triggerHaptic('light'); setIsAddOpen(true); }}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center font-bold shadow-sm active:scale-90 transition-transform ${
+                  className={`w-[38px] h-[38px] rounded-full flex items-center justify-center font-bold shadow-xs active:scale-90 transition-transform ${
                     isDark ? 'bg-zinc-800 text-white hover:bg-zinc-750' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900'
                   }`}
                   title="Add Appliance"
                 >
-                  <svg className="w-5 h-5 stroke-[2.4]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <svg className="w-4 h-4 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                   </svg>
@@ -3422,28 +3444,28 @@
                 <button
                   type="button"
                   onClick={() => { closeEditMode(); triggerHaptic('light'); setIsNotificationsOpen(true); }}
-                  className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-transform active:scale-90 shadow-sm ${
+                  className={`relative w-[38px] h-[38px] rounded-full flex items-center justify-center transition-transform active:scale-90 shadow-xs ${
                     isDark ? 'bg-zinc-800 text-white hover:bg-zinc-750' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900'
                   }`}
                   title="Maintenance Alerts"
                 >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="w-4.5 h-4.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                     <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                   </svg>
                   {unreadAlertCount > 0 && (
-                    <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#FF3B30] shadow-[0_0_6px_rgba(255,59,48,0.7)]"></span>
+                    <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FF3B30] shadow-[0_0_6px_rgba(255,59,48,0.7)]"></span>
                   )}
                 </button>
 
                 <button
                   onClick={() => { closeEditMode(); triggerHaptic('light'); setSettingsSubView('root'); setIsSettingsOpen(true); }}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-sm ${
+                  className={`w-[38px] h-[38px] rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-xs ${
                     isDark ? 'bg-zinc-800 text-white hover:bg-zinc-750' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900'
                   }`}
                   title="Settings"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4.5 h-4.5">
                     <circle cx="12" cy="8" r="4"/>
                     <path d="M4 20c0-4 4-5 8-5s8 1 8 5"/>
                   </svg>
@@ -3452,23 +3474,23 @@
             </div>
           </header>
 
-          <main className="flex-1 p-4 space-y-4 pb-28">
-            <div className="flex items-center justify-between pl-[14px] pr-1 gap-2">
+          {/* MAIN PAGE CONTAINER: Stretched px-2 horizontally to claim empty display space */}
+          <main className="flex-1 px-2 space-y-3 pb-28">
+            {/* Locked Alignment Guide: pl-[14px] perfectly lines up with the card title below */}
+            <div className="flex items-center justify-between pl-[14px] pr-1 gap-2 pt-1">
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className={`text-[13px] font-black tracking-wide uppercase shrink-0 transition-opacity duration-200 ${
+                <span className={`text-xs font-black tracking-wide uppercase shrink-0 transition-opacity duration-200 ${
                   isSearchExpanded ? 'opacity-40' : 'opacity-100'
-                } ${isDark ? 'text-zinc-400' : 'text-zinc-700'}`}>
+                } ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                   {appliances.length} Appliances
                 </span>
 
                 <div
                   className={`relative flex items-center rounded-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                     isSearchExpanded
-                      ? `flex-1 py-1.5 pl-3 pr-2.5 ${
-                          isDark ? 'bg-zinc-900' : 'bg-white border border-black/[0.06] light-card-elevation'
-                        }`
-                      : `w-9 h-9 justify-center cursor-pointer shrink-0 ${
-                          isDark ? 'bg-zinc-900 hover:bg-zinc-800' : 'bg-black/[0.04] border border-black/[0.04] hover:bg-black/[0.07]'
+                      ? `flex-1 py-1 pl-3 pr-2 ${isDark ? 'bg-zinc-900' : 'apple-card-light'}`
+                      : `w-8 h-8 justify-center cursor-pointer shrink-0 ${
+                          isDark ? 'bg-zinc-900 hover:bg-zinc-800' : 'bg-black/[0.04] hover:bg-black/[0.07]'
                         }`
                   }`}
                   onClick={() => {
@@ -3480,7 +3502,7 @@
                     }
                   }}
                 >
-                  <svg className="w-4 h-4 text-zinc-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="w-3.5 h-3.5 text-zinc-400 shrink-0 stroke-[2] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                   </svg>
@@ -3492,7 +3514,8 @@
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search here…"
-                      className="w-full bg-transparent text-xs font-semibold focus:outline-none ml-2 pr-1 placeholder:text-zinc-500"
+                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                      className="w-full bg-transparent text-xs font-medium focus:outline-none ml-2 pr-1 placeholder:text-zinc-500"
                       onBlur={() => {
                         if (!searchQuery.trim()) {
                           setIsSearchExpanded(false);
@@ -3521,14 +3544,14 @@
                   <button
                     type="button"
                     onClick={() => { triggerHaptic('light'); setIsFilterDropdownOpen(!isFilterDropdownOpen); }}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${
                       activeCategoryFilter !== 'All'
                         ? UI_ACCENT.badge
-                        : (isDark ? 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800' : 'bg-black/[0.04] border border-black/[0.04] text-zinc-700 hover:bg-black/[0.07]')
+                        : (isDark ? 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800' : 'bg-black/[0.04] text-zinc-700 hover:bg-black/[0.07]')
                     }`}
                     title="Filter Categories"
                   >
-                    <svg className="w-4 h-4 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                       <line x1="4" y1="21" x2="4" y2="14"></line>
                       <line x1="4" y1="10" x2="4" y2="3"></line>
                       <line x1="12" y1="21" x2="12" y2="12"></line>
@@ -3545,7 +3568,7 @@
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setIsFilterDropdownOpen(false)} />
                       <div className={`absolute left-0 top-10 w-44 rounded-2xl shadow-2xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${
-                        isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/10 text-zinc-900'
+                        isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
                       }`}>
                         {availableCategories.map(cat => (
                           <button
@@ -3558,7 +3581,7 @@
                             }}
                             className={`w-full py-2 px-3 rounded-xl text-xs font-bold text-left flex items-center justify-between ${
                               activeCategoryFilter === cat
-                                ? (isDark ? 'bg-zinc-800 text-[#FF9500]' : 'bg-[#FF9500]/10 text-amber-700')
+                                ? (isDark ? 'bg-zinc-800 text-[#FF9500]' : 'bg-[#FF9500]/15 text-amber-700')
                                 : (isDark ? 'hover:bg-zinc-800' : 'hover:bg-zinc-100')
                             }`}
                           >
@@ -3576,7 +3599,7 @@
                 {isPaidUser && isSelectMode && (
                   <button
                     onClick={() => { triggerHaptic('light'); setIsAddGroupModalOpen(true); }}
-                    className={`text-xs px-3 py-1.5 rounded-full font-bold shadow-sm ${
+                    className={`text-xs px-3 py-1.5 rounded-full font-bold shadow-xs ${
                       isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-black/[0.04] text-zinc-900'
                     }`}
                   >
@@ -3590,7 +3613,7 @@
                     setSelectedIds([]); 
                     setSwipeOffsets({}); 
                   }}
-                  className={`text-xs px-4 py-1.5 rounded-full font-black transition-all shadow-sm active:scale-95 ${
+                  className={`text-xs px-3.5 py-1.5 rounded-full font-black transition-all shadow-xs active:scale-95 ${
                     isSelectMode ? `${UI_ACCENT.solid}` : (isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900')
                   }`}
                 >
@@ -3599,19 +3622,21 @@
               </div>
             </div>
 
-            <div className="space-y-4">
+            {/* STRETCHED PROPERTY GROUP CARDS (No Dirty Borders, Clean Native Elevation) */}
+            <div className="space-y-3.5">
               {units.map((unit) => {
                 const unitAppliances = appliances.filter(a => a.unitId === unit.id && isApplianceMatchingFilter(a));
 
                 return (
                   <div
                     key={unit.id}
-                    className={`rounded-[24px] overflow-hidden ${
-                      isDark ? 'bg-zinc-950/60 shadow-xs' : 'bg-white border border-black/[0.06] light-card-elevation'
+                    className={`rounded-[22px] overflow-hidden ${
+                      isDark ? 'bg-zinc-950/60' : 'apple-card-light'
                     }`}
                   >
-                    <div className={`px-4 py-3 flex items-center justify-between ${
-                      isDark ? 'bg-zinc-900/70' : 'bg-white border-b border-black/[0.03]'
+                    {/* Header padding pl-3.5 lines up with the counter row above */}
+                    <div className={`px-3.5 py-2.5 flex items-center justify-between ${
+                      isDark ? 'bg-zinc-900/70' : 'bg-white'
                     }`}>
                       <div
                         onClick={() => {
@@ -3620,12 +3645,12 @@
                         }}
                         className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
                       >
-                        <span className="text-sm font-bold text-[#FF9500] flex items-center justify-center">
+                        <span className="text-xs font-bold text-[#FF9500] flex items-center justify-center">
                           {unit.collapsed ? '▶' : '▼'}
                         </span>
-                        <h3 className="text-[15px] font-black tracking-tight truncate">{unit.name}</h3>
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                          isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
+                        <h3 className="text-sm font-black tracking-tight truncate">{unit.name}</h3>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-800'
                         }`}>
                           {unitAppliances.length} / {isPaidUser ? PRO_MAX_PER_GROUP : FREE_MAX_PER_GROUP}
                         </span>
@@ -3639,7 +3664,7 @@
                             title="Delete Property"
                           >
                             <span className="w-5 h-5 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-xs">
-                              <svg className="w-3 h-3 stroke-[2.4]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                              <svg className="w-3 h-3 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                               </svg>
                             </span>
@@ -3653,12 +3678,12 @@
                             setAddForm(prev => ({ ...prev, selectedUnitId: unit.id, groupMode: 'existing' }));
                             setIsAddOpen(true); 
                           }}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center leading-none font-bold transition-all active:scale-90 ${
-                            isDark ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300' : 'bg-black/[0.04] hover:bg-black/[0.08] text-zinc-700 border border-black/5'
+                          className={`w-7 h-7 rounded-full flex items-center justify-center font-bold transition-all active:scale-90 ${
+                            isDark ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300' : 'bg-black/[0.04] hover:bg-black/[0.08] text-zinc-700'
                           }`}
                           title="Add appliance to this property"
                         >
-                          <svg className="w-4 h-4 stroke-[2.4]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <line x1="12" y1="5" x2="12" y2="19"></line>
                             <line x1="5" y1="12" x2="19" y2="12"></line>
                           </svg>
@@ -3667,12 +3692,12 @@
                     </div>
 
                     {!unit.collapsed && (
-                      <div className="p-3 space-y-2.5">
+                      <div className="p-2.5 space-y-2">
                         {unitAppliances.length > 0 ? (
                           unitAppliances.map(item => renderApplianceCard(item))
                         ) : (
                           searchQuery.trim() ? (
-                            <div className={`p-4 text-center rounded-2xl ${isDark ? 'text-zinc-400 bg-zinc-900/60' : 'text-zinc-600 bg-[#FAFAFC] border border-black/[0.04]'}`}>
+                            <div className={`p-4 text-center rounded-2xl ${isDark ? 'text-zinc-400 bg-zinc-900/60' : 'text-zinc-600 bg-[#FAFAFC]'}`}>
                               <p className="text-xs font-semibold mb-2">No appliances matching "{searchQuery}"</p>
                               <button
                                 type="button"
@@ -3687,9 +3712,9 @@
                               </button>
                             </div>
                           ) : (
-                            <div className={`p-5 text-center rounded-2xl ${isDark ? 'bg-zinc-900/40' : 'border border-dashed border-black/10 bg-[#FAFAFC]'}`}>
-                              <p className="text-xs font-bold text-zinc-400 mb-3">No appliances cataloged in {unit.name}</p>
-                              <div className="flex flex-wrap items-center justify-center gap-2 animate-starter-chip">
+                            <div className={`p-4 text-center rounded-2xl ${isDark ? 'bg-zinc-900/40' : 'bg-[#FAFAFC]'}`}>
+                              <p className="text-xs font-bold text-zinc-400 mb-2.5">No appliances cataloged in {unit.name}</p>
+                              <div className="flex flex-wrap items-center justify-center gap-1.5 animate-starter-chip">
                                 {starterChipSet.map((chipLabel) => (
                                   <button
                                     key={chipLabel}
@@ -3706,8 +3731,8 @@
                                     }}
                                     className={`text-xs font-bold px-3 py-1.5 rounded-full transition-transform active:scale-95 ${
                                       isDark 
-                                        ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' 
-                                        : 'bg-white text-zinc-800 border border-black/10 hover:bg-zinc-50 shadow-2xs'
+                                        ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-750' 
+                                        : 'bg-white text-zinc-800 hover:bg-zinc-50 shadow-xs'
                                     }`}
                                   >
                                     {chipLabel}
@@ -3726,8 +3751,8 @@
           </main>
 
           {isSelectMode && (
-            <div className={`fixed bottom-4 inset-x-4 max-w-md mx-auto z-40 rounded-2xl p-4 shadow-2xl flex items-center justify-between ${
-              isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+            <div className={`fixed bottom-4 inset-x-3 max-w-md mx-auto z-40 rounded-2xl p-3.5 shadow-2xl flex items-center justify-between ${
+              isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
             }`}>
               <div className="flex items-center gap-2">
                 <button
@@ -3743,7 +3768,7 @@
               <button
                 disabled={selectedIds.length === 0}
                 onClick={() => { triggerHaptic('warn'); setIsBulkDeleteModalOpen(true); }}
-                className="bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-bold text-xs px-4 py-1.5 rounded-full active:scale-95 shadow-sm transition-transform"
+                className="bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-bold text-xs px-4 py-1.5 rounded-full active:scale-95 shadow-xs transition-transform"
               >
                 Delete {selectedIds.length > 0 && `(${selectedIds.length})`}
               </button>
@@ -3772,12 +3797,12 @@
                   onClick={(e) => e.stopPropagation()} 
                   style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
                   className={`w-full max-w-md rounded-t-[32px] px-6 pt-5 space-y-4 cursor-default animate-sheet-spring ${
-                    isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
+                    isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
                   }`}
                 >
                   <div className="flex justify-between items-start pb-2.5 border-b border-black/[0.04] dark:border-zinc-800/80">
                     <div className="min-w-0 pr-3 pl-1 text-left">
-                      <p className="text-[11px] font-black uppercase tracking-widest text-[#FF9500]">
+                      <p className="text-[10.5px] font-black uppercase tracking-widest text-[#FF9500]">
                         {appliance.brand} • {appliance.name}
                       </p>
                       <h3 className="text-base font-black tracking-tight mt-0.5 leading-snug">
@@ -3793,8 +3818,8 @@
                   </div>
 
                   {/* Fluid Status Card */}
-                  <div className={`p-4 rounded-2xl text-xs space-y-3.5 text-center ${
-                    isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC] border border-black/[0.03]'
+                  <div className={`p-4 rounded-2xl text-xs space-y-3 text-center ${
+                    isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC]'
                   }`}>
                     <div className="space-y-1">
                       <span className={`text-xs font-bold block ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
@@ -3803,7 +3828,7 @@
                       <p style={{ color: status.colors.rgbString }} className="font-black text-base tracking-tight">
                         {status.timeRemainingText}
                       </p>
-                      <div className={`mt-2 w-full h-[6px] rounded-full overflow-hidden ${isDark ? 'bg-zinc-700/60' : 'bg-black/5'}`}>
+                      <div className={`mt-2 w-full h-[4px] rounded-full overflow-hidden ${isDark ? 'bg-zinc-700/60' : 'bg-black/5'}`}>
                         <div
                           style={{
                             width: `${status.displayPercent}%`,
@@ -3826,14 +3851,14 @@
                       </p>
                     </div>
 
-                    {/* Equal-Sized 50/50 Grid Action Pair (h-9) with Upward Drop-Up Popover */}
-                    <div className="pt-1.5 grid grid-cols-2 gap-2.5">
+                    {/* Equal-Sized 50/50 Grid Action Pair with Centered Upward Popover */}
+                    <div className="pt-1 grid grid-cols-2 gap-2.5">
                       <div className="relative">
                         <button
                           type="button"
                           onClick={() => { triggerHaptic('light'); setIsIntervalPopoverOpen(!isIntervalPopoverOpen); }}
                           className={`w-full h-9 inline-flex items-center justify-center gap-1.5 px-2.5 text-[11px] font-bold rounded-xl transition-transform active:scale-95 ${
-                            isDark ? 'bg-zinc-700/80 text-zinc-100 hover:bg-zinc-700' : 'bg-white text-zinc-800 border border-black/10 hover:bg-zinc-50 shadow-2xs'
+                            isDark ? 'bg-zinc-700/80 text-zinc-100 hover:bg-zinc-700' : 'bg-white text-zinc-800 hover:bg-zinc-50 shadow-xs'
                           }`}
                         >
                           <span>Adjust Interval</span>
@@ -3844,7 +3869,7 @@
                           <>
                             <div className="fixed inset-0 z-30" onClick={() => setIsIntervalPopoverOpen(false)} />
                             <div className={`absolute left-0 bottom-full mb-1.5 w-full min-w-[140px] rounded-2xl shadow-2xl p-1 z-40 text-left animate-in fade-in zoom-in-95 duration-100 ${
-                              isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/10 text-zinc-900'
+                              isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
                             }`}>
                               {[3, 6, 12].map(m => (
                                 <button
@@ -3870,10 +3895,10 @@
                         type="button"
                         onClick={() => exportConsumableToIcs(appliance, consumable)}
                         className={`w-full h-9 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold px-2.5 rounded-xl transition-transform active:scale-95 ${
-                          isDark ? 'bg-zinc-700/80 text-zinc-100 hover:bg-zinc-700' : 'bg-white text-zinc-800 border border-black/10 hover:bg-zinc-50 shadow-2xs'
+                          isDark ? 'bg-zinc-700/80 text-zinc-100 hover:bg-zinc-700' : 'bg-white text-zinc-800 hover:bg-zinc-50 shadow-xs'
                         }`}
                       >
-                        <svg className="w-3.5 h-3.5 text-[#FF9500]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg className="w-3.5 h-3.5 text-[#FF9500] stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                           <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                           <line x1="16" y1="2" x2="16" y2="6"></line>
                           <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -3905,7 +3930,7 @@
                           triggerHaptic('light');
                           window.open(buildPartPurchaseUrl(appliance.brand, consumable, 'amazon', appliance.modelNumber), '_blank');
                         }}
-                        className={`flex-1 ${UI_ACCENT.solid} text-xs font-bold py-2.5 rounded-xl shadow-sm transition-transform active:scale-95`}
+                        className={`flex-1 ${UI_ACCENT.solid} text-xs font-bold py-2.5 rounded-xl shadow-xs transition-transform active:scale-95`}
                       >
                         Amazon ↗
                       </button>
@@ -3921,7 +3946,7 @@
                       <button
                         type="button"
                         onClick={handleExecuteUndoReplacement}
-                        className="w-full h-full bg-[#FF9500]/15 hover:bg-[#FF9500]/25 text-[#FF9500] border border-[#FF9500]/30 font-black text-xs rounded-2xl shadow-sm active:scale-95 transition-all duration-200 flex items-center justify-center gap-1.5"
+                        className="w-full h-full bg-[#FF9500]/15 hover:bg-[#FF9500]/25 text-[#FF9500] font-black text-xs rounded-2xl shadow-xs active:scale-95 transition-all duration-200 flex items-center justify-center gap-1.5"
                       >
                         <span className="text-sm">↺</span>
                         <span>Undo Replacement ({consumableUndoCountdown.secondsLeft}s)</span>
@@ -3938,7 +3963,7 @@
                       <button
                         type="button"
                         onClick={() => handleTriggerMarkReplacedWithLiveCountdown(appliance.id, index)}
-                        className="w-full h-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-2xl shadow-sm active:scale-95 transition-opacity duration-200 flex items-center justify-center gap-1.5"
+                        className="w-full h-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-2xl shadow-xs active:scale-95 transition-opacity duration-200 flex items-center justify-center gap-1.5"
                       >
                         <span>Mark Replaced Today</span>
                       </button>
@@ -3962,7 +3987,7 @@
                 onClick={(e) => e.stopPropagation()} 
                 style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
                 className={`w-full max-w-md h-[88vh] max-h-[88vh] rounded-t-[32px] flex flex-col cursor-default overflow-hidden animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
+                  isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
                 <div className={`sticky top-0 z-20 backdrop-blur-xl px-6 pt-4 pb-3 grid grid-cols-[64px_1fr_64px] items-center ${
@@ -3999,7 +4024,7 @@
                       <button
                         type="button"
                         onClick={handleSaveEditedAppliance}
-                        className={`${UI_ACCENT.solid} px-3.5 py-1 rounded-full text-xs font-bold shadow-sm active:scale-95 transition-transform`}
+                        className={`${UI_ACCENT.solid} px-3.5 py-1 rounded-full text-xs font-bold shadow-xs active:scale-95 transition-transform`}
                       >
                         Save
                       </button>
@@ -4007,7 +4032,7 @@
                       <button
                         type="button"
                         onClick={() => setSelectedAppliance(null)}
-                        className={`px-3.5 py-1 rounded-full text-xs font-bold shadow-sm active:scale-95 transition-transform ${
+                        className={`px-3.5 py-1 rounded-full text-xs font-bold shadow-xs active:scale-95 transition-transform ${
                           isDark ? 'bg-zinc-800 text-white' : 'bg-black/[0.04] text-zinc-900'
                         }`}
                       >
@@ -4025,6 +4050,7 @@
                           Appliance Name
                         </label>
                         <input
+                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                           }`}
@@ -4038,6 +4064,7 @@
                             Room Nickname
                           </label>
                           <input
+                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4051,7 +4078,7 @@
                             Property
                           </label>
                           <select
-                            style={{ colorScheme: isDark ? 'dark' : 'light' }}
+                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4070,6 +4097,7 @@
                             Model SKU
                           </label>
                           <input
+                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4082,6 +4110,7 @@
                             Serial Number
                           </label>
                           <input
+                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4096,6 +4125,7 @@
                             Purchase Date
                           </label>
                           <input
+                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4109,6 +4139,7 @@
                             Purchase Price
                           </label>
                           <input
+                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4144,7 +4175,7 @@
                         onClick={() => { triggerHaptic('light'); setDetailTab(tab.id); }}
                         className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
                           detailTab === tab.id
-                            ? (isDark ? 'bg-zinc-700 text-white shadow-sm' : 'bg-white text-zinc-900 shadow-sm border border-black/[0.04]')
+                            ? (isDark ? 'bg-zinc-700 text-white shadow-xs' : 'bg-white text-zinc-900 shadow-xs')
                             : (isDark ? 'text-zinc-400 hover:text-zinc-200' : 'text-zinc-500 hover:text-zinc-800')
                         }`}
                       >
@@ -4179,7 +4210,7 @@
                         <>
                           {selectedAppliance.replacementParts.map((p, pIdx) => (
                             <div key={p.partNumber || pIdx} className={`rounded-2xl p-3.5 flex justify-between items-center ${
-                              isDark ? 'bg-zinc-800/60' : 'bg-white border border-black/[0.06] light-card-elevation'
+                              isDark ? 'bg-zinc-800/60' : 'apple-card-light'
                             }`}>
                               <div className="pr-2 min-w-0">
                                 <p className="text-xs font-bold truncate">{p.name}</p>
@@ -4199,14 +4230,14 @@
                                 <button
                                   onClick={() => { triggerHaptic('light'); window.open(buildPartPurchaseUrl(selectedAppliance.brand, p, 'oem', selectedAppliance.modelNumber), '_blank'); }}
                                   className={`text-[11px] font-bold px-3 py-1.5 rounded-full transition-all active:scale-95 ${
-                                    isDark ? 'bg-zinc-700/80 text-zinc-200 hover:bg-zinc-700' : 'bg-black/[0.04] text-zinc-900 border border-black/5'
+                                    isDark ? 'bg-zinc-700/80 text-zinc-200 hover:bg-zinc-700' : 'bg-black/[0.04] text-zinc-900'
                                   }`}
                                 >
                                   OEM ↗
                                 </button>
                                 <button
                                   onClick={() => { triggerHaptic('light'); window.open(buildPartPurchaseUrl(selectedAppliance.brand, p, 'amazon', selectedAppliance.modelNumber), '_blank'); }}
-                                  className={`${UI_ACCENT.solid} text-[11px] font-bold px-3 py-1.5 rounded-full shadow-sm active:scale-95 transition-transform`}
+                                  className={`${UI_ACCENT.solid} text-[11px] font-bold px-3 py-1.5 rounded-full shadow-xs active:scale-95 transition-transform`}
                                 >
                                   Amazon ↗
                                 </button>
@@ -4227,7 +4258,7 @@
 
                   {detailTab === 'docs' && (
                     <div className="space-y-3">
-                      <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC] border border-black/[0.03]'}`}>
+                      <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC]'}`}>
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="text-xs font-black">Manufacturer Warranty</p>
@@ -4251,11 +4282,11 @@
                                 sessionStorage.setItem('pending_warranty_appliance_id', selectedAppliance.id);
                                 window.open(resolveOfficialLinks(selectedAppliance).warranty, '_blank');
                               }}
-                              className={`${UI_ACCENT.solid} h-7 px-3 inline-flex items-center justify-center text-xs font-bold rounded-lg shadow-sm whitespace-nowrap active:scale-95 transition-transform`}
+                              className={`${UI_ACCENT.solid} h-7 px-3 inline-flex items-center justify-center text-xs font-bold rounded-lg shadow-xs whitespace-nowrap active:scale-95 transition-transform`}
                             >
                               Activate
                             </button>
-                            <label className={`h-7 px-3 inline-flex items-center justify-center cursor-pointer text-xs font-bold rounded-lg shadow-sm whitespace-nowrap transition-colors ${
+                            <label className={`h-7 px-3 inline-flex items-center justify-center cursor-pointer text-xs font-bold rounded-lg shadow-xs whitespace-nowrap transition-colors ${
                               isDark ? 'bg-zinc-700/80 hover:bg-zinc-700 text-white' : 'bg-white hover:bg-zinc-50 text-zinc-900 border border-black/10'
                             }`}>
                               Upload
@@ -4266,7 +4297,7 @@
 
                         {selectedAppliance.warrantyDoc && (
                           <div className={`mt-2 p-2.5 rounded-xl flex items-center justify-between ${
-                            isDark ? 'bg-zinc-800/90' : 'bg-white border border-black/[0.06] light-card-elevation'
+                            isDark ? 'bg-zinc-800/90' : 'apple-card-light'
                           }`}>
                             <div className="flex items-center gap-2.5 min-w-0 flex-1">
                               <span className="text-sm">📄</span>
@@ -4284,7 +4315,7 @@
                                 if (selectedAppliance.warrantyDoc.dataUrl) setReceiptLightboxUrl(selectedAppliance.warrantyDoc.dataUrl);
                               }}
                               className={`text-[11px] font-bold px-2.5 py-1 rounded-lg active:scale-95 transition-transform ${
-                                isDark ? 'bg-zinc-700 text-zinc-200' : 'bg-black/[0.04] text-zinc-800 border border-black/5'
+                                isDark ? 'bg-zinc-700 text-zinc-200' : 'bg-black/[0.04] text-zinc-800'
                               }`}
                             >
                               View
@@ -4306,13 +4337,13 @@
                         </div>
                       </div>
 
-                      <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC] border border-black/[0.03]'}`}>
+                      <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC]'}`}>
                         <div className="flex justify-between items-center">
                           <div>
                             <p className="text-xs font-black">Purchase Receipt</p>
                             <p className={`text-[10px] font-semibold leading-tight ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Proof of purchase & invoice storage</p>
                           </div>
-                          <label className={`${UI_ACCENT.solid} h-7 px-3 inline-flex items-center justify-center text-xs font-bold rounded-lg shadow-sm cursor-pointer whitespace-nowrap active:scale-95 transition-transform`}>
+                          <label className={`${UI_ACCENT.solid} h-7 px-3 inline-flex items-center justify-center text-xs font-bold rounded-lg shadow-xs cursor-pointer whitespace-nowrap active:scale-95 transition-transform`}>
                             Upload
                             <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(selectedAppliance.id, 'receiptDoc', e)} />
                           </label>
@@ -4320,7 +4351,7 @@
 
                         {selectedAppliance.receiptDoc && (
                           <div className={`mt-2 p-2.5 rounded-xl flex items-center justify-between ${
-                            isDark ? 'bg-zinc-800/90' : 'bg-white border border-black/[0.06] light-card-elevation'
+                            isDark ? 'bg-zinc-800/90' : 'apple-card-light'
                           }`}>
                             <div 
                               onClick={() => setReceiptLightboxUrl(selectedAppliance.receiptDoc.dataUrl)}
@@ -4396,7 +4427,7 @@
               className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[98] cursor-pointer"
             >
               <div onClick={(e) => e.stopPropagation()} className={`rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
               }`}>
                 <h3 className="text-base font-black">Delete Receipt?</h3>
                 <p className={`text-xs font-semibold leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
@@ -4406,7 +4437,7 @@
                   <button onClick={() => setPendingDeleteReceiptApplianceId(null)} className={`flex-1 text-xs py-2.5 rounded-2xl font-bold active:scale-95 transition-transform ${
                     isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
                   }`}>Cancel</button>
-                  <button onClick={handleConfirmDeleteReceipt} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform">Delete</button>
+                  <button onClick={handleConfirmDeleteReceipt} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-xs active:scale-95 transition-transform">Delete</button>
                 </div>
               </div>
             </div>
@@ -4420,7 +4451,7 @@
                 onClick={(e) => e.stopPropagation()} 
                 style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
                 className={`w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[32px] px-6 pt-6 space-y-4 cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
+                  isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
                 <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -4434,7 +4465,7 @@
                     onClick={() => { triggerHaptic('light'); setAddForm(prev => ({ ...prev, inputMode: 'manual' })); }}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
                       addForm.inputMode === 'manual'
-                        ? (isDark ? 'bg-zinc-700 text-white shadow-sm' : 'bg-white text-zinc-900 shadow-sm border border-black/[0.04]')
+                        ? (isDark ? 'bg-zinc-700 text-white shadow-xs' : 'bg-white text-zinc-900 shadow-xs')
                         : (isDark ? 'text-zinc-400 hover:text-zinc-200' : 'text-zinc-500 hover:text-zinc-800')
                     }`}
                   >
@@ -4449,7 +4480,7 @@
                     }}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
                       addForm.inputMode === 'ocr'
-                        ? (isDark ? 'bg-zinc-700 text-white shadow-sm' : 'bg-white text-zinc-900 shadow-sm border border-black/[0.04]')
+                        ? (isDark ? 'bg-zinc-700 text-white shadow-xs' : 'bg-white text-zinc-900 shadow-xs')
                         : (isDark ? 'text-zinc-400 hover:text-zinc-200' : 'text-zinc-500 hover:text-zinc-800')
                     }`}
                   >
@@ -4464,6 +4495,7 @@
                         Brand *
                       </label>
                       <input
+                        style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                         className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                           addFormSubmitted && !addForm.brand.trim() ? 'ring-2 ring-rose-500' : ''
                         } ${
@@ -4480,6 +4512,7 @@
                         Model #
                       </label>
                       <input
+                        style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                         className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                           addFormSubmitted && !addForm.model.trim() && !addForm.name.trim() ? 'ring-1 ring-amber-500/70' : ''
                         } ${
@@ -4497,6 +4530,7 @@
                       Product Name
                     </label>
                     <input
+                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                         addFormSubmitted && !addForm.name.trim() && !addForm.model.trim() ? 'ring-1 ring-amber-500/70' : ''
                       } ${
@@ -4513,6 +4547,7 @@
                       Location / Room Nickname
                     </label>
                     <input
+                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                       }`}
@@ -4527,7 +4562,7 @@
                       Property Group
                     </label>
                     <select
-                      style={{ colorScheme: isDark ? 'dark' : 'light' }}
+                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                       }`}
@@ -4565,6 +4600,7 @@
                               Serial Number
                             </label>
                             <input
+                              style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
@@ -4578,6 +4614,7 @@
                               Purchase Date
                             </label>
                             <input
+                              style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
@@ -4594,6 +4631,7 @@
                               Purchase Price
                             </label>
                             <input
+                              style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
@@ -4607,6 +4645,7 @@
                               Retailer / Vendor
                             </label>
                             <input
+                              style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
@@ -4624,7 +4663,7 @@
                     <button
                       type="submit"
                       disabled={isAnalyzing}
-                      className={`w-full ${UI_ACCENT.solid} font-black text-xs py-3 rounded-2xl shadow-sm active:scale-95 transition-all disabled:opacity-50`}
+                      className={`w-full ${UI_ACCENT.solid} font-black text-xs py-3 rounded-2xl shadow-xs active:scale-95 transition-all disabled:opacity-50`}
                     >
                       {isAnalyzing ? 'Cataloging Appliance...' : 'Register Appliance'}
                     </button>
@@ -4634,7 +4673,7 @@
             </div>
           )}
 
-          {/* CAPACITY REACHED MODAL: Friendly & Persuasive Upgrade Intercept */}
+          {/* CAPACITY REACHED MODAL */}
           {isCapacityModalOpen && (
             <div 
               onClick={() => setIsCapacityModalOpen(false)} 
@@ -4643,7 +4682,7 @@
               <div 
                 onClick={(e) => e.stopPropagation()} 
                 className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl cursor-default animate-sheet-spring text-center ${
-                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                  isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
                 }`}
               >
                 <div className="w-12 h-12 rounded-full bg-[#FF9500]/15 text-[#FF9500] mx-auto flex items-center justify-center text-xl font-black">
@@ -4690,7 +4729,7 @@
             </div>
           )}
 
-          {/* 4. SETTINGS BOTTOM-SHEET */}
+          {/* 4. SETTINGS BOTTOM-SHEET: Zero-Shift Elevation, Symmetrical Box Models */}
           {isSettingsOpen && (
             <div 
               onClick={() => {
@@ -4704,12 +4743,12 @@
                 onClick={(e) => e.stopPropagation()} 
                 style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
                 className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] px-6 pt-6 space-y-4 shadow-2xl cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
+                  isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
                 
                 {settingsSubView === 'root' && (
-                  <div className="space-y-4">
+                  <div className="space-y-3.5">
                     <div className="flex justify-between items-center pt-1 pb-1">
                       <div className="min-w-0 flex-1 pr-2 px-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -4725,7 +4764,8 @@
                                 <input
                                   ref={profileNameInputRef}
                                   maxLength={18}
-                                  className={`text-lg font-black tracking-tight text-[#FF9500] leading-none focus:outline-none px-2 py-0.5 rounded-lg border-none w-28 sm:w-36 transition-colors ${
+                                  style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                                  className={`text-base font-black tracking-tight text-[#FF9500] leading-none focus:outline-none px-2 py-0.5 rounded-lg border-none w-28 sm:w-36 transition-colors ${
                                     isDark ? 'bg-zinc-800 text-white' : 'bg-black/[0.05] text-[#FF9500]'
                                   }`}
                                   value={profileNameInput}
@@ -4750,10 +4790,10 @@
                                   className="relative inline-flex items-center cursor-pointer transition-colors group"
                                   title="Edit display name"
                                 >
-                                  <span className="text-lg font-black tracking-tight text-[#FF9500] group-hover:opacity-85 leading-none">
+                                  <span className="text-base font-black tracking-tight text-[#FF9500] group-hover:opacity-85 leading-none">
                                     {userDisplayName || currentUser.email.split('@')[0] || 'Welcome'}
                                   </span>
-                                  <svg className="w-2.5 h-2.5 ml-1 -mt-0.5 opacity-70 stroke-[2.5] align-top inline-block translate-y-[-2px] text-[#FF9500]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+                                  <svg className="w-2.5 h-2.5 ml-1 -mt-0.5 opacity-70 stroke-[2] align-top inline-block translate-y-[-2px] text-[#FF9500]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                                   </svg>
                                 </span>
@@ -4787,7 +4827,7 @@
                           <button
                             type="button"
                             onClick={() => { triggerHaptic('light'); setIsAuthModalOpen(true); }}
-                            className={`${UI_ACCENT.solid} font-bold text-xs px-3 py-1 rounded-xl shadow-2xs active:scale-95 transition-transform`}
+                            className={`${UI_ACCENT.solid} font-bold text-xs px-3 py-1 rounded-xl shadow-xs active:scale-95 transition-transform`}
                           >
                             Sign In
                           </button>
@@ -4796,15 +4836,15 @@
                       </div>
                     </div>
 
-                    {/* CARD 1: PLAN TIER */}
-                    <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'bg-white border border-black/[0.06] light-card-elevation'}`}>
+                    {/* CARD 1: PLAN TIER (No Dirty Borders, Exact Match Height) */}
+                    <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-xs font-black tracking-tight">Plan Tier</p>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider transition-all ${
                             isPaidUser 
                               ? UI_ACCENT.badge
-                              : (isDark ? 'bg-zinc-700/80 text-zinc-200' : 'bg-black/[0.04] text-zinc-900 border border-black/5')
+                              : (isDark ? 'bg-zinc-700/80 text-zinc-200' : 'bg-black/[0.04] text-zinc-900')
                           }`}>
                             {isPaidUser ? 'Advanced Manager' : 'Free Tier'}
                           </span>
@@ -4822,8 +4862,8 @@
                         onClick={() => { triggerHaptic('light'); setSettingsSubView('subscription'); }}
                         className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center ${
                           isPaidUser 
-                            ? (isDark ? 'bg-zinc-700/80 text-zinc-200 hover:bg-zinc-700' : 'bg-black/[0.04] text-zinc-900 border border-black/5 hover:bg-black/[0.08]')
-                            : `${UI_ACCENT.solid} border-transparent`
+                            ? (isDark ? 'bg-zinc-700/80 text-zinc-200 hover:bg-zinc-700' : 'bg-black/[0.04] text-zinc-900 hover:bg-black/[0.08]')
+                            : `${UI_ACCENT.solid}`
                         }`}
                       >
                         {isPaidUser ? 'Manage Subscription ➔' : 'Upgrade to Advanced Manager ➔'}
@@ -4831,7 +4871,7 @@
                     </div>
 
                     {/* CARD 2: PASSPORT */}
-                    <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'bg-white border border-black/[0.06] light-card-elevation'}`}>
+                    <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
                       <div>
                         <div className="flex justify-between items-center">
                           <div>
@@ -4866,7 +4906,7 @@
                         <button
                           onClick={() => { triggerHaptic('light'); setSettingsSubView('exports'); }}
                           className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${
-                            isDark ? 'bg-zinc-700/80 hover:bg-zinc-750 text-zinc-200' : 'bg-black/[0.04] hover:bg-black/[0.08] text-zinc-900 border border-black/5'
+                            isDark ? 'bg-zinc-700/80 hover:bg-zinc-750 text-zinc-200' : 'bg-black/[0.04] hover:bg-black/[0.08] text-zinc-900'
                           }`}
                         >
                           View Past Exports ({savedPassports.length}) ➔
@@ -4878,7 +4918,7 @@
                     <div 
                       onClick={() => { triggerHaptic('light'); setSettingsSubView('notifications'); }}
                       className={`px-4 py-3.5 rounded-2xl cursor-pointer active:scale-[0.99] transition-transform ${
-                        isDark ? 'bg-zinc-800/60 hover:bg-zinc-800' : 'bg-white border border-black/[0.06] light-card-elevation hover:bg-zinc-50'
+                        isDark ? 'bg-zinc-800/60 hover:bg-zinc-800' : 'apple-card-light hover:bg-zinc-50'
                       }`}
                     >
                       <div className="flex justify-between items-center">
@@ -4888,13 +4928,13 @@
                     </div>
 
                     {/* CARD 4: APPEARANCE */}
-                    <div className={`px-4 py-3.5 rounded-2xl ${isDark ? 'bg-zinc-800/60' : 'bg-white border border-black/[0.06] light-card-elevation'}`}>
+                    <div className={`px-4 py-3.5 rounded-2xl ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
                       <div className="flex justify-between items-center">
                         <div>
                           <p className="text-xs font-black tracking-tight">Appearance</p>
                         </div>
                         <div className={`flex p-1 rounded-xl ${
-                          isDark ? 'bg-zinc-800' : 'bg-black/[0.03] border border-black/[0.04]'
+                          isDark ? 'bg-zinc-800' : 'bg-black/[0.03]'
                         }`}>
                           {['dark', 'light', 'system'].map(mode => (
                             <button
@@ -4906,7 +4946,7 @@
                               }}
                               className={`px-3 py-1 rounded-lg text-xs font-bold capitalize transition-all ${
                                 appearanceSetting === mode
-                                  ? (isDark ? 'bg-zinc-700 text-white shadow-sm' : 'bg-white text-zinc-900 shadow-sm border border-black/5')
+                                  ? (isDark ? 'bg-zinc-700 text-white shadow-xs' : 'bg-white text-zinc-900 shadow-xs')
                                   : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                               }`}
                             >
@@ -4921,7 +4961,7 @@
                     <div 
                       onClick={() => { triggerHaptic('light'); setSettingsSubView('privacy_help'); }}
                       className={`px-4 py-3.5 rounded-2xl cursor-pointer active:scale-[0.99] transition-transform ${
-                        isDark ? 'bg-zinc-800/60 hover:bg-zinc-800' : 'bg-white border border-black/[0.06] light-card-elevation hover:bg-zinc-50'
+                        isDark ? 'bg-zinc-800/60 hover:bg-zinc-800' : 'apple-card-light hover:bg-zinc-50'
                       }`}
                     >
                       <div className="flex justify-between items-center">
@@ -4930,7 +4970,7 @@
                       </div>
                     </div>
 
-                    <div className="mt-2.5 mb-1 text-center">
+                    <div className="mt-2 text-center">
                       <p className={`text-[9.5px] font-mono tracking-tight leading-none ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
                         Appliance Engine v1.0.4 • PWA Standalone • Build 2026.10
                       </p>
@@ -4967,12 +5007,12 @@
                       </p>
                     </div>
 
-                    <div className={`px-4 py-3.5 rounded-2xl space-y-3.5 ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'}`}>
+                    <div className={`px-4 py-3.5 rounded-2xl space-y-3.5 ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'apple-card-light text-zinc-900'}`}>
                       <div>
                         <span className={`text-[10px] font-extrabold uppercase tracking-wider block mb-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Replacement Lead Time
                         </span>
-                        <div className={`flex p-0.5 rounded-xl ${isDark ? 'bg-zinc-800' : 'bg-black/[0.03] border border-black/[0.04]'}`}>
+                        <div className={`flex p-0.5 rounded-xl ${isDark ? 'bg-zinc-800' : 'bg-black/[0.03]'}`}>
                           {[0, 7, 14, 30].map(days => (
                             <button
                               key={days}
@@ -5079,7 +5119,7 @@
                       </p>
                     </div>
 
-                    <div className={`px-4 py-3.5 rounded-2xl space-y-3 text-xs ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-700'}`}>
+                    <div className={`px-4 py-3.5 rounded-2xl space-y-3 text-xs ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'apple-card-light text-zinc-700'}`}>
                       <div className="space-y-1 divide-y divide-black/5 dark:divide-zinc-700/50 font-semibold">
                         <div 
                           onClick={() => { triggerHaptic('light'); setSettingsSubView('faq'); }}
@@ -5181,7 +5221,7 @@
                         { q: "Can cataloged appliances and maintenance histories be transferred during a property sale?", a: "Yes. Compiling a Home Appliance Passport PDF or CSV generates a complete audit trail of serial numbers, installation dates, and verified maintenance logs suitable for real estate disclosures and escrow addendums." },
                         { q: "What occurs when an account or local database is erased?", a: "Selecting 'Delete Account & Erase All Data' permanently purges your records from Cloudflare D1 cloud backups and clears all IndexedDB object stores (PDF audits, receipts, and manuals). This action is non-reversible." }
                       ].map((faq, fIdx) => (
-                        <div key={fIdx} className={`px-4 py-3.5 rounded-2xl space-y-1.5 ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-700'}`}>
+                        <div key={fIdx} className={`px-4 py-3.5 rounded-2xl space-y-1.5 ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'apple-card-light text-zinc-700'}`}>
                           <p className="font-bold text-zinc-900 dark:text-zinc-50">{faq.q}</p>
                           <p className={`leading-relaxed ${isDark ? 'text-zinc-200' : 'text-zinc-500'}`}>{faq.a}</p>
                         </div>
@@ -5213,6 +5253,7 @@
                           Brand / Manufacturer *
                         </label>
                         <input
+                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
@@ -5228,6 +5269,7 @@
                           Model SKU *
                         </label>
                         <input
+                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
@@ -5243,6 +5285,7 @@
                           Appliance Category
                         </label>
                         <input
+                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
@@ -5280,7 +5323,7 @@
                     </div>
 
                     <div className={`px-4 py-3.5 rounded-2xl space-y-4 text-xs leading-relaxed max-h-[60vh] overflow-y-auto scrollbar-none ${
-                      isDark ? 'bg-zinc-800/60 text-zinc-200' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-700'
+                      isDark ? 'bg-zinc-800/60 text-zinc-200' : 'apple-card-light text-zinc-700'
                     }`}>
                       <div>
                         <p className="font-bold text-zinc-900 dark:text-zinc-50">1. Acceptance of Terms &amp; App Store Sublicense</p>
@@ -5359,7 +5402,7 @@
                     </div>
 
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3 text-xs ${
-                      isDark ? 'bg-zinc-800/60 text-zinc-200' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                      isDark ? 'bg-zinc-800/60 text-zinc-200' : 'apple-card-light text-zinc-900'
                     }`}>
                       <div className="flex justify-between items-center">
                         <span className={`font-semibold ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>Current Membership:</span>
@@ -5427,8 +5470,9 @@
                   </div>
                 )}
 
+                {/* TUNED CANCEL SUBSCRIPTION SUBVIEW: Flush Left Alignment, Balanced Button Width & Height */}
                 {settingsSubView === 'cancel' && (
-                  <div className="space-y-3">
+                  <div className="space-y-3.5">
                     <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
                       <button onClick={() => setSettingsSubView('subscription')} className={`text-xs font-bold ${UI_ACCENT.text} flex items-center gap-1`}>
                         ← Keep Subscription
@@ -5436,24 +5480,40 @@
                       <AppleCloseButton isDark={isDark} onClick={() => setSettingsSubView('subscription')} />
                     </div>
 
-                    <h3 className="text-sm font-black">Cancel Advanced Manager?</h3>
-                    <p className={`text-xs font-semibold leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                      Your membership will remain active until the end of your billing cycle.
-                    </p>
-                    <textarea
-                      rows="2"
-                      className={`w-full rounded-2xl p-2.5 text-xs font-medium focus:outline-none ${
-                        isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
-                      }`}
-                      placeholder="What could we improve? (Optional)"
-                      value={cancelFeedback}
-                      onChange={(e) => setCancelFeedback(e.target.value)}
-                    />
-                    <div className="flex gap-2 pt-1">
-                      <button onClick={() => setSettingsSubView('subscription')} className={`flex-1 py-2 rounded-xl text-xs font-bold ${
-                        isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
-                      }`}>Keep Plan</button>
+                    {/* Flush Alignment with the Input Inset below */}
+                    <div className="px-1 space-y-1">
+                      <h3 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">Cancel Advanced Manager?</h3>
+                      <p className={`text-xs font-normal leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        Your membership will remain active until the end of your billing cycle.
+                      </p>
+                    </div>
+
+                    <div>
+                      <textarea
+                        rows="2"
+                        style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                        className={`w-full rounded-2xl p-3 text-xs font-medium focus:outline-none ${
+                          isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
+                        }`}
+                        placeholder="What could we improve? (Optional)"
+                        value={cancelFeedback}
+                        onChange={(e) => setCancelFeedback(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Balanced Action Buttons: Inset padding, gap-3.5, and tactile h-11 height */}
+                    <div className="flex gap-3.5 pt-1 px-3">
+                      <button 
+                        type="button"
+                        onClick={() => setSettingsSubView('subscription')} 
+                        className={`flex-1 h-11 rounded-2xl text-xs font-bold transition-all active:scale-95 ${
+                          isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
+                        }`}
+                      >
+                        Keep Plan
+                      </button>
                       <button
+                        type="button"
                         onClick={() => {
                           triggerHaptic('warn');
                           setIsPaidUser(false);
@@ -5465,7 +5525,7 @@
                           setSettingsSubView('root');
                           showToast("Subscription cancelled");
                         }}
-                        className="flex-1 py-2 rounded-xl text-xs font-bold bg-[#E11D48] text-white shadow-sm active:scale-95 transition-transform"
+                        className="flex-1 h-11 rounded-2xl text-xs font-bold bg-[#E11D48] text-white shadow-xs active:scale-95 transition-transform"
                       >
                         Confirm Cancel
                       </button>
@@ -5484,7 +5544,7 @@
                     </div>
 
                     <div className={`px-5 py-5 rounded-2xl flex flex-col items-center justify-center text-center space-y-2 ${
-                      isDark ? 'bg-zinc-800/60' : 'bg-white border border-black/[0.06] light-card-elevation'
+                      isDark ? 'bg-zinc-800/60' : 'apple-card-light'
                     }`}>
                       <span className={`text-[10px] font-black uppercase tracking-widest ${UI_ACCENT.text}`}>
                         Verified Property Record
@@ -5500,7 +5560,7 @@
                       </p>
                     </div>
 
-                    <div className={`px-4 py-3.5 rounded-2xl space-y-2 text-xs font-semibold leading-relaxed ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-700'}`}>
+                    <div className={`px-4 py-3.5 rounded-2xl space-y-2 text-xs font-semibold leading-relaxed ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'apple-card-light text-zinc-700'}`}>
                       <ul className="space-y-1.5 text-[11px]">
                         <li>• <strong>Dual PDF &amp; CSV Export:</strong> Formal compiled inspection document or raw tabular spreadsheet.</li>
                         <li>• <strong>Included Properties &amp; Privacy:</strong> Scope which properties to include, with purchase valuations hidden by default.</li>
@@ -5542,12 +5602,13 @@
                       </p>
                     </div>
 
-                    <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'bg-white border border-black/[0.06] light-card-elevation'}`}>
+                    <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
                       <div>
                         <label className={`text-[10px] font-extrabold uppercase tracking-wider block pl-2.5 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
                           Property Address
                         </label>
                         <input
+                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
@@ -5562,6 +5623,7 @@
                           Prepared For / Owner Name
                         </label>
                         <input
+                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
@@ -5576,7 +5638,7 @@
                           Included Properties
                         </label>
                         <select
-                          style={{ colorScheme: isDark ? 'dark' : 'light' }}
+                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl py-1.5 px-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
@@ -5595,7 +5657,7 @@
                           Document Purpose
                         </label>
                         <select
-                          style={{ colorScheme: isDark ? 'dark' : 'light' }}
+                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl py-1.5 px-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
@@ -5667,7 +5729,7 @@
                         type="button"
                         onClick={handleExportPassportCsvDirectly}
                         className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-transform active:scale-95 ${
-                          isDark ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-750' : 'bg-black/[0.04] text-zinc-900 border border-black/5 hover:bg-black/[0.08]'
+                          isDark ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-750' : 'bg-black/[0.04] text-zinc-900 hover:bg-black/[0.08]'
                         }`}
                       >
                         Export CSV (.csv) ↓
@@ -5704,7 +5766,7 @@
                           <div
                             key={entry.id}
                             className={`relative rounded-xl p-2.5 flex items-center justify-between transition-colors ${
-                              isDark ? 'bg-zinc-800/60' : 'bg-white border border-black/[0.06] light-card-elevation'
+                              isDark ? 'bg-zinc-800/60' : 'apple-card-light'
                             }`}
                           >
                             <div 
@@ -5753,7 +5815,7 @@
                                 <div 
                                   onClick={(e) => e.stopPropagation()} 
                                   className={`absolute right-0 top-11 w-40 rounded-2xl shadow-2xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${
-                                    isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/10 text-zinc-900'
+                                    isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
                                   }`}
                                 >
                                   <button
@@ -5845,7 +5907,7 @@
                 onClick={(e) => e.stopPropagation()} 
                 style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
                 className={`w-full max-w-md rounded-t-[32px] px-6 pt-6 space-y-4 cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
+                  isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
                 <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -5867,7 +5929,7 @@
                         type="button"
                         onClick={clearAllAlerts}
                         className={`text-[11px] font-bold px-2.5 py-1 rounded-full transition-all active:scale-95 ${
-                          isDark ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-750' : 'bg-black/[0.04] text-zinc-700 border border-black/5 hover:bg-black/[0.08]'
+                          isDark ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-750' : 'bg-black/[0.04] text-zinc-700 hover:bg-black/[0.08]'
                         }`}
                       >
                         Clear All
@@ -5948,7 +6010,7 @@
                               setActiveConsumableSheet({ appliance: notif.appliance, consumable: notif.consumable, index: notif.index, openedFromNotifications: true });
                             }}
                             className={`relative z-10 py-2.5 px-3.5 rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-between ${
-                              isDark ? 'bg-zinc-800/80 hover:bg-zinc-800 shadow-2xs' : 'bg-white border border-black/[0.04] light-card-elevation hover:bg-zinc-50'
+                              isDark ? 'bg-zinc-800/80 hover:bg-zinc-800' : 'apple-card-light hover:bg-zinc-50'
                             }`}
                           >
                             <div className="min-w-0 flex-1 pr-2">
@@ -5978,7 +6040,7 @@
                                 }`}
                                 title="Dismiss Alert"
                               >
-                                <svg className="w-3.5 h-3.5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+                                <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                   <line x1="18" y1="6" x2="6" y2="18"></line>
                                   <line x1="6" y1="6" x2="18" y2="18"></line>
                                 </svg>
@@ -5991,7 +6053,7 @@
                   ) : (
                     <div className="text-center py-10 px-4 flex flex-col items-center justify-center space-y-2">
                       <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-1">
-                        <svg className="w-6 h-6 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+                        <svg className="w-6 h-6 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                           <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
                       </div>
@@ -6010,7 +6072,7 @@
           {pendingWarrantyAppliance && (
             <div onClick={() => setPendingWarrantyAppliance(null)} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[95] cursor-pointer">
               <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-[32px] p-6 space-y-3.5 shadow-2xl text-center cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
               }`}>
                 <div className="flex justify-between items-start">
                   <span className={`text-[10px] font-black uppercase tracking-widest ${UI_ACCENT.text}`}>Warranty Portal</span>
@@ -6035,7 +6097,7 @@
                   <button
                     type="button"
                     onClick={() => handleConfirmWarrantyActivation(pendingWarrantyAppliance.id, true)}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2.5 rounded-xl shadow-sm active:scale-95 transition-transform"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2.5 rounded-xl shadow-xs active:scale-95 transition-transform"
                   >
                     Yes, Activated
                   </button>
@@ -6057,7 +6119,7 @@
               <div 
                 onClick={(e) => e.stopPropagation()} 
                 className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                  isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
                 }`}
               >
                 <div className="flex justify-between items-start">
@@ -6076,14 +6138,14 @@
                 </div>
 
                 <div className={`flex p-1 rounded-2xl ${
-                  isDark ? 'bg-zinc-800' : 'bg-black/[0.03] border border-black/[0.04]'
+                  isDark ? 'bg-zinc-800' : 'bg-black/[0.03]'
                 }`}>
                   <button
                     type="button"
                     onClick={() => { triggerHaptic('light'); setPaywallPlanChoice('monthly'); }}
                     className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
                       paywallPlanChoice === 'monthly'
-                        ? (isDark ? 'bg-zinc-700 text-white shadow-sm' : 'bg-white text-zinc-900 shadow-sm border border-black/5')
+                        ? (isDark ? 'bg-zinc-700 text-white shadow-xs' : 'bg-white text-zinc-900 shadow-xs')
                         : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
@@ -6094,7 +6156,7 @@
                     onClick={() => { triggerHaptic('light'); setPaywallPlanChoice('yearly'); }}
                     className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                       paywallPlanChoice === 'yearly'
-                        ? (isDark ? 'bg-zinc-700 text-white shadow-sm' : 'bg-white text-zinc-900 shadow-sm border border-black/5')
+                        ? (isDark ? 'bg-zinc-700 text-white shadow-xs' : 'bg-white text-zinc-900 shadow-xs')
                         : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
@@ -6103,7 +6165,7 @@
                   </button>
                 </div>
 
-                <div className={`space-y-2 text-xs p-3.5 rounded-2xl font-semibold ${isDark ? 'bg-zinc-800/60 text-zinc-300' : 'bg-[#FAFAFC] text-zinc-700 border border-black/[0.04]'}`}>
+                <div className={`space-y-2 text-xs p-3.5 rounded-2xl font-semibold ${isDark ? 'bg-zinc-800/60 text-zinc-300' : 'bg-[#FAFAFC] text-zinc-700'}`}>
                   <p>✓ <strong>15 Appliances Per Property:</strong> Manage up to 5 properties (75 total assets).</p>
                   <p>✓ <strong>65 Advanced Diagnostic Inquiries:</strong> Deep step-by-step assistance per 2 hours.</p>
                   <p>✓ <strong>7-Day Retention:</strong> Diagnostic chats preserved for a full week.</p>
@@ -6156,8 +6218,8 @@
             >
               <div 
                 onClick={(e) => e.stopPropagation()} 
-                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl border cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl cursor-default animate-sheet-spring ${
+                  isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
                 }`}
               >
                 <div className="flex justify-between items-center">
@@ -6166,6 +6228,7 @@
                 </div>
                 <form onSubmit={handleCreateGroup} className="space-y-3">
                   <input
+                    style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                     className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none ${
                       isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                     }`}
@@ -6187,7 +6250,7 @@
           {deleteTargetGroup && (
             <div onClick={() => setDeleteTargetGroup(null)} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[75] cursor-pointer">
               <div onClick={(e) => e.stopPropagation()} className={`rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
               }`}>
                 <h3 className="text-base font-black">Delete "{deleteTargetGroup.name}"?</h3>
                 <p className={`text-xs font-medium leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
@@ -6197,7 +6260,7 @@
                   <button onClick={() => setDeleteTargetGroup(null)} className={`flex-1 text-xs py-2.5 rounded-2xl font-bold active:scale-95 transition-transform ${
                     isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
                   }`}>No</button>
-                  <button onClick={confirmDeleteGroup} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform">Yes</button>
+                  <button onClick={confirmDeleteGroup} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-xs active:scale-95 transition-transform">Yes</button>
                 </div>
               </div>
             </div>
@@ -6207,7 +6270,7 @@
           {isBulkDeleteModalOpen && (
             <div onClick={() => setIsBulkDeleteModalOpen(false)} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[70] cursor-pointer">
               <div onClick={(e) => e.stopPropagation()} className={`rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
               }`}>
                 <h3 className="text-base font-black">Delete {selectedIds.length} Appliances?</h3>
                 <p className={`text-xs font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>This will permanently remove selected appliances.</p>
@@ -6215,7 +6278,7 @@
                   <button onClick={() => setIsBulkDeleteModalOpen(false)} className={`flex-1 text-xs py-2.5 rounded-2xl font-bold active:scale-95 transition-transform ${
                     isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
                   }`}>No</button>
-                  <button onClick={confirmBulkDelete} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform">Yes</button>
+                  <button onClick={confirmBulkDelete} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-xs active:scale-95 transition-transform">Yes</button>
                 </div>
               </div>
             </div>
@@ -6231,7 +6294,7 @@
               className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[90] cursor-pointer"
             >
               <div onClick={(e) => e.stopPropagation()} className={`rounded-[32px] p-6 w-full max-w-xs space-y-3.5 shadow-2xl text-center cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
               }`}>
                 <h3 className="text-base font-black">Log Out?</h3>
                 <div className="space-y-1">
@@ -6256,7 +6319,7 @@
                   >
                     No
                   </button>
-                  <button onClick={handleLogout} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform">Yes</button>
+                  <button onClick={handleLogout} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-xs active:scale-95 transition-transform">Yes</button>
                 </div>
               </div>
             </div>
@@ -6269,10 +6332,10 @@
               className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[95] cursor-pointer"
             >
               <div onClick={(e) => e.stopPropagation()} className={`rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
               }`}>
                 <div className="w-11 h-11 rounded-full bg-rose-500/15 text-rose-500 mx-auto flex items-center justify-center">
-                  <svg className="w-5 h-5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <svg className="w-5 h-5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                   </svg>
@@ -6290,7 +6353,7 @@
                   >
                     Cancel
                   </button>
-                  <button onClick={handleDeleteAccountForever} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-sm active:scale-95 transition-transform">
+                  <button onClick={handleDeleteAccountForever} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-xs active:scale-95 transition-transform">
                     Delete Forever
                   </button>
                 </div>
@@ -6311,7 +6374,7 @@
                 onClick={(e) => e.stopPropagation()} 
                 style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
                 className={`w-full max-w-sm rounded-t-[32px] px-6 pt-6 space-y-4 cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
+                  isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
                 <div className="flex justify-between items-center">
@@ -6332,6 +6395,7 @@
                     </p>
                     <input
                       type="email"
+                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                       }`}
@@ -6344,7 +6408,7 @@
                     <button
                       type="submit"
                       disabled={authLoading}
-                      className={`w-full ${UI_ACCENT.solid} font-black text-xs py-3 rounded-2xl shadow-sm transition-all active:scale-95`}
+                      className={`w-full ${UI_ACCENT.solid} font-black text-xs py-3 rounded-2xl shadow-xs transition-all active:scale-95`}
                     >
                       {authLoading ? 'Sending Code...' : 'Send Login Code'}
                     </button>
@@ -6358,6 +6422,7 @@
                     <input
                       type="text"
                       maxLength="6"
+                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-2xl p-3 text-center text-lg tracking-widest font-mono font-black focus:outline-none ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                       }`}
@@ -6371,7 +6436,7 @@
                     <button
                       type="submit"
                       disabled={authLoading || authPinInput.length < 6}
-                      className={`w-full ${UI_ACCENT.solid} font-black text-xs py-3 rounded-2xl shadow-sm transition-all disabled:opacity-50 active:scale-95`}
+                      className={`w-full ${UI_ACCENT.solid} font-black text-xs py-3 rounded-2xl shadow-xs transition-all disabled:opacity-50 active:scale-95`}
                     >
                       {authLoading ? 'Verifying...' : 'Verify & Sign In'}
                     </button>
@@ -6395,7 +6460,7 @@
             </div>
           )}
 
-          {/* 11. DIAGNOSTIC ASSISTANT OVERLAY */}
+          {/* 11. DIAGNOSTIC ASSISTANT OVERLAY: Standalone Messaging Input (No iOS Accessory Bar, 16px Font Lock) */}
           {activeAppliance && (
             <div onClick={() => setActiveAppliance(null)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-[80] cursor-pointer">
               <div 
@@ -6407,7 +6472,7 @@
                   paddingBottom: 'max(20px, calc(env(safe-area-inset-bottom, 0px) + 8px))'
                 }}
                 className={`w-full max-w-md rounded-t-[32px] px-5 pt-5 flex flex-col cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'bg-white border-t border-black/[0.06] light-drawer-elevation text-zinc-900'
+                  isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
                 <div className="flex justify-between items-start pb-2.5 border-b border-black/[0.04] dark:border-zinc-800/80 shrink-0">
@@ -6469,8 +6534,8 @@
                       </div>
 
                       {m.showReferralFork && (
-                        <div className={`mx-auto max-w-[92%] p-4 rounded-2xl space-y-3 shadow-sm ${
-                          isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                        <div className={`mx-auto max-w-[92%] p-4 rounded-2xl space-y-3 shadow-xs ${
+                          isDark ? 'bg-zinc-800/80 text-zinc-200' : 'apple-card-light text-zinc-900'
                         }`}>
                           <div className="border-b border-black/5 dark:border-zinc-700/50 pb-2 text-center">
                             <span className={`text-[10px] font-black uppercase tracking-wider ${UI_ACCENT.text} block`}>
@@ -6490,7 +6555,7 @@
                                 window.open(buildPartPurchaseUrl(activeAppliance.brand, wearPart || { name: 'Part' }, 'oem', activeAppliance.modelNumber), '_blank');
                               }}
                               className={`p-2.5 rounded-xl text-center flex flex-col items-center justify-center font-bold text-xs shadow-xs active:scale-95 transition-transform ${
-                                isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-[#FAFAFC] hover:bg-zinc-100 border border-black/5 text-zinc-900'
+                                isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-[#FAFAFC] hover:bg-zinc-100 text-zinc-900'
                               }`}
                             >
                               <span className="leading-tight">Order OEM Part</span>
@@ -6505,7 +6570,7 @@
                                 window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, '_blank');
                               }}
                               className={`p-2.5 rounded-xl text-center flex flex-col items-center justify-center font-bold text-xs shadow-xs active:scale-95 transition-transform ${
-                                isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-[#FAFAFC] hover:bg-zinc-100 border border-black/5 text-zinc-900'
+                                isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-[#FAFAFC] hover:bg-zinc-100 text-zinc-900'
                               }`}
                             >
                               <span className="leading-tight">Find a Specialist</span>
@@ -6520,8 +6585,8 @@
                       )}
 
                       {m.showTransitionCard && (
-                        <div className={`mx-auto max-w-[92%] p-4 rounded-2xl space-y-3 shadow-sm ${
-                          isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-white border border-black/[0.06] light-card-elevation text-zinc-900'
+                        <div className={`mx-auto max-w-[92%] p-4 rounded-2xl space-y-3 shadow-xs ${
+                          isDark ? 'bg-zinc-800/80 text-zinc-200' : 'apple-card-light text-zinc-900'
                         }`}>
                           <div className="border-b border-black/5 dark:border-zinc-700/50 pb-2 text-center">
                             <span className={`text-[10px] font-black uppercase tracking-wider ${UI_ACCENT.text} block`}>
@@ -6556,7 +6621,7 @@
                             className={`text-[11px] font-bold py-1.5 px-3.5 rounded-full transition-all active:scale-95 flex items-center gap-1 ${
                               isDark 
                                 ? 'bg-zinc-800 text-[#FF9500] hover:bg-zinc-750' 
-                                : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 shadow-2xs'
+                                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 shadow-2xs'
                             }`}
                           >
                             <span>Using Standard Diagnostic • Upgrade to Advanced Diagnostic ➔</span>
@@ -6586,7 +6651,7 @@
 
                   {needsPlacardVerification && (
                     <div className={`p-3.5 rounded-2xl space-y-2 mt-2 ${
-                      isDark ? 'bg-zinc-800/80 border border-[#FF9500]/40' : 'bg-amber-50 border border-amber-200'
+                      isDark ? 'bg-zinc-800/80 border border-[#FF9500]/40' : 'bg-amber-50'
                     }`}>
                       <div className="flex justify-between items-center">
                         <span className={`text-[10px] font-black uppercase tracking-wider ${UI_ACCENT.text}`}>
@@ -6599,7 +6664,7 @@
                             isDark ? 'bg-zinc-700 text-[#FF9500] hover:bg-zinc-600' : 'bg-white text-amber-700 hover:bg-amber-100 shadow-2xs'
                           }`}
                         >
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                             <circle cx="12" cy="13" r="4"/>
                           </svg>
@@ -6611,6 +6676,7 @@
                       </p>
                       <div className="flex gap-2 pt-1">
                         <input
+                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`flex-1 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none ${
                             isDark ? 'bg-zinc-700 text-white' : 'bg-white border border-black/10 text-black'
                           }`}
@@ -6633,12 +6699,18 @@
                   {isLoading && <p className="text-xs text-zinc-400 animate-pulse px-2">Analyzing...</p>}
                 </div>
 
+                {/* Standalone Composer (No <form> tag, enterKeyHint="send" suppresses accessory bar) */}
                 <div className="pt-2 flex flex-col gap-1.5 border-t border-black/[0.04] dark:border-zinc-800/80 shrink-0">
                   <div className="flex items-center gap-2">
                     <div className={`flex-1 rounded-full px-3.5 py-1.5 flex items-center gap-2 ${
-                      isDark ? 'bg-zinc-800 text-white' : 'bg-black/[0.04] border border-black/[0.04] text-zinc-900'
+                      isDark ? 'bg-zinc-800 text-white' : 'bg-black/[0.04] text-zinc-900'
                     }`}>
                       <input
+                        type="text"
+                        enterKeyHint="send"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
                         className="flex-1 bg-transparent text-xs focus:outline-none placeholder:text-zinc-500"
                         placeholder={isListeningDictation ? "Listening... Speak now" : "Describe issue, sound, or symptom..."}
                         value={queryInput}
@@ -6656,7 +6728,7 @@
                         }`}
                         title={isListeningDictation ? "Stop Dictation" : "Dictate with Voice"}
                       >
-                        <svg className="w-3.5 h-3.5 stroke-[2.2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+                        <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                           <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                           <line x1="12" y1="19" x2="12" y2="23"></line>
@@ -6666,6 +6738,7 @@
                     </div>
 
                     <button 
+                      type="button"
                       onClick={() => sendQuery()} 
                       disabled={!queryInput.trim()}
                       className={`${UI_ACCENT.solid} font-bold text-xs px-4 py-2 rounded-full active:scale-95 transition-all disabled:opacity-40`}
