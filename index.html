@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Appliance Engine</title>
 
-  <!-- PWA & Mobile Meta Tags: default status bar style eliminates WebKit gradient fog -->
+  <!-- PWA & Mobile Meta Tags: default style prevents WebKit gradient fog -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Appliance Engine" />
@@ -57,10 +57,30 @@
       scrollbar-width: none;
     }
 
-    /* Apple Native Elevation Shadows (No dirty borders, zero height shifts) */
-    .apple-card-light {
+    /* Apple Liquid Glass & Specular Highlights (Easily adjustable / removable) */
+    .apple-liquid-glass {
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.45), 0 8px 32px 0 rgba(0, 0, 0, 0.08);
+    }
+    .dark .apple-liquid-glass {
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+    }
+
+    /* Apple Surface Elevation: Clear distinction between nested layers in light mode */
+    .apple-group-card-light {
       background-color: #FFFFFF;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 4px 14px rgba(0, 0, 0, 0.04);
+    }
+    .apple-appliance-card-light {
+      background-color: #F9F9FB;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    }
+    .apple-consumable-pill-light {
+      background-color: #FFFFFF;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
     .apple-drawer-light {
       background-color: #FFFFFF;
@@ -1838,7 +1858,7 @@
 
           const handleTouchPrevent = (e) => {
             // Permit inner scrolling inside scrollable containers only
-            if (e.target.closest('.overflow-y-auto, .overflow-y-scroll, textarea, input')) {
+            if (e.target.closest('.overflow-y-auto, .overflow-y-scroll, textarea, input, select')) {
               return;
             }
             if (e.cancelable) {
@@ -1891,9 +1911,9 @@
         model: '',
         name: '',
         nickname: '',
-        groupMode: 'existing',
         selectedUnitId: 'unit_main',
-        customGroupName: '',
+        isAddingNewUnitInline: false,
+        newUnitInlineName: '',
         isPassportDetailsOpen: false,
         serialNumber: '',
         purchaseDate: '',
@@ -1902,6 +1922,40 @@
         receiptDataUrl: '',
         receiptFileName: ''
       });
+
+      const inlineNewUnitInputRef = useRef(null);
+
+      const handleConfirmInlineNewProperty = (e) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        const trimmed = addForm.newUnitInlineName.trim();
+        if (!trimmed) {
+          setAddForm(prev => ({ ...prev, isAddingNewUnitInline: false }));
+          return;
+        }
+
+        const maxGroups = isPaidUser ? PRO_MAX_GROUPS : FREE_MAX_GROUPS;
+        if (units.length >= maxGroups) {
+          triggerHaptic('warn');
+          setIsCapacityModalOpen(true);
+          setAddForm(prev => ({ ...prev, isAddingNewUnitInline: false }));
+          return;
+        }
+
+        const existing = units.find(u => u.name.toLowerCase() === trimmed.toLowerCase());
+        if (existing) {
+          setAddForm(prev => ({ ...prev, selectedUnitId: existing.id, isAddingNewUnitInline: false, newUnitInlineName: '' }));
+          triggerHaptic('light');
+          return;
+        }
+
+        const newUnit = { id: `unit_${Date.now()}`, name: trimmed, collapsed: false };
+        const nextUnits = [...units, newUnit];
+        setUnits(nextUnits);
+        triggerDebouncedSync(appliances, nextUnits);
+        setAddForm(prev => ({ ...prev, selectedUnitId: newUnit.id, isAddingNewUnitInline: false, newUnitInlineName: '' }));
+        triggerHaptic('success');
+        showToast(`Property "${trimmed}" created`);
+      };
 
       const [isAnalyzing, setIsAnalyzing] = useState(false);
       const [lookupStatus, setLookupStatus] = useState('');
@@ -2376,18 +2430,6 @@
         const fallbackTitle = effectiveName || `${effectiveBrand} ${effectiveModel || 'Appliance'}`;
         let finalUnit = units.find(u => u.id === addForm.selectedUnitId) || units[0] || { id: 'unit_main', name: 'Main Residence', collapsed: false };
 
-        if (isPaidUser && addForm.groupMode === 'custom' && addForm.customGroupName.trim()) {
-          const matchExisting = units.find(u => u.name.toLowerCase() === addForm.customGroupName.trim().toLowerCase());
-          if (matchExisting) {
-            finalUnit = matchExisting;
-          } else {
-            finalUnit = { id: `unit_${Date.now()}`, name: addForm.customGroupName.trim(), collapsed: false };
-            const nextUnits = [...units, finalUnit];
-            setUnits(nextUnits);
-            triggerDebouncedSync(appliances, nextUnits);
-          }
-        }
-
         const itemsInGroup = appliances.filter(a => a.unitId === finalUnit.id);
         const maxAllowedPerGroup = isPaidUser ? PRO_MAX_PER_GROUP : FREE_MAX_PER_GROUP;
         
@@ -2471,9 +2513,9 @@
           model: '',
           name: '',
           nickname: '',
-          groupMode: 'existing',
           selectedUnitId: 'unit_main',
-          customGroupName: '',
+          isAddingNewUnitInline: false,
+          newUnitInlineName: '',
           isPassportDetailsOpen: false,
           serialNumber: '',
           purchaseDate: '',
@@ -3146,7 +3188,7 @@
         return (item.category || 'Appliance') === activeCategoryFilter;
       };
 
-      // Main Appliance Card: Single-row title, Nickname beside SKU, Stretched Sub-Cards, Goldilocks Progress Cushion
+      // Main Appliance Card: Single-row title, Nickname beside SKU, Layered Light Card, Goldilocks Progress Cushion
       const renderApplianceCard = (item) => {
         const isSelected = selectedIds.includes(item.id);
         const currentOffset = swipeOffsets[item.id] || 0;
@@ -3223,7 +3265,7 @@
                 transition: activeSwipingIdRef.current === item.id ? 'none' : 'transform 0.32s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
               className={`relative rounded-[20px] overflow-hidden ${
-                isDark ? 'bg-zinc-900' : 'apple-card-light'
+                isDark ? 'bg-zinc-900' : 'apple-appliance-card-light'
               } ${isSelected ? 'ring-2 ring-[#FF9500]' : ''}`}
             >
               <div className="px-3 pt-2.5 pb-2 flex items-center gap-2.5">
@@ -3281,10 +3323,10 @@
 
               {!isSelectMode && (
                 <div className={`px-2 pt-2 pb-2 ${
-                  isDark ? 'bg-zinc-950/40 border-t border-white/5' : 'bg-[#FAFAFC] border-t border-black/[0.02]'
+                  isDark ? 'bg-zinc-950/40 border-t border-white/5' : 'bg-black/[0.015] border-t border-black/[0.02]'
                 }`}>
                   <div className="flex justify-between items-center pb-1">
-                    {/* Aligned to pl-[14px] to match the 'Main Residence' left guide */}
+                    {/* Aligned to pl-[14px] to track straight down from the 'Main Residence' left guide */}
                     <span className={`text-[10px] font-bold tracking-wider uppercase pl-[14px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                       Consumables
                     </span>
@@ -3316,7 +3358,7 @@
                             className={`w-full rounded-xl px-3 py-1.5 cursor-pointer active:scale-[0.98] transition-all ${
                               isDark 
                                 ? 'bg-zinc-800/80 hover:bg-zinc-800' 
-                                : 'bg-white hover:bg-zinc-50 shadow-xs'
+                                : 'apple-consumable-pill-light hover:bg-zinc-50'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
@@ -3668,7 +3710,7 @@
                   <div
                     key={unit.id}
                     className={`rounded-[22px] overflow-hidden ${
-                      isDark ? 'bg-zinc-950/60' : 'apple-card-light'
+                      isDark ? 'bg-zinc-950/60' : 'apple-group-card-light'
                     }`}
                   >
                     {/* Header: pl-[14px] and pr-2 inside px-2 container strictly aligns title at 22px and right button at 16px from edge */}
@@ -3709,7 +3751,7 @@
                           onClick={() => { 
                             closeEditMode();
                             triggerHaptic('light');
-                            setAddForm(prev => ({ ...prev, selectedUnitId: unit.id, groupMode: 'existing' }));
+                            setAddForm(prev => ({ ...prev, selectedUnitId: unit.id }));
                             setIsAddOpen(true); 
                           }}
                           className={`w-7 h-7 rounded-full flex items-center justify-center font-bold transition-all active:scale-90 shrink-0 ${
@@ -4474,7 +4516,7 @@
             </div>
           )}
 
-          {/* 3. ADD APPLIANCE MODAL: Strict Flush Left Heading Alignment with Form Fields, Elevated Close Button */}
+          {/* 3. ADD APPLIANCE MODAL: In-Place Morphing Property Selector (+ Add New -> Checkmark Button) */}
           {isAddOpen && (
             <div onClick={() => setIsAddOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer">
               <div 
@@ -4590,22 +4632,69 @@
                     />
                   </div>
 
+                  {/* Morphing Property Dropdown with Inline Checkmark on "Add New" */}
                   <div className="pt-1">
                     <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                       Property Group
                     </label>
-                    <select
-                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
-                      className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
-                        isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
-                      }`}
-                      value={addForm.selectedUnitId}
-                      onChange={(e) => setAddForm(prev => ({ ...prev, selectedUnitId: e.target.value }))}
-                    >
-                      {units.map(u => (
-                        <option key={u.id} value={u.id}>{u.name}</option>
-                      ))}
-                    </select>
+                    {addForm.isAddingNewUnitInline ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          ref={inlineNewUnitInputRef}
+                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                          className={`flex-1 rounded-xl p-2.5 text-xs font-semibold focus:outline-none ${
+                            isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
+                          }`}
+                          placeholder="Property Name (e.g. Vacation Home)"
+                          value={addForm.newUnitInlineName}
+                          onChange={(e) => setAddForm(prev => ({ ...prev, newUnitInlineName: e.target.value }))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleConfirmInlineNewProperty(e);
+                            if (e.key === 'Escape') setAddForm(prev => ({ ...prev, isAddingNewUnitInline: false }));
+                          }}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={handleConfirmInlineNewProperty}
+                          className="w-10 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-xs active:scale-95 transition-transform shrink-0"
+                          title="Save Property"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAddForm(prev => ({ ...prev, isAddingNewUnitInline: false }))}
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold transition-colors shrink-0 ${
+                            isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-black/[0.04] text-zinc-500'
+                          }`}
+                          title="Cancel"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                        className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                          isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
+                        }`}
+                        value={addForm.selectedUnitId}
+                        onChange={(e) => {
+                          if (e.target.value === '__NEW__') {
+                            setAddForm(prev => ({ ...prev, isAddingNewUnitInline: true, newUnitInlineName: '' }));
+                            setTimeout(() => inlineNewUnitInputRef.current?.focus(), 80);
+                          } else {
+                            setAddForm(prev => ({ ...prev, selectedUnitId: e.target.value }));
+                          }
+                        }}
+                      >
+                        {units.map(u => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                        <option value="__NEW__">+ Add New Property...</option>
+                      </select>
+                    )}
                   </div>
 
                   {lookupStatus && (
@@ -4762,7 +4851,7 @@
             </div>
           )}
 
-          {/* 4. SETTINGS BOTTOM-SHEET: Elevated Close Button, Strict Subview Heading Left Alignment */}
+          {/* 4. SETTINGS BOTTOM-SHEET: Elevated Close Button, Centered Floating $2.99 Badge */}
           {isSettingsOpen && (
             <div 
               onClick={() => {
@@ -4904,22 +4993,23 @@
                       </button>
                     </div>
 
-                    {/* CARD 2: PASSPORT */}
+                    {/* CARD 2: PASSPORT (Centered Floating $2.99 Badge Matching Surrounding Typography) */}
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
-                      <div>
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="text-xs font-black tracking-tight">Home Appliance Passport (PDF &amp; CSV)</p>
-                            <p className={`text-[11px] font-semibold leading-normal mt-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                              Verified Home Appliance &amp; Maintenance Ledger
-                            </p>
-                          </div>
+                      <div className="flex items-center">
+                        <div className="max-w-[70%] flex-1">
+                          <p className="text-xs font-black tracking-tight">Home Appliance Passport (PDF &amp; CSV)</p>
+                          <p className={`text-[11px] font-semibold leading-normal mt-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                            Verified Home Appliance &amp; Maintenance Ledger
+                          </p>
+                        </div>
+                        {/* Centered Floating Badge in Open Space */}
+                        <div className="flex-1 flex justify-center items-center">
                           {isPassportUnlocked() ? (
-                            <span className="text-[11px] font-bold text-emerald-500 shrink-0 ml-3">
+                            <span className="text-xs font-bold text-emerald-500">
                               Active
                             </span>
                           ) : (
-                            <span className="text-[11px] font-black text-[#FF9500] shrink-0 ml-3">
+                            <span className="text-xs font-bold text-[#FF9500]">
                               $2.99
                             </span>
                           )}
@@ -5952,584 +6042,15 @@
             </div>
           )}
 
-          {/* NOTIFICATION CENTER DRAWER: Elevated Close Button */}
-          {isNotificationsOpen && (
-            <div onClick={() => setIsNotificationsOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer transition-opacity">
-              <div 
-                onClick={(e) => e.stopPropagation()} 
-                style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
-                className={`w-full max-w-md rounded-t-[32px] px-6 pt-5 space-y-4 cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
-                }`}
-              >
-                <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
-                  <div className="min-w-0 pr-2">
-                    <h3 className="text-base font-black tracking-tight leading-tight text-zinc-900 dark:text-zinc-50">
-                      Maintenance Alerts
-                    </h3>
-                    <p className={`text-[11px] font-semibold mt-0.5 ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                      {unacknowledgedNotifications.length === 0 
-                        ? 'No new alerts' 
-                        : (unacknowledgedNotifications.length === 1 
-                            ? '1 appliance requires your attention' 
-                            : `${unacknowledgedNotifications.length} appliances require your attention`)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 -mt-1 -mr-1">
-                    {unacknowledgedNotifications.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={clearAllAlerts}
-                        className={`text-[11px] font-bold px-2.5 py-1 rounded-full transition-all active:scale-95 ${
-                          isDark ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-750' : 'bg-black/[0.04] text-zinc-700 hover:bg-black/[0.08]'
-                        }`}
-                      >
-                        Clear All
-                      </button>
-                    )}
-                    <AppleCloseButton isDark={isDark} onClick={() => setIsNotificationsOpen(false)} />
-                  </div>
-                </div>
-
-                <div className="max-h-[60vh] overflow-y-auto space-y-2 py-1 scrollbar-none">
-                  {unacknowledgedNotifications.length > 0 ? (
-                    unacknowledgedNotifications.map((notif) => {
-                      const notifOffset = notifSwipeOffsets[notif.key] || 0;
-                      const notifProgress = Math.min(1, Math.abs(notifOffset) / 70);
-
-                      return (
-                        <div key={notif.key} className="relative overflow-hidden rounded-2xl">
-                          <div className="absolute inset-y-0 right-0 w-24 bg-rose-600 rounded-2xl flex items-center justify-end pr-4 z-0">
-                            <span
-                              style={{
-                                transform: `scale(${0.75 + notifProgress * 0.25})`,
-                                opacity: 0.4 + notifProgress * 0.6
-                              }}
-                              className="text-[10px] font-bold text-white uppercase tracking-wider"
-                            >
-                              Dismiss
-                            </span>
-                          </div>
-
-                          <div
-                            onTouchStart={(e) => {
-                              notifTouchStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                              notifTouchIsHorizontalRef.current = null;
-                              notifActiveSwipingKeyRef.current = notif.key;
-                              notifHasDraggedRef.current = false;
-                            }}
-                            onTouchMove={(e) => {
-                              if (notifActiveSwipingKeyRef.current !== notif.key) return;
-                              const deltaX = e.touches[0].clientX - notifTouchStartPosRef.current.x;
-                              const deltaY = e.touches[0].clientY - notifTouchStartPosRef.current.y;
-
-                              if (notifTouchIsHorizontalRef.current === null) {
-                                if (Math.abs(deltaX) > Math.abs(deltaY) + 6) {
-                                  notifTouchIsHorizontalRef.current = true;
-                                } else if (Math.abs(deltaY) > Math.abs(deltaX) + 6) {
-                                  notifTouchIsHorizontalRef.current = false;
-                                }
-                              }
-
-                              if (!notifTouchIsHorizontalRef.current) return;
-                              if (Math.abs(deltaX) > 8) notifHasDraggedRef.current = true;
-                              const damped = deltaX < 0 ? Math.max(-88, deltaX) : 0;
-                              setNotifSwipeOffsets(prev => ({ ...prev, [notif.key]: damped }));
-                            }}
-                            onTouchEnd={() => {
-                              if (notifActiveSwipingKeyRef.current !== notif.key) return;
-                              if (!notifTouchIsHorizontalRef.current) {
-                                notifActiveSwipingKeyRef.current = null;
-                                return;
-                              }
-                              const finalOffset = notifSwipeOffsets[notif.key] || 0;
-                              if (finalOffset < -50) {
-                                acknowledgeAlert(notif.key);
-                              }
-                              setNotifSwipeOffsets(prev => ({ ...prev, [notif.key]: 0 }));
-                              notifTouchIsHorizontalRef.current = null;
-                              notifActiveSwipingKeyRef.current = null;
-                              setTimeout(() => {
-                                notifHasDraggedRef.current = false;
-                              }, 100);
-                            }}
-                            onClick={() => {
-                              if (notifHasDraggedRef.current) return;
-                              acknowledgeAlert(notif.key);
-                              setIsNotificationsOpen(false);
-                              setConsumableUndoCountdown(null);
-                              setIsIntervalPopoverOpen(false);
-                              setActiveConsumableSheet({ appliance: notif.appliance, consumable: notif.consumable, index: notif.index, openedFromNotifications: true });
-                            }}
-                            className={`relative z-10 py-2.5 px-3.5 rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-between ${
-                              isDark ? 'bg-zinc-800/80 hover:bg-zinc-800' : 'apple-card-light hover:bg-zinc-50'
-                            }`}
-                          >
-                            <div className="min-w-0 flex-1 pr-2">
-                              <p className="text-xs font-bold leading-tight truncate text-zinc-900 dark:text-zinc-50">
-                                {notif.appliance.brand} {notif.appliance.name}
-                              </p>
-                              <p className="text-[11px] font-medium text-zinc-600 dark:text-zinc-300 truncate mt-[1px]">
-                                <span>{notif.consumable.name}</span>
-                                {notif.appliance.nickname && (
-                                  <span> • {notif.appliance.nickname}</span>
-                                )}
-                              </p>
-                              <p className="text-[10.5px] font-bold text-rose-600 dark:text-rose-400 mt-[1px]">
-                                {notif.status.timeRemainingText}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center shrink-0">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  acknowledgeAlert(notif.key);
-                                }}
-                                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                                  isDark ? 'hover:bg-zinc-700 text-zinc-400' : 'hover:bg-zinc-200 text-zinc-500'
-                                }`}
-                                title="Dismiss Alert"
-                              >
-                                <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-10 px-4 flex flex-col items-center justify-center space-y-2">
-                      <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-1">
-                        <svg className="w-6 h-6 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      </div>
-                      <h4 className="text-sm font-black tracking-tight text-zinc-900 dark:text-zinc-100">All Clear</h4>
-                      <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 max-w-xs leading-relaxed">
-                        All maintenance schedules and consumables are up to date.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* WARRANTY CONFIRMATION POPUP: Strict Left Alignment Lock & Centered Close Button */}
-          {pendingWarrantyAppliance && (
-            <div onClick={() => setPendingWarrantyAppliance(null)} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[95] cursor-pointer">
-              <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-sm rounded-[32px] p-6 space-y-3.5 shadow-2xl text-left cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
-              }`}>
-                {/* Aligned Top Row: "Warranty Portal" aligned flush left, close button vertically centered */}
-                <div className="flex justify-between items-center">
-                  <span className={`text-[10.5px] font-black uppercase tracking-widest ${UI_ACCENT.text}`}>Warranty Portal</span>
-                  <AppleCloseButton isDark={isDark} onClick={() => setPendingWarrantyAppliance(null)} />
-                </div>
-                
-                {/* Aligned Question: Flush with Warranty Portal */}
-                <h3 className="text-base font-black tracking-tight leading-snug">
-                  Were you able to activate your warranty for {formatApplianceTitle(pendingWarrantyAppliance.brand, pendingWarrantyAppliance.name)}?
-                </h3>
-                <p className={`text-xs font-medium leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Confirming will record active coverage on this hardware ledger.
-                </p>
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => handleConfirmWarrantyActivation(pendingWarrantyAppliance.id, false)}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold active:scale-95 transition-transform ${
-                      isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
-                    }`}
-                  >
-                    No
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleConfirmWarrantyActivation(pendingWarrantyAppliance.id, true)}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2.5 rounded-xl shadow-xs active:scale-95 transition-transform"
-                  >
-                    Yes, Activated
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 5. PAYWALL MODAL */}
-          {isPaywallOpen && (
-            <div 
-              onClick={() => {
-                setIsPaywallOpen(false);
-                setSettingsSubView('root');
-                setIsSettingsOpen(true);
-              }} 
-              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[90] cursor-pointer"
-            >
-              <div 
-                onClick={(e) => e.stopPropagation()} 
-                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${UI_ACCENT.text}`}>Advanced Manager</span>
-                    <h3 className="text-lg font-black tracking-tight mt-0.5">Appliance Engine Pro</h3>
-                  </div>
-                  <div className="-mt-1 -mr-1">
-                    <AppleCloseButton 
-                      isDark={isDark} 
-                      onClick={() => {
-                        setIsPaywallOpen(false);
-                        setSettingsSubView('root');
-                        setIsSettingsOpen(true);
-                      }} 
-                    />
-                  </div>
-                </div>
-
-                <div className={`flex p-1 rounded-2xl ${
-                  isDark ? 'bg-zinc-800' : 'bg-black/[0.03]'
-                }`}>
-                  <button
-                    type="button"
-                    onClick={() => { triggerHaptic('light'); setPaywallPlanChoice('monthly'); }}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
-                      paywallPlanChoice === 'monthly'
-                        ? (isDark ? 'bg-zinc-700 text-white shadow-xs' : 'bg-white text-zinc-900 shadow-xs')
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    Monthly ($4.99/mo)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { triggerHaptic('light'); setPaywallPlanChoice('yearly'); }}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      paywallPlanChoice === 'yearly'
-                        ? (isDark ? 'bg-zinc-700 text-white shadow-xs' : 'bg-white text-zinc-900 shadow-xs')
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <span>Yearly ($49.99/yr)</span>
-                    <span className="text-[10px] text-emerald-500 font-semibold">Save 17%</span>
-                  </button>
-                </div>
-
-                <div className={`space-y-2 text-xs p-3.5 rounded-2xl font-semibold ${isDark ? 'bg-zinc-800/60 text-zinc-300' : 'bg-[#FAFAFC] text-zinc-700'}`}>
-                  <p>✓ <strong>15 Appliances Per Property:</strong> Manage up to 5 properties (75 total assets).</p>
-                  <p>✓ <strong>65 Advanced Diagnostic Inquiries:</strong> Deep step-by-step assistance per 2 hours.</p>
-                  <p>✓ <strong>7-Day Retention:</strong> Diagnostic chats preserved for a full week.</p>
-                  <p>✓ <strong>Cloud Sync &amp; Archive:</strong> Unlimited document &amp; receipt storage.</p>
-                </div>
-
-                <div className="flex flex-col gap-2 pt-1">
-                  <button
-                    onClick={() => {
-                      triggerHaptic('success');
-                      setIsPaidUser(true);
-                      localStorage.setItem('is_pro_user', 'true');
-                      localStorage.setItem('billing_interval', paywallPlanChoice);
-                      const updatedUser = { 
-                        ...(currentUser || {}), 
-                        email: currentUser?.email || 'member@applianceengine.internal',
-                        is_pro: true,
-                        billing_interval: paywallPlanChoice
-                      };
-                      localStorage.setItem('app_user_session', JSON.stringify(updatedUser));
-                      setCurrentUser(updatedUser);
-                      setIsPaywallOpen(false);
-                      setSettingsSubView('root');
-                      setIsSettingsOpen(true);
-                      triggerDebouncedSync(appliances, units);
-                      showToast(paywallPlanChoice === 'yearly' ? "Pro Activated ($49.99/yr)" : "Pro Activated ($4.99/mo)");
-                    }}
-                    className={`w-full ${UI_ACCENT.solid} font-bold text-xs py-2.5 rounded-xl shadow-xs transition-all active:scale-95`}
-                  >
-                    {paywallPlanChoice === 'yearly' ? 'Start Annual Membership ($49.99/yr)' : 'Start Monthly Membership ($4.99/mo)'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleRestorePurchases}
-                    className="text-xs text-center font-bold text-zinc-400 hover:text-white dark:text-zinc-200 dark:hover:text-white py-1 transition-colors"
-                  >
-                    Restore Purchases
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 6. PROPERTY CREATION MODAL */}
-          {isAddGroupModalOpen && (
-            <div 
-              onClick={() => setIsAddGroupModalOpen(false)} 
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-start justify-center pt-24 px-4 pb-6 z-50 cursor-pointer overflow-y-auto"
-            >
-              <div 
-                onClick={(e) => e.stopPropagation()} 
-                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <h3 className="text-base font-black tracking-tight pt-0.5">Create New Property</h3>
-                  <div className="-mt-1 -mr-1">
-                    <AppleCloseButton isDark={isDark} onClick={() => setIsAddGroupModalOpen(false)} />
-                  </div>
-                </div>
-                <form onSubmit={handleCreateGroup} className="space-y-3">
-                  <input
-                    style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
-                    className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none ${
-                      isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
-                    }`}
-                    placeholder="e.g. Unit 4B, Summer Cabin"
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setIsAddGroupModalOpen(false)} className={`flex-1 py-2 rounded-xl text-xs font-bold ${
-                      isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
-                    }`}>Cancel</button>
-                    <button type="submit" className={`flex-1 py-2 rounded-xl text-xs font-bold ${UI_ACCENT.solid} shadow-xs active:scale-95 transition-transform`}>Create</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {deleteTargetGroup && (
-            <div onClick={() => setDeleteTargetGroup(null)} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[75] cursor-pointer">
-              <div onClick={(e) => e.stopPropagation()} className={`rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
-              }`}>
-                <h3 className="text-base font-black">Delete "{deleteTargetGroup.name}"?</h3>
-                <p className={`text-xs font-medium leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  This will permanently remove "{deleteTargetGroup.name}" and all appliances inside it.
-                </p>
-                <div className="flex gap-2 pt-2">
-                  <button onClick={() => setDeleteTargetGroup(null)} className={`flex-1 text-xs py-2.5 rounded-2xl font-bold active:scale-95 transition-transform ${
-                    isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
-                  }`}>No</button>
-                  <button onClick={confirmDeleteGroup} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-xs active:scale-95 transition-transform">Yes</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 7. BULK DELETION CONFIRMATION */}
-          {isBulkDeleteModalOpen && (
-            <div onClick={() => setIsBulkDeleteModalOpen(false)} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[70] cursor-pointer">
-              <div onClick={(e) => e.stopPropagation()} className={`rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
-              }`}>
-                <h3 className="text-base font-black">Delete {selectedIds.length} Appliances?</h3>
-                <p className={`text-xs font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>This will permanently remove selected appliances.</p>
-                <div className="flex gap-2 pt-2">
-                  <button onClick={() => setIsBulkDeleteModalOpen(false)} className={`flex-1 text-xs py-2.5 rounded-2xl font-bold active:scale-95 transition-transform ${
-                    isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
-                  }`}>No</button>
-                  <button onClick={confirmBulkDelete} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-xs active:scale-95 transition-transform">Yes</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 8. LOG OUT CONFIRMATION MODAL */}
-          {isLogoutModalOpen && (
-            <div 
-              onClick={() => {
-                setIsLogoutModalOpen(false);
-                setIsSettingsOpen(true);
-              }} 
-              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[90] cursor-pointer"
-            >
-              <div onClick={(e) => e.stopPropagation()} className={`rounded-[32px] p-6 w-full max-w-xs space-y-3.5 shadow-2xl text-center cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
-              }`}>
-                <h3 className="text-base font-black">Log Out?</h3>
-                <div className="space-y-1">
-                  <p className={`text-xs font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                    Are you sure you want to log out of:
-                  </p>
-                  <p className={`text-xs font-bold font-mono break-all px-2 ${
-                    isDark ? 'text-zinc-100' : 'text-[#111827]'
-                  }`}>
-                    {currentUser?.email || 'this account'}
-                  </p>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button 
-                    onClick={() => {
-                      setIsLogoutModalOpen(false);
-                      setIsSettingsOpen(true);
-                    }} 
-                    className={`flex-1 text-xs py-2.5 rounded-2xl font-bold active:scale-95 transition-transform ${
-                      isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
-                    }`}
-                  >
-                    No
-                  </button>
-                  <button onClick={handleLogout} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-xs active:scale-95 transition-transform">Yes</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 9. DELETE ACCOUNT CONFIRMATION MODAL */}
-          {isDeleteAccountModalOpen && (
-            <div 
-              onClick={() => setIsDeleteAccountModalOpen(false)} 
-              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[95] cursor-pointer"
-            >
-              <div onClick={(e) => e.stopPropagation()} className={`rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default animate-sheet-spring ${
-                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
-              }`}>
-                <div className="w-11 h-11 rounded-full bg-rose-500/15 text-rose-500 mx-auto flex items-center justify-center">
-                  <svg className="w-5 h-5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                  </svg>
-                </div>
-                <h3 className="text-base font-black">Erase All Appliance Data?</h3>
-                <p className={`text-xs font-semibold leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  Permanently deletes your account, property registries, warranty receipts, and synchronized cloud records. This action cannot be undone.
-                </p>
-                <div className="flex gap-2 pt-2">
-                  <button 
-                    onClick={() => setIsDeleteAccountModalOpen(false)} 
-                    className={`flex-1 text-xs py-2.5 rounded-2xl font-bold active:scale-95 transition-transform ${
-                      isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
-                    }`}
-                  >
-                    Cancel
-                  </button>
-                  <button onClick={handleDeleteAccountForever} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-xs active:scale-95 transition-transform">
-                    Delete Forever
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 10. AUTHENTICATION MODAL */}
-          {isAuthModalOpen && (
-            <div 
-              onClick={() => {
-                setIsAuthModalOpen(false);
-                setIsSettingsOpen(true);
-              }} 
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-[60] cursor-pointer"
-            >
-              <div 
-                onClick={(e) => e.stopPropagation()} 
-                style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
-                className={`w-full max-w-sm rounded-t-[32px] px-6 pt-5 space-y-4 cursor-default animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <h3 className="text-base font-black pt-0.5">Account Login</h3>
-                  <div className="-mt-1 -mr-1">
-                    <AppleCloseButton 
-                      isDark={isDark} 
-                      onClick={() => {
-                        setIsAuthModalOpen(false);
-                        setIsSettingsOpen(true);
-                      }} 
-                    />
-                  </div>
-                </div>
-
-                {authStep === 'email' ? (
-                  <form onSubmit={handleAuthSendOtp} className="space-y-3">
-                    <p className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                      Enter your email to sign in and synchronize your hardware schedule:
-                    </p>
-                    <input
-                      type="email"
-                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
-                      className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none ${
-                        isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
-                      }`}
-                      placeholder="your@email.com"
-                      value={authEmailInput}
-                      onChange={(e) => setAuthEmailInput(e.target.value)}
-                      required
-                      autoFocus
-                    />
-                    <button
-                      type="submit"
-                      disabled={authLoading}
-                      className={`w-full ${UI_ACCENT.solid} font-black text-xs py-3 rounded-2xl shadow-xs transition-all active:scale-95`}
-                    >
-                      {authLoading ? 'Sending Code...' : 'Send Login Code'}
-                    </button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleAuthVerifyOtp} className="space-y-3">
-                    <p className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                      A 6-digit code was sent to <strong className={UI_ACCENT.text}>{authEmailInput}</strong>.
-                    </p>
-
-                    <input
-                      type="text"
-                      maxLength="6"
-                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
-                      className={`w-full rounded-2xl p-3 text-center text-lg tracking-widest font-mono font-black focus:outline-none ${
-                        isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
-                      }`}
-                      placeholder="000000"
-                      value={authPinInput}
-                      onChange={(e) => setAuthPinInput(e.target.value.replace(/\D/g, ''))}
-                      required
-                      autoFocus
-                    />
-
-                    <button
-                      type="submit"
-                      disabled={authLoading || authPinInput.length < 6}
-                      className={`w-full ${UI_ACCENT.solid} font-black text-xs py-3 rounded-2xl shadow-xs transition-all disabled:opacity-50 active:scale-95`}
-                    >
-                      {authLoading ? 'Verifying...' : 'Verify & Sign In'}
-                    </button>
-
-                    <div className="flex justify-between items-center pt-2">
-                      <button type="button" onClick={() => setAuthStep('email')} className="text-xs text-zinc-400 hover:opacity-80">
-                        ← Change Email
-                      </button>
-                      <button
-                        type="button"
-                        disabled={otpCooldownSeconds > 0}
-                        onClick={handleAuthSendOtp}
-                        className={`text-xs ${UI_ACCENT.text} disabled:opacity-40`}
-                      >
-                        {otpCooldownSeconds > 0 ? `Resend in ${otpCooldownSeconds}s` : 'Resend Code'}
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* 11. DIAGNOSTIC ASSISTANT OVERLAY: Capped at max-h-[78vh] to Preserve Bottom Drawer Hierarchy */}
+          {/* 11. DIAGNOSTIC ASSISTANT OVERLAY: Capped at max-h-[78vh] with iOS Visual Viewport Keyboard Pinning */}
           {activeAppliance && (
             <div onClick={() => setActiveAppliance(null)} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-[80] cursor-pointer">
               <div 
                 onClick={(e) => e.stopPropagation()} 
                 style={{ 
                   overscrollBehavior: 'contain',
-                  maxHeight: '78vh',
-                  height: '78vh',
+                  maxHeight: viewportHeight ? `${Math.min(viewportHeight * 0.78, 640)}px` : '78vh',
+                  height: viewportHeight ? `${Math.min(viewportHeight * 0.78, 640)}px` : '78vh',
                   paddingBottom: 'max(20px, calc(env(safe-area-inset-bottom, 0px) + 8px))'
                 }}
                 className={`w-full max-w-md rounded-t-[32px] px-5 pt-5 flex flex-col cursor-default animate-sheet-spring ${
@@ -6760,7 +6281,7 @@
                   {isLoading && <p className="text-xs text-zinc-400 animate-pulse px-2">Analyzing...</p>}
                 </div>
 
-                {/* Standalone Composer (No <form> wrapper, enterKeyHint="send" suppresses accessory bar) */}
+                {/* Standalone Composer (Pinned smoothly above iOS keyboard) */}
                 <div className="pt-2 flex flex-col gap-1.5 border-t border-black/[0.04] dark:border-zinc-800/80 shrink-0">
                   <div className="flex items-center gap-2">
                     <div className={`flex-1 rounded-full px-3.5 py-1.5 flex items-center gap-2 ${
@@ -6775,6 +6296,10 @@
                         className="flex-1 bg-transparent text-xs focus:outline-none placeholder:text-zinc-500"
                         placeholder={isListeningDictation ? "Listening... Speak now" : "Describe issue, sound, or symptom..."}
                         value={queryInput}
+                        onFocus={() => {
+                          // Prevent iOS WebKit from scrolling parent background upward
+                          setTimeout(() => window.scrollTo(0, 0), 100);
+                        }}
                         onChange={(e) => setQueryInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && sendQuery()}
                       />
