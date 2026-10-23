@@ -14,6 +14,11 @@
   <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22Appliance%20Engine%22%2C%22short_name%22%3A%22Appliances%22%2C%22start_url%22%3A%22%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23000000%22%2C%22theme_color%22%3A%22%23000000%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%2520viewBox%3D%270%25200%2520100%2520100%27%253E%253Crect%2520width%3D%27100%27%2520height%3D%27100%27%2520rx%3D%2720%27%2520fill%3D%27%23FF9500%27%2F%253E%253Cpath%2520d%3D%27M30%252050%2520h40M50%252030%2520v40%27%2520stroke%3D%27white%27%2520stroke-width%3D%2710%27%2520stroke-linecap%3D%27round%27%2F%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D" />
 
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class'
+    };
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
@@ -445,7 +450,6 @@
       const title = `Replace ${consumable.name} (${appliance.brand} ${appliance.name})`;
       const desc = `Scheduled replacement for OEM Part #${consumable.partNumber || 'Standard'}. Tracked via Appliance Engine.`;
       
-      // Sanitized location string namespace prevents iOS Data Detectors phone parsing
       const cleanUnit = (appliance.unitName || 'Main Residence').replace(/^[0-9-]+$/, 'Unit $&');
       const cleanRoom = appliance.nickname ? ` - ${appliance.nickname}` : '';
       const locationText = `Property: ${cleanUnit}${cleanRoom}`;
@@ -800,7 +804,7 @@
       async set(storeName, key, value) {
         try {
           const db = await this.getDB();
-          return new Promise((resolve) => {
+          return new Promise((resolve, reject) => {
             const tx = db.transaction(storeName, 'readwrite');
             const req = tx.objectStore(storeName).put(value, key);
             req.onsuccess = () => resolve();
@@ -1083,7 +1087,6 @@
         isExpiringSoon: remainingDays <= 30
       };
     }
-
     // Comprehensive Fallback Registry
     const STATIC_BRAND_PORTALS = {
       samsung: { warranty: 'https://www.samsung.com/us/support/register/', support: 'https://www.samsung.com/us/support/contact/' },
@@ -1526,6 +1529,7 @@
       html += '</div></div>';
       return html;
     }
+
     function App() {
       const [toastMessage, setToastMessage] = useState(null);
       const toastTimerRef = useRef(null);
@@ -2559,7 +2563,9 @@
           });
           clearTimeout(timeoutId);
           const data = await res.json();
-          if (data?.appliance) {
+          if (!res.ok || data.error) {
+            alert("Worker Discovery Error: " + (data.error || ("HTTP " + res.status)));
+          } else if (data?.appliance) {
             const parsed = data.appliance;
             resolvedCanonicalName = parsed.name || resolvedCanonicalName;
             detectedCategory = parsed.category || '';
@@ -3127,7 +3133,7 @@
         setProfileNameInput(val);
       };
 
-        const handleAuthSendOtp = async (e) => {
+      const handleAuthSendOtp = async (e) => {
         e.preventDefault();
         triggerHaptic('light');
         setAuthLoading(true);
@@ -4126,7 +4132,9 @@
                       <button
                         type="button"
                         disabled
-                        className="w-full h-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 cursor-default"
+                        className={`w-full h-full font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 cursor-default ${
+                          isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-600'
+                        }`}
                       >
                         <span>✓ Replaced Today</span>
                       </button>
@@ -4257,7 +4265,7 @@
                             onChange={(e) => setEditApplianceForm(prev => ({ ...prev, unitId: e.target.value }))}
                           >
                             {units.map(u => (
-                              <option key={u.id} value={u.id}>{u.name}</option>
+                              <option key={u.id} value={u.id} className={isDark ? 'bg-zinc-900 text-white' : 'bg-white text-black'}>{u.name}</option>
                             ))}
                           </select>
                         </div>
@@ -4786,9 +4794,9 @@
                         }}
                       >
                         {units.map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
+                          <option key={u.id} value={u.id} className={isDark ? 'bg-zinc-900 text-white' : 'bg-white text-black'}>{u.name}</option>
                         ))}
-                        <option value="__NEW__">+ Add New Property...</option>
+                        <option value="__NEW__" className={isDark ? 'bg-zinc-900 text-white' : 'bg-white text-black'}>+ Add New Property...</option>
                       </select>
                     )}
                   </div>
@@ -5047,7 +5055,11 @@
                         {!currentUser?.email && (
                           <button
                             type="button"
-                            onClick={() => { triggerHaptic('light'); setIsAuthModalOpen(true); }}
+                            onClick={() => {
+                              triggerHaptic('light');
+                              setIsSettingsOpen(false);
+                              setIsAuthModalOpen(true);
+                            }}
                             className={`${UI_ACCENT.solid} font-bold text-xs px-3 py-1 rounded-xl shadow-xs active:scale-95 transition-transform`}
                           >
                             Sign In
@@ -5701,6 +5713,250 @@
                     </div>
                   </div>
                 )}
+
+                {/* 1. CANCEL SUBSCRIPTION SUBVIEW */}
+                {settingsSubView === 'cancel' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
+                      <button onClick={() => setSettingsSubView('subscription')} className={`text-xs font-bold ${UI_ACCENT.text} flex items-center gap-1 pt-0.5`}>
+                        ← Back to Subscription
+                      </button>
+                      <div className="-mt-1 -mr-1">
+                        <AppleCloseButton isDark={isDark} onClick={() => setSettingsSubView('root')} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Cancel Membership</h3>
+                      <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        Downgrade to the complimentary Free Starter Tier
+                      </p>
+                    </div>
+
+                    <div className={`p-4 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'apple-card-light text-zinc-900'}`}>
+                      <p className="text-xs font-medium leading-relaxed">
+                        If you downgrade, your properties will be capped at 1, maximum appliances reduced to 3, and advanced AI diagnostics will return to standard local checks.
+                      </p>
+
+                      <div className="pt-2 space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic('warn');
+                            setIsPaidUser(false);
+                            localStorage.setItem('is_pro_user', 'false');
+                            localStorage.removeItem('billing_interval');
+                            if (currentUser) {
+                              const updated = { ...currentUser, is_pro: false, billing_interval: 'monthly' };
+                              setCurrentUser(updated);
+                              localStorage.setItem('app_user_session', JSON.stringify(updated));
+                            }
+                            setSettingsSubView('root');
+                            showToast("Subscription cancelled. Downgraded to Free Tier.");
+                          }}
+                          className="w-full py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-xs active:scale-95 transition-transform"
+                        >
+                          Confirm Cancellation &amp; Downgrade
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSettingsSubView('subscription')}
+                          className={`w-full py-2.5 rounded-xl text-xs font-bold active:scale-95 transition-transform ${
+                            isDark ? 'bg-zinc-700 text-zinc-200' : 'bg-black/[0.04] text-zinc-800'
+                          }`}
+                        >
+                          Keep My Subscription
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. PASSPORT CHECKOUT SUBVIEW ($2.99 PASS) */}
+                {settingsSubView === 'passport_checkout' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
+                      <button onClick={() => setSettingsSubView('root')} className={`text-xs font-bold ${UI_ACCENT.text} flex items-center gap-1 pt-0.5`}>
+                        ← Back to Settings
+                      </button>
+                      <div className="-mt-1 -mr-1">
+                        <AppleCloseButton isDark={isDark} onClick={() => setSettingsSubView('root')} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">72-Hour Passport Pass</h3>
+                      <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        Verified Home Appliance &amp; Maintenance Ledger ($2.99)
+                      </p>
+                    </div>
+
+                    <div className={`p-4 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'apple-card-light text-zinc-900'}`}>
+                      <div className="space-y-2 text-xs font-medium">
+                        <p>✓ <strong>72 Hours of Unlimited Exports:</strong> Compile and download as many audits as needed.</p>
+                        <p>✓ <strong>Official PDF Ledger:</strong> Structured format for real estate sales, insurance, and escrow.</p>
+                        <p>✓ <strong>Spreadsheet (.CSV) Ingestion:</strong> Raw export with verified serial numbers and maintenance timestamps.</p>
+                        <p>✓ <strong>Permanent Archive:</strong> Exported documents remain permanently accessible in your ledger at no recurring cost.</p>
+                      </div>
+
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={handleSimulatedPassportPurchase}
+                          className={`w-full py-3 rounded-xl text-xs font-bold ${UI_ACCENT.solid} shadow-xs active:scale-95 transition-transform`}
+                        >
+                          Activate 72-Hour Pass ($2.99) ➔
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. PASSPORT COMPILER & CONFIGURATION SUBVIEW */}
+                {settingsSubView === 'passport' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
+                      <button onClick={() => setSettingsSubView('root')} className={`text-xs font-bold ${UI_ACCENT.text} flex items-center gap-1 pt-0.5`}>
+                        ← Back to Settings
+                      </button>
+                      <div className="-mt-1 -mr-1">
+                        <AppleCloseButton isDark={isDark} onClick={() => setSettingsSubView('root')} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Compile Audit Ledger</h3>
+                      <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {getPassportRemainingTimeString()} on active pass
+                      </p>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                          Property Scope
+                        </label>
+                        <select
+                          className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                            isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                          }`}
+                          value={passportScopeUnitId}
+                          onChange={(e) => setPassportScopeUnitId(e.target.value)}
+                        >
+                          <option value="all" className={isDark ? 'bg-zinc-900 text-white' : 'bg-white text-black'}>All Properties ({appliances.length} Appliances)</option>
+                          {units.map(u => (
+                            <option key={u.id} value={u.id} className={isDark ? 'bg-zinc-900 text-white' : 'bg-white text-black'}>{u.name} ({appliances.filter(a => a.unitId === u.id).length} items)</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                          Property Address (Optional)
+                        </label>
+                        <input
+                          className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                            isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                          }`}
+                          placeholder="e.g. 742 Evergreen Terrace"
+                          value={passportPropertyAddress}
+                          onChange={(e) => setPassportPropertyAddress(e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                          Owner / Client Name (Optional)
+                        </label>
+                        <input
+                          className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                            isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                          }`}
+                          placeholder="e.g. Jane Doe"
+                          value={passportOwnerName}
+                          onChange={(e) => setPassportOwnerName(e.target.value)}
+                        />
+                      </div>
+
+                      <div className={`p-3.5 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold">Include Declared Valuation</span>
+                          <AppleToggle checked={includeValuationOnExport} onChange={setIncludeValuationOnExport} />
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t border-black/5 dark:border-zinc-700/50">
+                          <span className="font-bold">Include Maintenance History</span>
+                          <AppleToggle checked={includeMaintenanceLogOnExport} onChange={setIncludeMaintenanceLogOnExport} />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-2">
+                        <button
+                          type="button"
+                          disabled={isGeneratingPdf}
+                          onClick={handleGenerateAndSavePassport}
+                          className={`py-3 rounded-xl font-bold text-xs ${UI_ACCENT.solid} shadow-xs active:scale-95 transition-transform disabled:opacity-50`}
+                        >
+                          {isGeneratingPdf ? 'Compiling PDF...' : 'Export PDF Audit'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleExportPassportCsvDirectly}
+                          className={`py-3 rounded-xl font-bold text-xs active:scale-95 transition-transform ${
+                            isDark ? 'bg-zinc-800 hover:bg-zinc-750 text-white' : 'bg-black/[0.04] hover:bg-black/[0.08] text-zinc-900'
+                          }`}
+                        >
+                          Export .CSV
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. PAST EXPORTS LEDGER SUBVIEW */}
+                {settingsSubView === 'exports' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
+                      <button onClick={() => setSettingsSubView('root')} className={`text-xs font-bold ${UI_ACCENT.text} flex items-center gap-1 pt-0.5`}>
+                        ← Back to Settings
+                      </button>
+                      <div className="-mt-1 -mr-1">
+                        <AppleCloseButton isDark={isDark} onClick={() => setSettingsSubView('root')} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Past Export Audits</h3>
+                      <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        {savedPassports.length} archived ledgers in local IndexedDB storage
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                      {savedPassports.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`p-3.5 rounded-2xl flex items-center justify-between ${
+                            isDark ? 'bg-zinc-800/60' : 'apple-card-light'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1 pr-2">
+                            <p className="text-xs font-bold truncate">{item.unitName}</p>
+                            <p className={`text-[10.5px] mt-0.5 font-mono ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                              {item.verificationHash} • {new Date(item.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSavedPassport(item)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold ${UI_ACCENT.solid} active:scale-95 transition-transform`}
+                          >
+                            View
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -5922,8 +6178,9 @@
             <div 
               onClick={() => {
                 setIsPaywallOpen(false);
-                setSettingsSubView('root');
-                setIsSettingsOpen(true);
+                if (settingsSubView !== 'root' || !activeAppliance) {
+                  setIsSettingsOpen(true);
+                }
               }} 
               className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[90] cursor-pointer"
             >
@@ -5943,8 +6200,9 @@
                       isDark={isDark} 
                       onClick={() => {
                         setIsPaywallOpen(false);
-                        setSettingsSubView('root');
-                        setIsSettingsOpen(true);
+                        if (settingsSubView !== 'root' || !activeAppliance) {
+                          setIsSettingsOpen(true);
+                        }
                       }} 
                     />
                   </div>
@@ -6014,7 +6272,9 @@
                   <button
                     type="button"
                     onClick={handleRestorePurchases}
-                    className="text-xs text-center font-bold text-zinc-400 hover:text-white dark:text-zinc-200 dark:hover:text-white py-1 transition-colors"
+                    className={`text-xs text-center font-bold py-1 transition-colors ${
+                      isDark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'
+                    }`}
                   >
                     Restore Purchases
                   </button>
