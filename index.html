@@ -38,16 +38,25 @@
       overscroll-behavior-y: none;
       background-color: #000000;
     }
-    /* 16px Font Lock: Disables iOS Safari 120% input auto-zoom */
+
+    /* Fixed Input Typography: Proportional to field titles & Prevents iOS zoom */
     input, textarea, select {
-      font-size: 16px !important;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif !important;
+      font-size: 14px !important;
+      line-height: 1.35 !important;
+      scroll-margin-top: 76px !important;
       user-select: text !important;
       -webkit-user-select: text !important;
     }
     input::placeholder, textarea::placeholder {
-      font-size: 13px !important;
+      font-size: 12.5px !important;
       font-weight: 400 !important;
       opacity: 0.45 !important;
+    }
+    .modal-scroll-container {
+      scroll-padding-top: 76px;
+      overscroll-behavior-y: contain;
+      -webkit-overflow-scrolling: touch;
     }
     .selectable-text {
       user-select: text !important;
@@ -61,7 +70,7 @@
       scrollbar-width: none;
     }
 
-    /* Native Apple Light Mode Elevation & Layer Separation */
+    /* Zero-Shift Card Foundations (Standardized 1px border across themes) */
     .apple-group-card-light {
       background-color: #FFFFFF;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.04);
@@ -70,7 +79,7 @@
     .apple-appliance-card-light {
       background-color: #FFFFFF;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-      border: 1px solid rgba(0, 0, 0, 0.06);
+      border: 1px solid rgba(0, 0, 0, 0.05);
     }
     .apple-consumable-pill-light {
       background-color: #F6F6F9;
@@ -86,6 +95,18 @@
       background-color: #FFFFFF;
       box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06), 0 -12px 36px rgba(0, 0, 0, 0.08);
       border-top: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    /* Smooth Momentum Scrolling */
+    .overflow-x-auto {
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .overflow-x-auto::-webkit-scrollbar {
+      display: none;
+    }
+    .overflow-y-auto {
+      -webkit-overflow-scrolling: touch;
     }
 
     /* SVG Ambient Celestial Animations */
@@ -590,116 +611,8 @@
       }
     }
 
-    const MOCK_INITIAL_APPLIANCES = [
-      {
-        id: "mock_1",
-        unitId: "unit_main",
-        name: "French Door Refrigerator",
-        nickname: "Kitchen",
-        brand: "GE",
-        modelNumber: "GNE27JYMFS",
-        category: "Refrigeration",
-        serialNumber: "GE-8849102",
-        purchaseDate: "2024-02-15",
-        purchasePrice: "$2,199.00",
-        vendor: "Best Buy",
-        warrantyMonths: 12,
-        warrantyActivated: false,
-        consumables: [
-          { 
-            name: "Water & Ice Filter", 
-            partNumber: "RPWFE", 
-            intervalMonths: 6, 
-            lastReplaced: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
-            replacementHistory: [
-              new Date(Date.now() - 208 * 24 * 60 * 60 * 1000).toISOString(),
-              new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString()
-            ]
-          },
-          { 
-            name: "FreshFlow Air Filter", 
-            partNumber: "ODORFILTER", 
-            intervalMonths: 6, 
-            lastReplaced: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString(),
-            replacementHistory: [
-              new Date(Date.now() - 210 * 24 * 60 * 60 * 1000).toISOString(),
-              new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString()
-            ]
-          }
-        ],
-        replacementParts: [
-          { name: "Water Inlet Valve", partNumber: "WR57X10032" },
-          { name: "Evaporator Fan Motor", partNumber: "WR60X10307" },
-          { name: "Defrost Thermostat", partNumber: "WR50X10068" },
-          { name: "Temperature Sensor Thermistor", partNumber: "WR55X10025" }
-        ],
-        updatedAt: Date.now() - 50000
-      },
-      {
-        id: "mock_2",
-        unitId: "unit_main",
-        name: "Airmega Mighty Air Purifier",
-        nickname: "Living Room",
-        brand: "Coway",
-        modelNumber: "AP-1512HH",
-        category: "Air Quality",
-        serialNumber: "CW-2023-0199",
-        purchaseDate: "2023-11-10",
-        purchasePrice: "$229.00",
-        vendor: "Amazon",
-        warrantyMonths: 12,
-        warrantyActivated: false,
-        consumables: [
-          { 
-            name: "Activated Carbon Odor Pre-Filter", 
-            partNumber: "3304898", 
-            intervalMonths: 6, 
-            lastReplaced: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-            replacementHistory: [
-              new Date(Date.now() - 212 * 24 * 60 * 60 * 1000).toISOString(),
-              new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-            ]
-          }
-        ],
-        replacementParts: [
-          { name: "Air Quality Particle Sensor Unit", partNumber: "CW-SENS-15" }
-        ],
-        updatedAt: Date.now() - 40000
-      },
-      {
-        id: "mock_3",
-        unitId: "unit_main",
-        name: "High-Efficiency HVAC Heat Pump",
-        nickname: "Basement Utility",
-        brand: "Carrier",
-        modelNumber: "25VNA4",
-        category: "HVAC",
-        serialNumber: "CR-992140A",
-        purchaseDate: "2022-08-01",
-        purchasePrice: "$8,500.00",
-        vendor: "Local Mechanical",
-        warrantyMonths: 60,
-        warrantyActivated: false,
-        consumables: [
-          { 
-            name: "Whole-House Media Air Filter", 
-            partNumber: "FILXXCAR0020", 
-            intervalMonths: 3, 
-            lastReplaced: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-            replacementHistory: [
-              new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(),
-              new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-            ]
-          }
-        ],
-        replacementParts: [
-          { name: "Dual Run Capacitor 45/5 uF", partNumber: "HC98JA046" },
-          { name: "Contactor Relay 24V", partNumber: "HN51KC024" },
-          { name: "Condenser Fan Motor", partNumber: "HC38GE238" }
-        ],
-        updatedAt: Date.now() - 30000
-      }
-    ];
+    // Completely purged demo starters so app starts from clean slate
+    const MOCK_INITIAL_APPLIANCES = [];
 
     const BUNDLED_CHASSIS_ERRORS = {
       "refrigeration": {
@@ -879,6 +792,9 @@
       return html2pdfLoadingPromise;
     }
 
+    /**
+     * Clean Part & Consumable Purchase URL (Zero SKU Pollution, Zero Double Quotes)
+     */
     function buildPartPurchaseUrl(brand, partItem, targetStore = 'amazon', applianceModel = '') {
       const cleanBrand = (brand || '').trim();
       const partNumber = (partItem?.partNumber || '').trim();
@@ -886,18 +802,41 @@
       const asin = (partItem?.asin || '').trim();
       const modelSku = (applianceModel || '').trim();
 
+      // Detect generic or chemical maintenance products
+      const isRoutineMaintenance = /clean|tablet|wash|descal|salt|odor|twindos|detergent|deodor|sanit/i.test(partName);
+
       if (targetStore === 'amazon') {
         const tagParam = 'tag=applianceengine-20';
         if (asin && /^B[0-9A-Z]{9}$/i.test(asin)) {
           return `https://www.amazon.com/dp/${asin}?${tagParam}`;
         }
-        const query = partNumber 
-          ? `"${cleanBrand}" "${partNumber}"`
-          : (modelSku ? `"${modelSku}" "${partName}"` : `"${cleanBrand}" "${partName}"`);
-        return `https://www.amazon.com/s?k=${encodeURIComponent(query)}&${tagParam}`;
+        
+        let query = '';
+        if (isRoutineMaintenance) {
+          // Never include model SKU or restrictive quotes for cleaners/tablets
+          const simplifiedName = partName.replace(/\b(for|replacement|cartridge|pack)\b/gi, '').trim();
+          query = `${cleanBrand} ${simplifiedName}`.trim();
+        } else if (partNumber && partNumber.length > 2 && !/filter|oem|part|cleaner/i.test(partNumber)) {
+          query = `${cleanBrand} ${partNumber} replacement part`.trim();
+        } else if (modelSku) {
+          query = `${cleanBrand} ${modelSku} ${partName}`.trim();
+        } else {
+          query = `${cleanBrand} ${partName}`.trim();
+        }
+        
+        const cleanQuery = query.replace(/["']/g, '');
+        return `https://www.amazon.com/s?k=${encodeURIComponent(cleanQuery)}&${tagParam}`;
       }
 
-      const clearinghouseQuery = partNumber || (modelSku ? `${modelSku} ${partName}` : `${cleanBrand} ${partName}`);
+      // OEM / Clearinghouse
+      if (isRoutineMaintenance) {
+        // Send chemical maintenance/cleaning products to Google Shopping / Brand Store instead of empty RepairClinic schematics
+        const simplifiedName = partName.replace(/\b(for|replacement|cartridge|pack)\b/gi, '').trim();
+        const query = `${cleanBrand} ${simplifiedName}`.replace(/["']/g, '').trim();
+        return `https://www.google.com/search?q=${encodeURIComponent(query)}&tbm=shop`;
+      }
+
+      const clearinghouseQuery = (partNumber || (modelSku ? `${modelSku} ${partName}` : `${cleanBrand} ${partName}`)).replace(/["']/g, '').trim();
       return `https://www.repairclinic.com/Shop-For-Parts?query=${encodeURIComponent(clearinghouseQuery)}`;
     }
 
@@ -1059,8 +998,11 @@
       };
     }
 
+    /**
+     * Accurate Warranty Badging (Separates active verified documents from estimated dates)
+     */
     function calculateApplianceWarrantyStatus(appliance) {
-      if (appliance.warrantyActivated) {
+      if (appliance.warrantyActivated && appliance.warrantyDoc) {
         return { status: 'active', label: 'Warranty Verified (OEM Active)', isExpired: false, daysRemaining: null };
       }
       if (!appliance.purchaseDate || !appliance.purchaseDate.trim()) {
@@ -1076,17 +1018,18 @@
       const remainingMs = expireMs - Date.now();
       const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
       if (remainingDays <= 0) {
-        return { status: 'expired', label: 'Warranty Expired', isExpired: true, daysRemaining: 0 };
+        return { status: 'expired', label: 'Standard Warranty Window Elapsed', isExpired: true, daysRemaining: 0 };
       }
       const remainingMonths = Math.ceil(remainingDays / 30.4);
       return {
-        status: 'active',
-        label: `Warranty Active (${remainingMonths} Mo Remaining)`,
+        status: 'estimated_active',
+        label: `Estimated Standard Window (${remainingMonths} Mo Remaining)`,
         isExpired: false,
         daysRemaining: remainingDays,
         isExpiringSoon: remainingDays <= 30
       };
     }
+
     // Comprehensive Fallback Registry
     const STATIC_BRAND_PORTALS = {
       samsung: { warranty: 'https://www.samsung.com/us/support/register/', support: 'https://www.samsung.com/us/support/contact/' },
@@ -1150,7 +1093,7 @@
         if (b.includes(key) || key.includes(b)) return portal;
       }
 
-      // Direct domain fallback (No search engine redirects)
+      // Direct domain fallback
       const cleanDomain = b.replace(/[^a-z0-9]/g, '');
       return {
         warranty: `https://www.${cleanDomain}.com/product-registration`,
@@ -1529,7 +1472,6 @@
       html += '</div></div>';
       return html;
     }
-
     function App() {
       const [toastMessage, setToastMessage] = useState(null);
       const toastTimerRef = useRef(null);
@@ -1605,7 +1547,7 @@
       const [appliances, setAppliances] = useState(() => {
         try {
           const saved = localStorage.getItem('user_appliances_catalog');
-          let list = MOCK_INITIAL_APPLIANCES;
+          let list = [];
           if (saved) {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
@@ -1616,7 +1558,7 @@
             warrantyActivated: Boolean(item.warrantyActivated),
             updatedAt: item.updatedAt || Date.now()
           }));
-        } catch(e) { return MOCK_INITIAL_APPLIANCES; }
+        } catch(e) { return []; }
       });
 
       // Search & Category Filters (Nickname indexed, Vendor strictly excluded)
@@ -1847,6 +1789,16 @@
         }
       }, []);
 
+      // Auto-terminate microphone stream immediately when AI chat view closes
+      useEffect(() => {
+        if (!activeAppliance && isListeningDictation && recognitionRef.current) {
+          try {
+            recognitionRef.current.stop();
+          } catch (e) {}
+          setIsListeningDictation(false);
+        }
+      }, [activeAppliance, isListeningDictation]);
+
       const toggleDictation = () => {
         if (!recognitionRef.current) {
           showToast("Speech dictation not supported in this browser.");
@@ -1908,7 +1860,7 @@
           document.body.style.overflow = 'hidden';
 
           const handleTouchPrevent = (e) => {
-            if (e.target.closest('.overflow-y-auto, .overflow-y-scroll, textarea, input, select')) {
+            if (e.target.closest('.overflow-y-auto, .overflow-y-scroll, .overflow-x-auto, textarea, input, select')) {
               return;
             }
             if (e.cancelable) {
@@ -1948,15 +1900,27 @@
 
       const inlineNewUnitInputRef = useRef(null);
 
-      // Cleanly resets add form state (including inline property creation) on dismissal
+      // Cleanly resets add form state and completely purges attachments on dismissal
       const closeAddModal = useCallback(() => {
         setIsAddOpen(false);
         setAddFormSubmitted(false);
-        setAddForm(prev => ({
-          ...prev,
+        setAddForm({
+          inputMode: 'manual',
+          brand: '',
+          model: '',
+          name: '',
+          nickname: '',
+          selectedUnitId: 'unit_main',
           isAddingNewUnitInline: false,
-          newUnitInlineName: ''
-        }));
+          newUnitInlineName: '',
+          isPassportDetailsOpen: false,
+          serialNumber: '',
+          purchaseDate: '',
+          purchasePrice: '',
+          vendor: '',
+          receiptDataUrl: '',
+          receiptFileName: ''
+        });
       }, []);
 
       useEffect(() => {
@@ -2133,7 +2097,7 @@
           });
           const data = await res.json();
           const incomingAppliances = data.appliances || data.fleet || [];
-          if (Array.isArray(incomingAppliances) && incomingAppliances.length > 0) {
+          if (Array.isArray(incomingAppliances)) {
             setAppliances(prev => {
               const cloudMap = new Map(incomingAppliances.map(a => [a.id, a]));
               const merged = prev.map(localItem => {
@@ -2232,14 +2196,51 @@
         finally { setLookupStatus(''); }
       };
 
+      // Fixed: Removes strict !name guard so editing Model SKU updates the title dynamically
       useEffect(() => {
         const b = addForm.brand.trim();
         const m = addForm.model.trim();
-        if (b.length >= 2 && m.length >= 4 && !addForm.name.trim()) {
-          const timer = setTimeout(() => resolveTitleAutomated(b, m), 1200);
+        if (b.length >= 2 && m.length >= 3) {
+          const timer = setTimeout(() => resolveTitleAutomated(b, m), 900);
           return () => clearTimeout(timer);
         }
       }, [addForm.brand, addForm.model]);
+
+      // --- REORDER MECHANICS FOR EDIT MODE ---
+      const moveUnitOrder = (index, direction) => {
+        triggerHaptic('light');
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= units.length) return;
+        const updated = [...units];
+        const [moved] = updated.splice(index, 1);
+        updated.splice(targetIndex, 0, moved);
+        setUnits(updated);
+        triggerDebouncedSync(appliances, updated);
+      };
+
+      const moveApplianceOrder = (applianceId, direction) => {
+        triggerHaptic('light');
+        const currentItem = appliances.find(a => a.id === applianceId);
+        if (!currentItem) return;
+
+        const groupItems = appliances.filter(a => a.unitId === currentItem.unitId);
+        const currentIndex = groupItems.findIndex(a => a.id === applianceId);
+        const targetIndex = currentIndex + direction;
+        if (targetIndex < 0 || targetIndex >= groupItems.length) return;
+
+        const swapTargetItem = groupItems[targetIndex];
+        const globalIdx1 = appliances.findIndex(a => a.id === currentItem.id);
+        const globalIdx2 = appliances.findIndex(a => a.id === swapTargetItem.id);
+
+        if (globalIdx1 !== -1 && globalIdx2 !== -1) {
+          const updated = [...appliances];
+          const temp = updated[globalIdx1];
+          updated[globalIdx1] = updated[globalIdx2];
+          updated[globalIdx2] = temp;
+          setAppliances(updated);
+          triggerDebouncedSync(updated, units);
+        }
+      };
 
       const handleCopyPartSku = (sku) => {
         if (!sku) return;
@@ -3295,8 +3296,8 @@
         return (item.category || 'Appliance') === activeCategoryFilter;
       };
 
-      // Main Appliance Card: Single-row title, Nickname beside SKU, Layered Light Card, Goldilocks Progress Cushion
-      const renderApplianceCard = (item) => {
+      // Main Appliance Card: Single-row title, Nickname beside SKU, Layered Light Card, Goldilocks Progress Cushion, Up/Down reorder in Edit Mode
+      const renderApplianceCard = (item, itemIndex, totalInGroup) => {
         const isSelected = selectedIds.includes(item.id);
         const currentOffset = swipeOffsets[item.id] || 0;
         const consumablesList = item.consumables || [];
@@ -3377,19 +3378,50 @@
             >
               <div className="px-3 pt-2.5 pb-2 flex items-center gap-2.5">
                 {isSelectMode && (
-                  <div
-                    onClick={() => toggleSelectId(item.id)}
-                    className={`w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center cursor-pointer shrink-0 self-center transition-all ${
-                      isSelected 
-                        ? 'bg-[#FF9500] border-[#FF9500] text-white' 
-                        : (isDark ? 'border-zinc-700 bg-transparent' : 'border-zinc-400 bg-transparent')
-                    }`}
-                  >
-                    {isSelected && (
-                      <svg className="w-3 h-3 text-white stroke-[3.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                      </svg>
-                    )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div
+                      onClick={() => toggleSelectId(item.id)}
+                      className={`w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center cursor-pointer shrink-0 self-center transition-all ${
+                        isSelected 
+                          ? 'bg-[#FF9500] border-[#FF9500] text-white' 
+                          : (isDark ? 'border-zinc-700 bg-transparent' : 'border-zinc-400 bg-transparent')
+                      }`}
+                    >
+                      {isSelected && (
+                        <svg className="w-3 h-3 text-white stroke-[3.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        type="button"
+                        disabled={itemIndex === 0}
+                        onClick={(e) => { e.stopPropagation(); moveApplianceOrder(item.id, -1); }}
+                        className={`w-6 h-4 rounded flex items-center justify-center text-[10px] transition-colors ${
+                          itemIndex === 0 
+                            ? 'opacity-20 cursor-not-allowed' 
+                            : (isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-black/[0.04] text-zinc-700 hover:bg-black/[0.08]')
+                        }`}
+                        title="Move Up"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        disabled={itemIndex === totalInGroup - 1}
+                        onClick={(e) => { e.stopPropagation(); moveApplianceOrder(item.id, 1); }}
+                        className={`w-6 h-4 rounded flex items-center justify-center text-[10px] transition-colors ${
+                          itemIndex === totalInGroup - 1 
+                            ? 'opacity-20 cursor-not-allowed' 
+                            : (isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-black/[0.04] text-zinc-700 hover:bg-black/[0.08]')
+                        }`}
+                        title="Move Down"
+                      >
+                        ▼
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -3571,369 +3603,403 @@
             </div>
           )}
 
-          {/* APP HEADER */}
-          <header 
-            style={{ paddingTop: 'max(24px, calc(env(safe-area-inset-top, 44px) + 20px))' }}
-            className={`pl-[18px] pr-4 pb-3.5 sticky top-0 z-20 transition-colors ${
-              isDark ? 'bg-black' : 'bg-[#F2F2F7]'
-            }`}
-          >
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm font-black uppercase tracking-wider text-[#FF9500]">
-                  Appliance Engine
-                </p>
+          {/* Underlay Concealment Wrapper: Hides main screen completely while full-screen AI chat is open */}
+          <div className={activeAppliance ? "hidden" : "contents"}>
+            {/* APP HEADER */}
+            <header 
+              style={{ paddingTop: 'max(24px, calc(env(safe-area-inset-top, 44px) + 20px))' }}
+              className={`pl-[18px] pr-4 pb-3.5 sticky top-0 z-20 transition-colors ${
+                isDark ? 'bg-black' : 'bg-[#F2F2F7]'
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-[15.5px] font-black uppercase tracking-wider text-[#FF9500] leading-none">
+                    Appliance Engine
+                  </p>
 
-                <div className={`text-xs font-bold mt-0.5 flex items-center animate-greeting-reveal ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {greetingInfo.iconType === 'morning' && (
-                    <svg className="w-4 h-4 inline-block mr-1.5 align-[-1.5px] shrink-0 text-amber-500 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="4" fill="currentColor" fillOpacity="0.15"/>
-                      <g className="animate-solar-rays">
-                        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
-                      </g>
-                    </svg>
-                  )}
-                  {greetingInfo.iconType === 'afternoon' && (
-                    <svg className="w-4 h-4 inline-block mr-1.5 align-[-1.5px] shrink-0 text-amber-500 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <g className="animate-ambient-sun">
-                        <circle cx="12" cy="12" r="4.2" fill="currentColor" fillOpacity="0.15"/>
-                        <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-                      </g>
-                    </svg>
-                  )}
-                  {greetingInfo.iconType === 'evening' && (
-                    <svg className="w-4 h-4 inline-block mr-1.5 align-[-1.5px] shrink-0 text-amber-400 dark:text-amber-300 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor" fillOpacity="0.2"/>
-                      <circle cx="17.5" cy="5.5" r="1.2" fill="currentColor" stroke="none" className="animate-twinkle-a"/>
-                      <circle cx="19.5" cy="10.5" r="0.9" fill="currentColor" stroke="none" className="animate-twinkle-b"/>
-                    </svg>
-                  )}
-                  <span>{greetingInfo.text}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => { closeEditMode(); triggerHaptic('light'); setIsAddOpen(true); }}
-                  className={`w-[38px] h-[38px] rounded-full flex items-center justify-center font-bold shadow-xs active:scale-90 transition-transform ${
-                    isDark ? 'bg-zinc-800 text-white hover:bg-zinc-750' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900'
-                  }`}
-                  title="Add Appliance"
-                >
-                  <svg className="w-4 h-4 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeEditMode();
-                    triggerHaptic('light');
-                    setIsNotificationsOpen(true);
-                  }}
-                  className={`relative w-[38px] h-[38px] rounded-full flex items-center justify-center transition-transform active:scale-90 shadow-xs ${
-                    isDark ? 'bg-zinc-800 text-white hover:bg-zinc-750' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900'
-                  }`}
-                  title="Maintenance Alerts"
-                >
-                  <svg className="w-[18px] h-[18px] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                  </svg>
-                  {unreadAlertCount > 0 && (
-                    <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FF3B30] shadow-[0_0_6px_rgba(255,59,48,0.7)]"></span>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => { closeEditMode(); triggerHaptic('light'); setSettingsSubView('root'); setIsSettingsOpen(true); }}
-                  className={`w-[38px] h-[38px] rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-xs ${
-                    isDark ? 'bg-zinc-800 text-white hover:bg-zinc-750' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900'
-                  }`}
-                  title="Settings"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
-                    <circle cx="12" cy="8" r="4"/>
-                    <path d="M4 20c0-4 4-5 8-5s8 1 8 5"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </header>
-
-          {/* MAIN PAGE CONTAINER */}
-          <main className="flex-1 px-2 space-y-3 pb-28">
-            <div className="flex items-center justify-between pl-[14px] pr-2 gap-2 pt-1">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className={`text-xs font-black tracking-wide uppercase shrink-0 transition-opacity duration-200 ${
-                  isSearchExpanded ? 'opacity-40' : 'opacity-100'
-                } ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                  {appliances.length} Appliances
-                </span>
-
-                <div
-                  className={`relative flex items-center rounded-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                    isSearchExpanded
-                      ? `flex-1 py-1 pl-3 pr-2 ${isDark ? 'bg-zinc-900' : 'apple-card-light'}`
-                      : `w-8 h-8 justify-center cursor-pointer shrink-0 ${
-                          isDark ? 'bg-zinc-900 hover:bg-zinc-800' : 'bg-black/[0.04] hover:bg-black/[0.07]'
-                        }`
-                  }`}
-                  onClick={() => {
-                    closeEditMode();
-                    if (!isSearchExpanded) {
-                      triggerHaptic('light');
-                      setIsSearchExpanded(true);
-                      setTimeout(() => searchInputRef.current?.focus(), 60);
-                    }
-                  }}
-                >
-                  <svg className="w-3.5 h-3.5 text-zinc-400 shrink-0 stroke-[2] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                  </svg>
-
-                  {isSearchExpanded && (
-                    <input
-                      ref={searchInputRef}
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search here…"
-                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
-                      className="w-full bg-transparent text-xs font-medium focus:outline-none ml-2 pr-1 placeholder:text-zinc-500"
-                      onBlur={() => {
-                        if (!searchQuery.trim()) {
-                          setIsSearchExpanded(false);
-                        }
-                      }}
-                    />
-                  )}
-
-                  {isSearchExpanded && searchQuery && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        triggerHaptic('light');
-                        setSearchQuery('');
-                        setIsSearchExpanded(false);
-                      }}
-                      className="w-4 h-4 rounded-full bg-zinc-500/20 text-zinc-400 flex items-center justify-center text-[10px] shrink-0"
-                    >
-                      ✕
-                    </button>
-                  )}
+                  <div className={`text-[13px] font-bold mt-1 leading-none flex items-center animate-greeting-reveal ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {greetingInfo.iconType === 'morning' && (
+                      <svg className="w-[15px] h-[15px] inline-block mr-1.5 align-middle shrink-0 text-amber-500 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="4" fill="currentColor" fillOpacity="0.15"/>
+                        <g className="animate-solar-rays">
+                          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+                        </g>
+                      </svg>
+                    )}
+                    {greetingInfo.iconType === 'afternoon' && (
+                      <svg className="w-[15px] h-[15px] inline-block mr-1.5 align-middle shrink-0 text-amber-500 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <g className="animate-ambient-sun">
+                          <circle cx="12" cy="12" r="4.2" fill="currentColor" fillOpacity="0.15"/>
+                          <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                        </g>
+                      </svg>
+                    )}
+                    {greetingInfo.iconType === 'evening' && (
+                      <svg className="w-[15px] h-[15px] inline-block mr-1.5 align-middle shrink-0 text-amber-400 dark:text-amber-300 overflow-visible" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor" fillOpacity="0.2"/>
+                        <circle cx="17.5" cy="5.5" r="1.2" fill="currentColor" stroke="none" className="animate-twinkle-a"/>
+                        <circle cx="19.5" cy="10.5" r="0.9" fill="currentColor" stroke="none" className="animate-twinkle-b"/>
+                      </svg>
+                    )}
+                    <span>{greetingInfo.text}</span>
+                  </div>
                 </div>
 
-                <div className="relative shrink-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { closeEditMode(); triggerHaptic('light'); setIsAddOpen(true); }}
+                    className={`w-[38px] h-[38px] rounded-full flex items-center justify-center font-bold shadow-xs active:scale-90 transition-transform ${
+                      isDark ? 'bg-zinc-800 text-white hover:bg-zinc-750' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900'
+                    }`}
+                    title="Add Appliance"
+                  >
+                    <svg className="w-4 h-4 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </button>
+
                   <button
                     type="button"
-                    onClick={() => { triggerHaptic('light'); setIsFilterDropdownOpen(!isFilterDropdownOpen); }}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${
-                      activeCategoryFilter !== 'All'
-                        ? UI_ACCENT.badge
-                        : (isDark ? 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800' : 'bg-black/[0.04] text-zinc-700 hover:bg-black/[0.07]')
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeEditMode();
+                      triggerHaptic('light');
+                      setIsNotificationsOpen(true);
+                    }}
+                    className={`relative w-[38px] h-[38px] rounded-full flex items-center justify-center transition-transform active:scale-90 shadow-xs ${
+                      isDark ? 'bg-zinc-800 text-white hover:bg-zinc-750' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900'
                     }`}
-                    title="Filter Categories"
+                    title="Maintenance Alerts"
                   >
-                    <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <line x1="4" y1="21" x2="4" y2="14"></line>
-                      <line x1="4" y1="10" x2="4" y2="3"></line>
-                      <line x1="12" y1="21" x2="12" y2="12"></line>
-                      <line x1="12" y1="8" x2="12" y2="3"></line>
-                      <line x1="20" y1="21" x2="20" y2="16"></line>
-                      <line x1="20" y1="12" x2="20" y2="3"></line>
-                      <line x1="1" y1="14" x2="7" y2="14"></line>
-                      <line x1="9" y1="8" x2="15" y2="8"></line>
-                      <line x1="17" y1="16" x2="23" y2="16"></line>
+                    <svg className="w-[18px] h-[18px] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                     </svg>
+                    {unreadAlertCount > 0 && (
+                      <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FF3B30] shadow-[0_0_6px_rgba(255,59,48,0.7)]"></span>
+                    )}
                   </button>
 
-                  {isFilterDropdownOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setIsFilterDropdownOpen(false)} />
-                      <div className={`absolute left-0 top-10 w-44 rounded-2xl shadow-2xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${
-                        isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
-                      }`}>
-                        {availableCategories.map(cat => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => {
-                              triggerHaptic('light');
-                              setActiveCategoryFilter(cat);
-                              setIsFilterDropdownOpen(false);
-                            }}
-                            className={`w-full py-2 px-3 rounded-xl text-xs font-bold text-left flex items-center justify-between ${
-                              activeCategoryFilter === cat
-                                ? (isDark ? 'bg-zinc-800 text-[#FF9500]' : 'bg-[#FF9500]/15 text-amber-700')
-                                : (isDark ? 'hover:bg-zinc-800' : 'hover:bg-zinc-100')
-                            }`}
-                          >
-                            <span>{cat}</span>
-                            {activeCategoryFilter === cat && <span className="text-xs">✓</span>}
-                          </button>
-                        ))}
-                      </div>
-                    </>
+                  <button
+                    onClick={() => { closeEditMode(); triggerHaptic('light'); setSettingsSubView('root'); setIsSettingsOpen(true); }}
+                    className={`w-[38px] h-[38px] rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-xs ${
+                      isDark ? 'bg-zinc-800 text-white hover:bg-zinc-750' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900'
+                    }`}
+                    title="Settings"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[18px] h-[18px]">
+                      <circle cx="12" cy="8" r="4"/>
+                      <path d="M4 20c0-4 4-5 8-5s8 1 8 5"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </header>
+
+            {/* MAIN PAGE CONTAINER */}
+            <main className="flex-1 px-2 space-y-3 pb-28">
+              <div className="flex items-center justify-between pl-[14px] pr-2 gap-2 pt-1">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className={`text-xs font-black tracking-wide uppercase shrink-0 transition-opacity duration-200 ${
+                    isSearchExpanded ? 'opacity-40' : 'opacity-100'
+                  } ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                    {appliances.length} Appliances
+                  </span>
+
+                  <div
+                    className={`relative flex items-center rounded-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                      isSearchExpanded
+                        ? `flex-1 py-1 pl-3 pr-2 ${isDark ? 'bg-zinc-900' : 'apple-card-light'}`
+                        : `w-8 h-8 justify-center cursor-pointer shrink-0 ${
+                            isDark ? 'bg-zinc-900 hover:bg-zinc-800' : 'bg-black/[0.04] hover:bg-black/[0.07]'
+                          }`
+                    }`}
+                    onClick={() => {
+                      closeEditMode();
+                      if (!isSearchExpanded) {
+                        triggerHaptic('light');
+                        setIsSearchExpanded(true);
+                        setTimeout(() => searchInputRef.current?.focus(), 60);
+                      }
+                    }}
+                  >
+                    <svg className="w-3.5 h-3.5 text-zinc-400 shrink-0 stroke-[2] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+
+                    {isSearchExpanded && (
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search here…"
+                        style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                        className="w-full bg-transparent text-xs font-medium focus:outline-none ml-2 pr-1 placeholder:text-zinc-500"
+                        onBlur={() => {
+                          if (!searchQuery.trim()) {
+                            setIsSearchExpanded(false);
+                          }
+                        }}
+                      />
+                    )}
+
+                    {isSearchExpanded && searchQuery && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          triggerHaptic('light');
+                          setSearchQuery('');
+                          setIsSearchExpanded(false);
+                        }}
+                        className="w-4 h-4 rounded-full bg-zinc-500/20 text-zinc-400 flex items-center justify-center text-[10px] shrink-0"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => { triggerHaptic('light'); setIsFilterDropdownOpen(!isFilterDropdownOpen); }}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+                        activeCategoryFilter !== 'All'
+                          ? UI_ACCENT.badge
+                          : (isDark ? 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800' : 'bg-black/[0.04] text-zinc-700 hover:bg-black/[0.07]')
+                      }`}
+                      title="Filter Categories"
+                    >
+                      <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <line x1="4" y1="21" x2="4" y2="14"></line>
+                        <line x1="4" y1="10" x2="4" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12" y2="3"></line>
+                        <line x1="20" y1="21" x2="20" y2="16"></line>
+                        <line x1="20" y1="12" x2="20" y2="3"></line>
+                        <line x1="1" y1="14" x2="7" y2="14"></line>
+                        <line x1="9" y1="8" x2="15" y2="8"></line>
+                        <line x1="17" y1="16" x2="23" y2="16"></line>
+                      </svg>
+                    </button>
+
+                    {isFilterDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setIsFilterDropdownOpen(false)} />
+                        <div className={`absolute left-0 top-10 w-44 rounded-2xl shadow-2xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${
+                          isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
+                        }`}>
+                          {availableCategories.map(cat => (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => {
+                                triggerHaptic('light');
+                                setActiveCategoryFilter(cat);
+                                setIsFilterDropdownOpen(false);
+                              }}
+                              className={`w-full py-2 px-3 rounded-xl text-xs font-bold text-left flex items-center justify-between ${
+                                activeCategoryFilter === cat
+                                  ? (isDark ? 'bg-zinc-800 text-[#FF9500]' : 'bg-[#FF9500]/15 text-amber-700')
+                                  : (isDark ? 'hover:bg-zinc-800' : 'hover:bg-zinc-100')
+                              }`}
+                            >
+                              <span>{cat}</span>
+                              {activeCategoryFilter === cat && <span className="text-xs">✓</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {isPaidUser && isSelectMode && (
+                    <button
+                      onClick={() => { triggerHaptic('light'); setIsAddGroupModalOpen(true); }}
+                      className={`text-[11px] px-2.5 py-1 rounded-full font-bold shadow-xs ${
+                        isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-black/[0.04] text-zinc-900'
+                      }`}
+                    >
+                      + Add Property
+                    </button>
                   )}
+                  <button
+                    onClick={() => { 
+                      triggerHaptic('light');
+                      setIsSelectMode(!isSelectMode); 
+                      setSelectedIds([]); 
+                      setSwipeOffsets({}); 
+                    }}
+                    className={`text-[11px] px-2.5 py-1 rounded-full font-bold transition-all shadow-xs active:scale-95 ${
+                      isSelectMode ? `${UI_ACCENT.solid}` : (isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900')
+                    }`}
+                  >
+                    {isSelectMode ? 'Done' : 'Edit'}
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                {isPaidUser && isSelectMode && (
-                  <button
-                    onClick={() => { triggerHaptic('light'); setIsAddGroupModalOpen(true); }}
-                    className={`text-[11px] px-2.5 py-1 rounded-full font-bold shadow-xs ${
-                      isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-black/[0.04] text-zinc-900'
-                    }`}
-                  >
-                    + Add Property
-                  </button>
-                )}
-                <button
-                  onClick={() => { 
-                    triggerHaptic('light');
-                    setIsSelectMode(!isSelectMode); 
-                    setSelectedIds([]); 
-                    setSwipeOffsets({}); 
-                  }}
-                  className={`text-[11px] px-2.5 py-1 rounded-full font-bold transition-all shadow-xs active:scale-95 ${
-                    isSelectMode ? `${UI_ACCENT.solid}` : (isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900')
-                  }`}
-                >
-                  {isSelectMode ? 'Done' : 'Edit'}
-                </button>
-              </div>
-            </div>
+              {/* PROPERTY GROUP CARDS */}
+              <div className="space-y-3.5">
+                {units.map((unit, unitIdx) => {
+                  const unitAppliances = appliances.filter(a => a.unitId === unit.id && isApplianceMatchingFilter(a));
 
-            {/* PROPERTY GROUP CARDS */}
-            <div className="space-y-3.5">
-              {units.map((unit) => {
-                const unitAppliances = appliances.filter(a => a.unitId === unit.id && isApplianceMatchingFilter(a));
-
-                return (
-                  <div
-                    key={unit.id}
-                    className={`rounded-[22px] overflow-hidden ${
-                      isDark ? 'bg-zinc-950/60' : 'apple-group-card-light'
-                    }`}
-                  >
-                    <div className={`pl-[14px] pr-2 py-2.5 flex items-center justify-between ${
-                      isDark ? 'bg-zinc-900/70' : 'bg-white'
-                    }`}>
-                      <div
-                        onClick={() => {
-                          triggerHaptic('light');
-                          setUnits(units.map(u => u.id === unit.id ? { ...u, collapsed: !u.collapsed } : u));
-                        }}
-                        className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
-                      >
-                        <span className="text-xs font-bold text-[#FF9500] flex items-center justify-center">
-                          {unit.collapsed ? '▶' : '▼'}
-                        </span>
-                        <h3 className="text-sm font-black tracking-tight truncate">{unit.name}</h3>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-800'
-                        }`}>
-                          {unitAppliances.length} / {isPaidUser ? PRO_MAX_PER_GROUP : FREE_MAX_PER_GROUP}
-                        </span>
-                      </div>
-
-                      {isSelectMode ? (
-                        <button
-                          onClick={() => { triggerHaptic('arm'); setDeleteTargetGroup(unit); }}
-                          className="w-7 h-7 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-xs active:scale-90 transition-all shrink-0"
-                          title="Delete Property"
-                        >
-                          <svg className="w-3.5 h-3.5 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                          </svg>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => { 
-                            closeEditMode();
+                  return (
+                    <div
+                      key={unit.id}
+                      className={`rounded-[22px] overflow-hidden ${
+                        isDark ? 'bg-zinc-950/60' : 'apple-group-card-light'
+                      }`}
+                    >
+                      <div className={`pl-[14px] pr-2 py-2.5 flex items-center justify-between ${
+                        isDark ? 'bg-zinc-900/70' : 'bg-white'
+                      }`}>
+                        <div
+                          onClick={() => {
                             triggerHaptic('light');
-                            setAddForm(prev => ({ ...prev, selectedUnitId: unit.id }));
-                            setIsAddOpen(true); 
+                            setUnits(units.map(u => u.id === unit.id ? { ...u, collapsed: !u.collapsed } : u));
                           }}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center font-bold transition-all active:scale-90 shrink-0 ${
-                            isDark ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300' : 'bg-black/[0.04] hover:bg-black/[0.08] text-zinc-700'
-                          }`}
-                          title="Add appliance to this property"
+                          className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
                         >
-                          <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                          </svg>
-                        </button>
-                      )}
-                    </div>
+                          <span className="text-xs font-bold text-[#FF9500] flex items-center justify-center">
+                            {unit.collapsed ? '▶' : '▼'}
+                          </span>
+                          <h3 className="text-sm font-black tracking-tight truncate">{unit.name}</h3>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-800'
+                          }`}>
+                            {unitAppliances.length} / {isPaidUser ? PRO_MAX_PER_GROUP : FREE_MAX_PER_GROUP}
+                          </span>
+                        </div>
 
-                    {!unit.collapsed && (
-                      <div className="p-2 space-y-2">
-                        {unitAppliances.length > 0 ? (
-                          unitAppliances.map(item => renderApplianceCard(item))
-                        ) : (
-                          searchQuery.trim() ? (
-                            <div className={`p-4 text-center rounded-2xl ${isDark ? 'text-zinc-400 bg-zinc-900/60' : 'text-zinc-600 bg-[#FAFAFC]'}`}>
-                              <p className="text-xs font-semibold mb-2">No appliances matching "{searchQuery}"</p>
+                        {isSelectMode ? (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Property Group Up/Down Reorder Controls */}
+                            <div className="flex items-center gap-1">
                               <button
                                 type="button"
-                                onClick={() => { 
-                                  triggerHaptic('light'); 
-                                  setSearchQuery(''); 
-                                  setIsSearchExpanded(false); 
-                                }}
-                                className={`text-xs font-bold px-3 py-1.5 rounded-full ${UI_ACCENT.badge} active:scale-95 transition-transform`}
+                                disabled={unitIdx === 0}
+                                onClick={(e) => { e.stopPropagation(); moveUnitOrder(unitIdx, -1); }}
+                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] transition-colors ${
+                                  unitIdx === 0 
+                                    ? 'opacity-20 cursor-not-allowed' 
+                                    : (isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-black/[0.04] text-zinc-700 hover:bg-black/[0.08]')
+                                }`}
+                                title="Move Group Up"
                               >
-                                Clear Search Filter
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                disabled={unitIdx === units.length - 1}
+                                onClick={(e) => { e.stopPropagation(); moveUnitOrder(unitIdx, 1); }}
+                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] transition-colors ${
+                                  unitIdx === units.length - 1 
+                                    ? 'opacity-20 cursor-not-allowed' 
+                                    : (isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-black/[0.04] text-zinc-700 hover:bg-black/[0.08]')
+                                }`}
+                                title="Move Group Down"
+                              >
+                                ▼
                               </button>
                             </div>
-                          ) : (
-                            <div className={`p-4 text-center rounded-2xl ${isDark ? 'bg-zinc-900/40' : 'bg-[#FAFAFC]'}`}>
-                              <p className="text-xs font-bold text-zinc-400 mb-2.5">No appliances cataloged in {unit.name}</p>
-                              <div className="flex flex-wrap items-center justify-center gap-1.5 animate-starter-chip">
-                                {starterChipSet.map((chipLabel) => (
-                                  <button
-                                    key={chipLabel}
-                                    type="button"
-                                    onClick={() => {
-                                      closeEditMode();
-                                      triggerHaptic('light');
-                                      setAddForm(prev => ({
-                                        ...prev,
-                                        selectedUnitId: unit.id,
-                                        name: chipLabel.replace('+ ', '').trim()
-                                      }));
-                                      setIsAddOpen(true);
-                                    }}
-                                    className={`text-xs font-bold px-3 py-1.5 rounded-full transition-transform active:scale-95 ${
-                                      isDark 
-                                        ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-750' 
-                                        : 'bg-white text-zinc-800 hover:bg-zinc-50 shadow-xs'
-                                    }`}
-                                  >
-                                    {chipLabel}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )
+
+                            <button
+                              onClick={() => { triggerHaptic('arm'); setDeleteTargetGroup(unit); }}
+                              className="w-7 h-7 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-xs active:scale-90 transition-all shrink-0 ml-1"
+                              title="Delete Property"
+                            >
+                              <svg className="w-3.5 h-3.5 stroke-[2]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                              </svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { 
+                              closeEditMode();
+                              triggerHaptic('light');
+                              setAddForm(prev => ({ ...prev, selectedUnitId: unit.id }));
+                              setIsAddOpen(true); 
+                            }}
+                            className={`w-7 h-7 rounded-full flex items-center justify-center font-bold transition-all active:scale-90 shrink-0 ${
+                              isDark ? 'bg-zinc-800 hover:bg-zinc-750 text-zinc-300' : 'bg-black/[0.04] hover:bg-black/[0.08] text-zinc-700'
+                            }`}
+                            title="Add appliance to this property"
+                          >
+                            <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                              <line x1="12" y1="5" x2="12" y2="19"></line>
+                              <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                          </button>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </main>
 
+                      {!unit.collapsed && (
+                        <div className="p-2 space-y-2">
+                          {unitAppliances.length > 0 ? (
+                            unitAppliances.map((item, idx) => renderApplianceCard(item, idx, unitAppliances.length))
+                          ) : (
+                            searchQuery.trim() ? (
+                              <div className={`p-4 text-center rounded-2xl ${isDark ? 'text-zinc-400 bg-zinc-900/60' : 'text-zinc-600 bg-[#FAFAFC]'}`}>
+                                <p className="text-xs font-semibold mb-2">No appliances matching "{searchQuery}"</p>
+                                <button
+                                  type="button"
+                                  onClick={() => { 
+                                    triggerHaptic('light'); 
+                                    setSearchQuery(''); 
+                                    setIsSearchExpanded(false); 
+                                  }}
+                                  className={`text-xs font-bold px-3 py-1.5 rounded-full ${UI_ACCENT.badge} active:scale-95 transition-transform`}
+                                >
+                                  Clear Search Filter
+                                </button>
+                              </div>
+                            ) : (
+                              <div className={`p-4 text-center rounded-2xl ${isDark ? 'bg-zinc-900/40' : 'bg-[#FAFAFC]'}`}>
+                                <p className="text-xs font-bold text-zinc-400 mb-2.5">No appliances cataloged in {unit.name}</p>
+                                <div className="flex flex-wrap items-center justify-center gap-1.5 animate-starter-chip">
+                                  {starterChipSet.map((chipLabel) => (
+                                    <button
+                                      key={chipLabel}
+                                      type="button"
+                                      onClick={() => {
+                                        closeEditMode();
+                                        triggerHaptic('light');
+                                        setAddForm(prev => ({
+                                          ...prev,
+                                          selectedUnitId: unit.id,
+                                          name: chipLabel.replace('+ ', '').trim()
+                                        }));
+                                        setIsAddOpen(true);
+                                      }}
+                                      className={`text-xs font-bold px-3 py-1.5 rounded-full transition-transform active:scale-95 ${
+                                        isDark 
+                                          ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-750' 
+                                          : 'bg-white text-zinc-800 hover:bg-zinc-50 shadow-xs'
+                                      }`}
+                                    >
+                                      {chipLabel}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </main>
+          </div>
           {isSelectMode && (
             <div className={`fixed bottom-4 inset-x-3 max-w-md mx-auto z-40 rounded-2xl p-3.5 shadow-2xl flex items-center justify-between ${
               isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
@@ -4229,7 +4295,7 @@
                           Appliance Name
                         </label>
                         <input
-                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                          style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                           }`}
@@ -4243,7 +4309,7 @@
                             Room Nickname
                           </label>
                           <input
-                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                            style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4257,7 +4323,7 @@
                             Property
                           </label>
                           <select
-                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                            style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4276,7 +4342,7 @@
                             Model SKU
                           </label>
                           <input
-                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                            style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4289,7 +4355,7 @@
                             Serial Number
                           </label>
                           <input
-                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                            style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4304,7 +4370,7 @@
                             Purchase Date
                           </label>
                           <input
-                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                            style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4318,7 +4384,7 @@
                             Purchase Price
                           </label>
                           <input
-                            style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                            style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
@@ -4628,7 +4694,7 @@
                 ref={addEquipmentModalRef}
                 onClick={(e) => e.stopPropagation()} 
                 style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
-                className={`w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-[32px] px-6 pt-5 space-y-4 cursor-default animate-sheet-spring ${
+                className={`w-full max-w-md max-h-[90vh] overflow-y-auto modal-scroll-container rounded-t-[32px] px-6 pt-5 space-y-4 cursor-default animate-sheet-spring ${
                   isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
@@ -4671,11 +4737,11 @@
                 <form onSubmit={handleAddEquipmentSubmit} className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                      <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                         Brand *
                       </label>
                       <input
-                        style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                        style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                         className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                           addFormSubmitted && !addForm.brand.trim() ? 'ring-2 ring-rose-500' : ''
                         } ${
@@ -4688,11 +4754,11 @@
                       />
                     </div>
                     <div>
-                      <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                      <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                         Model #
                       </label>
                       <input
-                        style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                        style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                         className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                           addFormSubmitted && !addForm.model.trim() && !addForm.name.trim() ? 'ring-1 ring-amber-500/70' : ''
                         } ${
@@ -4706,11 +4772,11 @@
                   </div>
 
                   <div>
-                    <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                       Product Name
                     </label>
                     <input
-                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                      style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                         addFormSubmitted && !addForm.name.trim() && !addForm.model.trim() ? 'ring-1 ring-amber-500/70' : ''
                       } ${
@@ -4723,11 +4789,11 @@
                   </div>
 
                   <div>
-                    <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                       Location / Room Nickname
                     </label>
                     <input
-                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                      style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                       }`}
@@ -4738,14 +4804,14 @@
                   </div>
 
                   <div className="pt-1">
-                    <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                       Property Group
                     </label>
                     {addForm.isAddingNewUnitInline ? (
                       <div className="flex items-center gap-2 mt-1">
                         <input
                           ref={inlineNewUnitInputRef}
-                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                          style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`flex-1 rounded-xl p-2.5 text-xs font-semibold focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
@@ -4779,7 +4845,7 @@
                       </div>
                     ) : (
                       <select
-                        style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                        style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                         className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                           isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                         }`}
@@ -4822,11 +4888,11 @@
                       <div className="space-y-3 pt-2">
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                            <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                               Serial Number
                             </label>
                             <input
-                              style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                              style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
@@ -4836,11 +4902,11 @@
                             />
                           </div>
                           <div>
-                            <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                            <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                               Purchase Date
                             </label>
                             <input
-                              style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                              style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
@@ -4853,11 +4919,11 @@
 
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                            <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                               Purchase Price
                             </label>
                             <input
-                              style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                              style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
@@ -4867,11 +4933,11 @@
                             />
                           </div>
                           <div>
-                            <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                            <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                               Retailer / Vendor
                             </label>
                             <input
-                              style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                              style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
@@ -4911,7 +4977,6 @@
                   isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
                 }`}
               >
-                {/* Native Apple Spark Badge: Replaced Broken Unicode Glyph */}
                 <div className="w-12 h-12 rounded-full bg-[#FF9500]/15 text-[#FF9500] mx-auto flex items-center justify-center shadow-xs">
                   <svg className="w-6 h-6 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
@@ -4978,7 +5043,8 @@
                 
                 {settingsSubView === 'root' && (
                   <div className="space-y-3.5">
-                    <div className="flex justify-between items-start pt-1 pb-1">
+                    {/* Aligned to px-4 to match the inner text boundary of the cards below */}
+                    <div className="flex justify-between items-start pt-1 pb-1 px-4">
                       <div className="min-w-0 flex-1 pr-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h3 className="text-base font-black tracking-tight leading-none shrink-0">Account &amp; Backup</h3>
@@ -4993,7 +5059,7 @@
                                 <input
                                   ref={profileNameInputRef}
                                   maxLength={18}
-                                  style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                                  style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                                   className={`text-base font-black tracking-tight text-[#FF9500] leading-none focus:outline-none px-2 py-0.5 rounded-lg border-none w-28 sm:w-36 transition-colors ${
                                     isDark ? 'bg-zinc-800 text-white' : 'bg-black/[0.05] text-[#FF9500]'
                                   }`}
@@ -5092,7 +5158,7 @@
 
                       <button
                         type="button"
-                        onClick={() => { triggerHaptic('light'); setSettingsSubView('subscription'); }}
+                        onClick={(e) => { e.stopPropagation(); triggerHaptic('light'); setSettingsSubView('subscription'); }}
                         className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center ${
                           isPaidUser 
                             ? (isDark ? 'bg-zinc-700/80 text-zinc-200 hover:bg-zinc-700' : 'bg-black/[0.04] text-zinc-900 hover:bg-black/[0.08]')
@@ -5126,7 +5192,8 @@
                       </div>
 
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           triggerHaptic('light');
                           if (isPassportUnlocked()) setSettingsSubView('passport');
                           else setSettingsSubView('passport_checkout');
@@ -5137,7 +5204,7 @@
                       </button>
                       {savedPassports.length > 0 && (
                         <button
-                          onClick={() => { triggerHaptic('light'); setSettingsSubView('exports'); }}
+                          onClick={(e) => { e.stopPropagation(); triggerHaptic('light'); setSettingsSubView('exports'); }}
                           className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${
                             isDark ? 'bg-zinc-700/80 hover:bg-zinc-750 text-zinc-200' : 'bg-black/[0.04] hover:bg-black/[0.08] text-zinc-900'
                           }`}
@@ -5149,7 +5216,7 @@
 
                     {/* CARD 3: NOTIFICATIONS */}
                     <div 
-                      onClick={() => { triggerHaptic('light'); setSettingsSubView('notifications'); }}
+                      onClick={(e) => { e.stopPropagation(); triggerHaptic('light'); setSettingsSubView('notifications'); }}
                       className={`px-4 py-3.5 rounded-2xl cursor-pointer active:scale-[0.99] transition-transform ${
                         isDark ? 'bg-zinc-800/60 hover:bg-zinc-800' : 'apple-card-light hover:bg-zinc-50'
                       }`}
@@ -5192,7 +5259,7 @@
 
                     {/* CARD 5: PRIVACY & HELP */}
                     <div 
-                      onClick={() => { triggerHaptic('light'); setSettingsSubView('privacy_help'); }}
+                      onClick={(e) => { e.stopPropagation(); triggerHaptic('light'); setSettingsSubView('privacy_help'); }}
                       className={`px-4 py-3.5 rounded-2xl cursor-pointer active:scale-[0.99] transition-transform ${
                         isDark ? 'bg-zinc-800/60 hover:bg-zinc-800' : 'apple-card-light hover:bg-zinc-50'
                       }`}
@@ -5235,7 +5302,7 @@
                       </div>
                     </div>
 
-                    <div>
+                    <div className="px-4">
                       <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Membership &amp; Subscription</h3>
                       <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-200' : 'text-zinc-500'}`}>
                         Manage active subscription plan and limits
@@ -5280,7 +5347,7 @@
                         {isPaidUser ? (
                           <button
                             type="button"
-                            onClick={() => { triggerHaptic('light'); setSettingsSubView('cancel'); }}
+                            onClick={(e) => { e.stopPropagation(); triggerHaptic('light'); setSettingsSubView('cancel'); }}
                             className="w-full py-2.5 rounded-xl text-xs font-bold text-rose-500 hover:text-rose-600 bg-rose-500/10 active:scale-95 transition-transform"
                           >
                             Cancel Subscription
@@ -5288,7 +5355,8 @@
                         ) : (
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               triggerHaptic('light');
                               setIsSettingsOpen(false);
                               setIsPaywallOpen(true);
@@ -5315,7 +5383,7 @@
                       </div>
                     </div>
 
-                    <div>
+                    <div className="px-4">
                       <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Notifications</h3>
                       <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-200' : 'text-zinc-500'}`}>
                         Configure advance warnings and automated safety alerts
@@ -5324,7 +5392,7 @@
 
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3.5 ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'apple-card-light text-zinc-900'}`}>
                       <div>
-                        <span className={`text-xs font-bold uppercase tracking-wider block mb-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <span className={`text-[12.5px] font-bold tracking-tight block mb-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Replacement Lead Time
                         </span>
                         <div className={`flex p-0.5 rounded-xl ${isDark ? 'bg-zinc-800' : 'bg-black/[0.03]'}`}>
@@ -5429,7 +5497,7 @@
                       </div>
                     </div>
 
-                    <div>
+                    <div className="px-4">
                       <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Privacy &amp; Help</h3>
                       <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-200' : 'text-zinc-500'}`}>
                         Assistance, manufacturer requests, and legal notices
@@ -5523,7 +5591,7 @@
                       </div>
                     </div>
 
-                    <div>
+                    <div className="px-4">
                       <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Frequently Asked Questions</h3>
                       <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-200' : 'text-zinc-500'}`}>
                         Operational documentation &amp; guides
@@ -5549,7 +5617,7 @@
                   </div>
                 )}
 
-                {/* REQUEST MISSING MANUAL SUBVIEW */}
+                {/* REQUEST MISSING MANUAL SUBVIEW (All text aligned with input 'e.g.') */}
                 {settingsSubView === 'request_manual' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -5561,7 +5629,7 @@
                       </div>
                     </div>
 
-                    <div>
+                    <div className="px-3">
                       <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Request Missing Manual</h3>
                       <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-200' : 'text-zinc-500'}`}>
                         Submit unindexed appliances for automated schematic ingestion
@@ -5570,12 +5638,12 @@
 
                     <form onSubmit={handleMissingManualSubmit} className="space-y-3 pt-1">
                       <div>
-                        <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block px-3 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Brand / Manufacturer *
                         </label>
                         <input
-                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
-                          className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                          style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                          className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
                           placeholder="e.g. Sub-Zero, Bosch"
@@ -5586,12 +5654,12 @@
                       </div>
 
                       <div>
-                        <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block px-3 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Model SKU *
                         </label>
                         <input
-                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
-                          className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                          style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                          className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
                           placeholder="e.g. B36CL80ENS"
@@ -5602,12 +5670,12 @@
                       </div>
 
                       <div>
-                        <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block px-3 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Appliance Category
                         </label>
                         <input
-                          style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
-                          className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                          style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                          className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
                           placeholder="e.g. Refrigeration, Dishwashing"
@@ -5640,7 +5708,7 @@
                       </div>
                     </div>
 
-                    <div>
+                    <div className="px-4">
                       <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Terms of Service &amp; Privacy Policy</h3>
                       <p className={`text-[11px] font-semibold mt-0.5 ${isDark ? 'text-zinc-200' : 'text-zinc-500'}`}>Master End User Agreement • October 2026</p>
                     </div>
@@ -5726,7 +5794,7 @@
                       </div>
                     </div>
 
-                    <div>
+                    <div className="px-4">
                       <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Cancel Membership</h3>
                       <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                         Downgrade to the complimentary Free Starter Tier
@@ -5784,7 +5852,7 @@
                       </div>
                     </div>
 
-                    <div>
+                    <div className="px-4">
                       <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">72-Hour Passport Pass</h3>
                       <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                         Verified Home Appliance &amp; Maintenance Ledger ($2.99)
@@ -5824,7 +5892,7 @@
                       </div>
                     </div>
 
-                    <div>
+                    <div className="px-4">
                       <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Compile Audit Ledger</h3>
                       <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                         {getPassportRemainingTimeString()} on active pass
@@ -5833,10 +5901,11 @@
 
                     <div className="space-y-3 text-xs">
                       <div>
-                        <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Property Scope
                         </label>
                         <select
+                          style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                           }`}
@@ -5851,10 +5920,11 @@
                       </div>
 
                       <div>
-                        <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Property Address (Optional)
                         </label>
                         <input
+                          style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                           }`}
@@ -5865,10 +5935,11 @@
                       </div>
 
                       <div>
-                        <label className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Owner / Client Name (Optional)
                         </label>
                         <input
+                          style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                           }`}
@@ -5924,7 +5995,7 @@
                       </div>
                     </div>
 
-                    <div>
+                    <div className="px-4">
                       <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Past Export Audits</h3>
                       <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                         {savedPassports.length} archived ledgers in local IndexedDB storage
@@ -6287,7 +6358,7 @@
           {isAddGroupModalOpen && (
             <div 
               onClick={() => setIsAddGroupModalOpen(false)} 
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-start justify-center pt-24 px-4 pb-6 z-50 cursor-pointer overflow-y-auto"
+              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-start justify-center pt-24 px-4 pb-6 z-50 cursor-pointer overflow-y-auto modal-scroll-container"
             >
               <div 
                 onClick={(e) => e.stopPropagation()} 
@@ -6303,7 +6374,7 @@
                 </div>
                 <form onSubmit={handleCreateGroup} className="space-y-3">
                   <input
-                    style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                    style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                     className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none ${
                       isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                     }`}
@@ -6448,7 +6519,7 @@
               <div 
                 onClick={(e) => e.stopPropagation()} 
                 style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
-                className={`w-full max-w-sm rounded-t-[32px] px-6 pt-5 space-y-4 cursor-default animate-sheet-spring ${
+                className={`w-full max-w-sm rounded-t-[32px] px-6 pt-5 space-y-4 cursor-default animate-sheet-spring modal-scroll-container ${
                   isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
@@ -6472,7 +6543,7 @@
                     </p>
                     <input
                       type="email"
-                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                      style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                       }`}
@@ -6499,7 +6570,7 @@
                     <input
                       type="text"
                       maxLength="6"
-                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                      style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-2xl p-3 text-center text-lg tracking-widest font-mono font-black focus:outline-none ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                       }`}
@@ -6569,11 +6640,20 @@
                   </p>
                 </div>
                 <div className="-mt-1 -mr-1">
-                  <AppleCloseButton isDark={isDark} onClick={() => setActiveAppliance(null)} />
+                  <AppleCloseButton 
+                    isDark={isDark} 
+                    onClick={() => {
+                      if (recognitionRef.current) {
+                        try { recognitionRef.current.stop(); } catch(e){}
+                      }
+                      setIsListeningDictation(false);
+                      setActiveAppliance(null);
+                    }} 
+                  />
                 </div>
               </div>
 
-              {/* Adaptive Action Chips */}
+              {/* Adaptive Action Chips (Smooth Horizontal Touch Scrolling) */}
               <div className={`py-2 px-4 overflow-x-auto scrollbar-none pill-scroll-mask shrink-0 ${
                 isDark ? 'bg-zinc-950/40' : 'bg-white/40'
               }`}>
@@ -6764,7 +6844,7 @@
                     </p>
                     <div className="flex gap-2 pt-1">
                       <input
-                        style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                        style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                         className={`flex-1 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none ${
                           isDark ? 'bg-zinc-700 text-white' : 'bg-white border border-black/10 text-black'
                         }`}
@@ -6800,7 +6880,7 @@
                       enterKeyHint="send"
                       autoComplete="off"
                       autoCorrect="off"
-                      style={{ fontSize: '16px', colorScheme: isDark ? 'dark' : 'light' }}
+                      style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                       className="flex-1 bg-transparent text-xs pl-2.5 focus:outline-none placeholder:text-zinc-500"
                       placeholder={isListeningDictation ? "Listening... Speak now" : "Describe issue, sound, or symptom..."}
                       value={queryInput}
