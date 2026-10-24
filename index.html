@@ -223,18 +223,6 @@
         box.innerText = 'Runtime Error: ' + msg + ' (Line: ' + line + ', Col: ' + col + ')\n' + (err ? err.stack : '');
       }
     };
-
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        const swBlob = new Blob([
-          `self.addEventListener('install', e => self.skipWaiting());\n` +
-          `self.addEventListener('activate', e => e.waitUntil(clients.claim()));\n` +
-          `self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));`
-        ], { type: 'application/javascript' });
-        const swUrl = URL.createObjectURL(swBlob);
-        navigator.serviceWorker.register(swUrl).catch(() => {});
-      });
-    }
   </script>
 
   <script type="text/babel">
@@ -1737,7 +1725,7 @@
       const [inlinePdfViewerData, setInlinePdfViewerData] = useState(null);
       const [activeExportMenuId, setActiveExportMenuId] = useState(null);
 
-      // AI Diagnostic Chat State (Docked Bottom Sheet with Viewport Clamping)
+            // AI Diagnostic Chat State (Docked Bottom Sheet with Viewport Clamping)
       const [activeAppliance, setActiveAppliance] = useState(null);
       const [messages, setMessages] = useState([]);
       const [queryInput, setQueryInput] = useState('');
@@ -1746,6 +1734,8 @@
       const [streamingText, setStreamingText] = useState('');
       const [needsPlacardVerification, setNeedsPlacardVerification] = useState(false);
       const [placardVerifyInput, setPlacardVerifyInput] = useState('');
+      const chatTouchStartRef = useRef({ x: 0, y: 0 });
+      const isKeyboardActive = viewportHeight > 0 && viewportHeight < (window.innerHeight - 80);
 
       // Speech Dictation Hook
       const [isListeningDictation, setIsListeningDictation] = useState(false);
@@ -2601,28 +2591,31 @@
         let detectedCategory = '';
         let resolvedCanonicalName = fallbackTitle;
 
-        const abortCtrl = new AbortController();
-        const timeoutId = setTimeout(() => abortCtrl.abort(), 10000);
+         const abortCtrl = new AbortController();
+        const timeoutId = setTimeout(() => abortCtrl.abort(), 9000);
 
         try {
           const res = await fetch(`${WORKER_ENDPOINT}/api/discover`, {
             method: 'POST',
             signal: abortCtrl.signal,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ brand: effectiveBrand, modelOrQuery: effectiveModel || effectiveName })
+            body: JSON.stringify({ 
+              brand: effectiveBrand, 
+              modelOrQuery: effectiveModel || effectiveName,
+              model: effectiveModel,
+              name: effectiveName
+            })
           });
           clearTimeout(timeoutId);
-          const data = await res.json();
-          if (!res.ok || data.error) {
-            showToast(data.error || "Catalog lookup error");
-          } else if (data?.appliance) {
+          const data = await res.json().catch(() => ({}));
+          if (data?.appliance) {
             const parsed = data.appliance;
             resolvedCanonicalName = parsed.name || resolvedCanonicalName;
             detectedCategory = parsed.category || '';
             discoveredConsumables = (parsed.consumables || []).map(c => ({
               name: c.name,
               partNumber: c.partNumber || '',
-              intervalMonths: Math.round((c.expectedLifeDays || 180) / 30),
+              intervalMonths: Math.round((c.expectedLifeDays || 180) / 30) || c.intervalMonths || 6,
               replacementHistory: []
             }));
             discoveredParts = parsed.replacementParts || [];
@@ -5321,18 +5314,18 @@
                       </button>
                     </div>
 
-                    {/* CARD 2: PASSPORT (Enlarged & Shifted-Left $2.99 Badge) */}
+                                        {/* CARD 2: PASSPORT (Single-Row Subtitle) */}
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
-                      <div className="flex items-center">
-                        <div className="flex-1 pr-1">
-                          <p className="text-xs font-black tracking-tight">Home Appliance Passport (PDF &amp; CSV)</p>
-                          <p className={`text-[12px] font-semibold leading-normal mt-1.5 ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-black tracking-tight truncate">Home Appliance Passport (PDF &amp; CSV)</p>
+                          <p className={`text-[11.5px] font-semibold leading-normal mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
                             Verified Home Appliance &amp; Maintenance Ledger
                           </p>
                         </div>
-                        <div className="w-20 flex justify-start pl-1 items-center shrink-0">
+                        <div className="flex justify-end items-center shrink-0 pl-1">
                           {isPassportUnlocked() ? (
-                            <span className="text-[13px] font-bold text-emerald-500">
+                            <span className="text-[12.5px] font-bold text-emerald-500">
                               Active
                             </span>
                           ) : (
@@ -5342,6 +5335,7 @@
                           )}
                         </div>
                       </div>
+
 
                       <button
                         onClick={(e) => {
@@ -6675,9 +6669,9 @@
                   isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
                 }`}
               >
-                <div className="flex justify-between items-start">
-                  <h3 className="text-base font-black pt-0.5">Account Login</h3>
-                  <div className="-mt-1 -mr-1">
+                                <div className="relative flex items-center justify-center pb-0.5">
+                  <h3 className="text-base font-black tracking-tight">Account Login</h3>
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 -mr-1">
                     <AppleCloseButton 
                       isDark={isDark} 
                       onClick={() => {
@@ -6690,14 +6684,17 @@
                 </div>
 
                 {authStep === 'email' ? (
-                  <form onSubmit={handleAuthSendOtp} className="space-y-3">
-                    <p className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                      Enter your email to sign in and synchronize your hardware schedule:
-                    </p>
+                  <form onSubmit={handleAuthSendOtp} className="space-y-3.5">
+                    <div className="max-w-xs mx-auto text-center px-1">
+                      <p className={`text-xs font-semibold leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        Enter your email to sign in and synchronize your hardware schedule across devices.
+                      </p>
+                    </div>
+
                     <input
                       type="email"
                       style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                      className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none ${
+                      className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none text-center ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                       }`}
                       placeholder="your@email.com"
@@ -6715,10 +6712,12 @@
                     </button>
                   </form>
                 ) : (
-                  <form onSubmit={handleAuthVerifyOtp} className="space-y-3">
-                    <p className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                      A 6-digit code was sent to <strong className={UI_ACCENT.text}>{authEmailInput}</strong>.
-                    </p>
+                  <form onSubmit={handleAuthVerifyOtp} className="space-y-3.5">
+                    <div className="max-w-xs mx-auto text-center px-1">
+                      <p className={`text-xs font-semibold leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        A 6-digit code was sent to <strong className={UI_ACCENT.text}>{authEmailInput}</strong>.
+                      </p>
+                    </div>
 
                     <input
                       type="text"
@@ -6761,7 +6760,7 @@
             </div>
           )}
 
-          {/* 11. DIAGNOSTIC ASSISTANT BOTTOM-SHEET MODAL (With Viewport Clamping & Scroll Containment) */}
+                    {/* 11. DIAGNOSTIC ASSISTANT BOTTOM-SHEET MODAL (78vh Matching Details Sheet, High-Contrast Light Mode & Rigid Touch Lock) */}
           {activeAppliance && (
             <div 
               onClick={() => {
@@ -6774,31 +6773,35 @@
               }} 
               style={{
                 top: viewportOffsetTop ? `${viewportOffsetTop}px` : '0px',
-                height: viewportHeight ? `${viewportHeight}px` : '100dvh'
+                height: viewportHeight ? `${viewportHeight}px` : '100dvh',
+                touchAction: 'none'
               }}
-              className="fixed inset-x-0 bottom-0 z-50 bg-black/80 backdrop-blur-md flex items-end justify-center cursor-pointer transition-all duration-100"
+              className="fixed inset-x-0 bottom-0 z-50 bg-black/80 backdrop-blur-md flex items-end justify-center cursor-pointer transition-all duration-100 overflow-hidden"
             >
               <div 
                 onClick={(e) => e.stopPropagation()} 
                 style={{
-                  maxHeight: viewportHeight ? `${viewportHeight - 16}px` : '85vh',
-                  height: '85vh',
-                  paddingBottom: 'max(14px, env(safe-area-inset-bottom, 10px))'
+                  maxHeight: isKeyboardActive ? `${viewportHeight - 12}px` : '78vh',
+                  height: isKeyboardActive ? `${viewportHeight - 12}px` : '78vh',
+                  touchAction: 'none'
                 }}
                 className={`w-full max-w-md rounded-t-[32px] flex flex-col cursor-default overflow-hidden animate-sheet-spring shadow-2xl ${
                   isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
                 {/* Top Bar Anchored */}
-                <div className={`px-5 py-3 border-b flex items-center justify-between shrink-0 ${
-                  isDark ? 'border-zinc-800 bg-zinc-900/90' : 'border-black/5 bg-white/90'
-                }`}>
+                <div 
+                  style={{ touchAction: 'none' }}
+                  className={`px-5 py-3 border-b flex items-center justify-between shrink-0 select-none ${
+                    isDark ? 'border-zinc-800 bg-zinc-900/90' : 'border-black/5 bg-white/90'
+                  }`}
+                >
                   <div className="min-w-0 flex-1 pr-3">
                     <h3 className="text-sm font-black truncate leading-tight">{formatApplianceTitle(activeAppliance.brand, activeAppliance.name)}</h3>
                     <p className={`text-[12px] mt-0.5 ${
                       getAssistantTierLabel().includes('Advanced') 
                         ? 'text-[#FF9500] font-bold' 
-                        : (isDark ? 'text-zinc-400 font-semibold' : 'text-zinc-500 font-semibold')
+                        : (isDark ? 'text-zinc-400 font-semibold' : 'text-zinc-600 font-semibold')
                     }`}>
                       {getAssistantTierLabel()}
                     </p>
@@ -6818,17 +6821,25 @@
                   </div>
                 </div>
 
-                {/* Adaptive Action Chips */}
-                <div className={`py-2 px-4 overflow-x-auto scrollbar-none pill-scroll-mask shrink-0 ${
-                  isDark ? 'bg-zinc-950/40' : 'bg-black/[0.02]'
-                }`}>
+                {/* Adaptive Action Chips (Horizontal Scroll Isolated) */}
+                <div 
+                  style={{ 
+                    touchAction: 'pan-x',
+                    overscrollBehaviorX: 'contain',
+                    WebkitOverflowScrolling: 'touch'
+                  }}
+                  className={`py-2 px-4 overflow-x-auto scrollbar-none pill-scroll-mask shrink-0 ${
+                    isDark ? 'bg-zinc-950/40' : 'bg-black/[0.02]'
+                  }`}
+                >
                   <div className="flex items-center gap-1.5 w-max pr-6">
                     {getAdaptiveChips(activeAppliance).map(chip => (
                       <button
                         key={chip}
+                        type="button"
                         onClick={() => sendQuery(chip)}
                         className={`text-xs px-3 py-1 rounded-full font-bold shadow-2xs active:scale-95 transition-transform whitespace-nowrap ${
-                          chip === 'Go Deeper' ? `${UI_ACCENT.solid}` : (isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-750' : 'bg-white text-zinc-700 hover:bg-zinc-50 shadow-xs')
+                          chip === 'Go Deeper' ? `${UI_ACCENT.solid}` : (isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-750' : 'bg-white text-zinc-800 hover:bg-zinc-50 shadow-xs border border-black/5')
                         }`}
                       >
                         {chip}
@@ -6837,15 +6848,28 @@
                   </div>
                 </div>
 
-                {/* Message Stream with Strict Scroll Containment */}
+                {/* Message Stream with Drag-to-Dismiss Keyboard & High-Contrast Light Mode */}
                 <div 
                   ref={chatContainerRef}
-                  style={{ overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch' }}
+                  onTouchStart={(e) => {
+                    chatTouchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                  }}
+                  onTouchMove={(e) => {
+                    const deltaY = e.touches[0].clientY - chatTouchStartRef.current.y;
+                    if (deltaY > 16 && isKeyboardActive) {
+                      dismissActiveKeyboard();
+                    }
+                  }}
+                  style={{ 
+                    touchAction: 'pan-y',
+                    overscrollBehaviorY: 'contain', 
+                    WebkitOverflowScrolling: 'touch' 
+                  }}
                   className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5 text-xs scrollbar-none"
                 >
                   {(isPaidUser || AIQuotaTracker.getStatus(false).count < FREE_TOTAL_QUOTA) && chatSystemStatus === 'offline' && (
                     <div className="text-center my-3 py-0.5 animate-in fade-in duration-300">
-                      <p className={`text-[12px] font-medium tracking-tight ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                      <p className={`text-[12px] font-medium tracking-tight ${isDark ? 'text-zinc-500' : 'text-zinc-500'}`}>
                         Internet Connection Offline • Resuming with Local Equipment Schematics
                       </p>
                     </div>
@@ -6853,7 +6877,7 @@
 
                   {(isPaidUser || AIQuotaTracker.getStatus(false).count < FREE_TOTAL_QUOTA) && chatSystemStatus === 'restored' && (
                     <div className="text-center my-3 py-0.5 animate-in fade-in duration-300">
-                      <p className={`text-[12px] font-medium tracking-tight ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                      <p className={`text-[12px] font-medium tracking-tight ${isDark ? 'text-zinc-500' : 'text-zinc-500'}`}>
                         Internet Connection Restored • Advanced Diagnostics Engaged
                       </p>
                     </div>
@@ -6861,23 +6885,25 @@
 
                   {messages.map(m => (
                     <div key={m.id} className="space-y-2">
-                      <div className={`py-2.5 px-4 rounded-[20px] w-fit max-w-[85%] whitespace-pre-line font-medium leading-relaxed ${
+                      <div className={`py-2.5 px-4 rounded-[20px] w-fit max-w-[85%] whitespace-pre-line leading-relaxed ${
                         m.sender === 'user' 
-                          ? 'ml-auto bg-[#FF9500] text-white shadow-xs' 
-                          : (isDark ? 'mr-auto bg-zinc-800 text-zinc-200 shadow-xs' : 'mr-auto bg-white text-zinc-900 shadow-xs border border-black/5')
+                          ? 'ml-auto bg-[#FF9500] text-white font-medium shadow-xs' 
+                          : (isDark 
+                              ? 'mr-auto bg-zinc-800 text-zinc-100 font-medium shadow-xs' 
+                              : 'mr-auto bg-[#E5E5EA] text-[#000000] font-medium shadow-2xs')
                       }`}>
                         {m.text}
                       </div>
 
                       {m.showReferralFork && (
                         <div className={`mx-auto max-w-[92%] p-4 rounded-2xl space-y-3 shadow-xs ${
-                          isDark ? 'bg-zinc-800/80 text-zinc-200' : 'apple-card-light text-zinc-900'
+                          isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-[#FAFAFC] border border-black/8 text-zinc-900'
                         }`}>
                           <div className="border-b border-black/5 dark:border-zinc-700/50 pb-2 text-center">
                             <span className={`text-[11px] font-black uppercase tracking-wider ${UI_ACCENT.text} block`}>
                               Recommended Next Steps
                             </span>
-                            <p className="text-[12px] font-medium leading-relaxed text-zinc-500 dark:text-zinc-400 mt-1">
+                            <p className={`text-[12px] font-medium leading-relaxed mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                               If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically.
                             </p>
                           </div>
@@ -6890,7 +6916,7 @@
                                 openExternalRetailer(buildPartPurchaseUrl(activeAppliance.brand, wearPart || { name: 'Part' }, 'amazon', activeAppliance.modelNumber));
                               }}
                               className={`p-2.5 rounded-xl text-center flex flex-col items-center justify-center font-bold text-xs shadow-xs active:scale-95 transition-transform ${
-                                isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-[#FAFAFC] hover:bg-zinc-100 text-zinc-900'
+                                isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-white hover:bg-zinc-50 border border-black/8 text-zinc-900'
                               }`}
                             >
                               <span className="leading-tight">Order OEM Part</span>
@@ -6904,7 +6930,7 @@
                                 openExternalRetailer(`https://www.google.com/search?q=${encodeURIComponent(q)}`);
                               }}
                               className={`p-2.5 rounded-xl text-center flex flex-col items-center justify-center font-bold text-xs shadow-xs active:scale-95 transition-transform ${
-                                isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-[#FAFAFC] hover:bg-zinc-100 text-zinc-900'
+                                isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-white hover:bg-zinc-50 border border-black/8 text-zinc-900'
                               }`}
                             >
                               <span className="leading-tight">Find a Specialist</span>
@@ -6912,7 +6938,7 @@
                             </button>
                           </div>
 
-                          <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400 text-center font-medium pt-1 italic">
+                          <p className={`text-[11.5px] text-center font-medium pt-1 italic ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                             Otherwise, send another message to continue troubleshooting.
                           </p>
                         </div>
@@ -6920,13 +6946,13 @@
 
                       {m.showTransitionCard && (
                         <div className={`mx-auto max-w-[92%] p-4 rounded-2xl space-y-3 shadow-xs ${
-                          isDark ? 'bg-zinc-800/80 text-zinc-200' : 'apple-card-light text-zinc-900'
+                          isDark ? 'bg-zinc-800/80 text-zinc-200' : 'bg-[#FAFAFC] border border-black/8 text-zinc-900'
                         }`}>
                           <div className="border-b border-black/5 dark:border-zinc-700/50 pb-2 text-center">
                             <span className={`text-[11px] font-black uppercase tracking-wider ${UI_ACCENT.text} block`}>
                               Diagnostic Limit Reached
                             </span>
-                            <p className="text-[12px] font-medium leading-relaxed text-zinc-500 dark:text-zinc-400 mt-1">
+                            <p className={`text-[12px] font-medium leading-relaxed mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                               5 complimentary Advanced Inquiries used. Standard Diagnostic is now active.
                             </p>
                           </div>
@@ -6941,7 +6967,7 @@
                             </button>
                           </div>
 
-                          <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400 text-center font-medium pt-1 italic">
+                          <p className={`text-[11.5px] text-center font-medium pt-1 italic ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                             Or continue below with Standard Diagnostic.
                           </p>
                         </div>
@@ -6955,7 +6981,7 @@
                             className={`text-[11.5px] font-bold py-1.5 px-3.5 rounded-full transition-all active:scale-95 flex items-center gap-1 ${
                               isDark 
                                 ? 'bg-zinc-800 text-[#FF9500] hover:bg-zinc-750' 
-                                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 shadow-2xs'
+                                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 shadow-2xs border border-amber-200/60'
                             }`}
                           >
                             <span>Using Standard Diagnostic • Upgrade to Advanced Diagnostic ➔</span>
@@ -6967,7 +6993,7 @@
 
                   {isThinking && (
                     <div className={`h-7 px-3.5 rounded-full inline-flex items-center justify-center gap-1.5 mr-auto shadow-xs ${
-                      isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-white text-zinc-500 border border-black/5'
+                      isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-[#E5E5EA] text-zinc-600'
                     }`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] imessage-dot"></span>
                       <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] imessage-dot"></span>
@@ -6976,8 +7002,10 @@
                   )}
 
                   {streamingText && (
-                    <div className={`py-2.5 px-4 rounded-[20px] w-fit max-w-[85%] mr-auto whitespace-pre-line font-medium leading-relaxed ${
-                      isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-white text-zinc-900 border border-black/5 shadow-xs'
+                    <div className={`py-2.5 px-4 rounded-[20px] w-fit max-w-[85%] mr-auto whitespace-pre-line leading-relaxed ${
+                      isDark 
+                        ? 'bg-zinc-800 text-zinc-100 font-medium shadow-xs' 
+                        : 'bg-[#E5E5EA] text-[#000000] font-medium shadow-2xs'
                     }`}>
                       {streamingText}
                     </div>
@@ -6995,7 +7023,7 @@
                           type="button"
                           onClick={() => { triggerHaptic('light'); placardFileInputRef.current?.click(); }}
                           className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg transition-colors active:scale-95 ${
-                            isDark ? 'bg-zinc-700 text-[#FF9500] hover:bg-zinc-600' : 'bg-white text-amber-700 hover:bg-amber-100 shadow-2xs'
+                            isDark ? 'bg-zinc-700 text-[#FF9500] hover:bg-zinc-600' : 'bg-white text-amber-700 hover:bg-amber-100 shadow-2xs border border-amber-200'
                           }`}
                         >
                           <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -7030,13 +7058,19 @@
                     </div>
                   )}
 
-                  {isLoading && <p className="text-xs text-zinc-400 animate-pulse px-2">Analyzing...</p>}
+                  {isLoading && <p className={`text-xs animate-pulse px-2 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Analyzing...</p>}
                 </div>
 
-                {/* Docked Composer */}
-                <div className={`px-4 pt-2 pb-1 border-t flex flex-col gap-1.5 shrink-0 ${
-                  isDark ? 'border-zinc-800 bg-zinc-900' : 'border-black/5 bg-white'
-                }`}>
+                {/* Docked Composer with Adaptive Keyboard Padding & Dual-Tick Scroll Anchor */}
+                <div 
+                  style={{ 
+                    touchAction: 'none',
+                    paddingBottom: isKeyboardActive ? '8px' : 'max(14px, env(safe-area-inset-bottom, 10px))'
+                  }}
+                  className={`px-4 pt-2.5 border-t flex flex-col gap-1.5 shrink-0 transition-all ${
+                    isDark ? 'border-zinc-800 bg-zinc-900' : 'border-black/5 bg-white'
+                  }`}
+                >
                   <div className="flex items-center gap-2">
                     <div className={`flex-1 rounded-full px-2 py-1.5 flex items-center gap-2 ${
                       isDark ? 'bg-zinc-800 text-white' : 'bg-black/[0.04] text-zinc-900 shadow-xs'
@@ -7053,45 +7087,47 @@
                         onChange={(e) => setQueryInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && sendQuery()}
                         onFocus={() => {
-                          setTimeout(() => scrollToChatBottom(true), 120);
+                          setTimeout(() => scrollToChatBottom(true), 60);
+                          setTimeout(() => scrollToChatBottom(true), 280);
                         }}
                       />
 
-                    <button
-                      type="button"
-                      onClick={toggleDictation}
-                      className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                        isListeningDictation
-                          ? 'bg-[#FF9500] text-white animate-mic-listening'
-                          : (isDark ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900')
-                      }`}
-                      title={isListeningDictation ? "Stop Dictation" : "Dictate with Voice"}
+                      <button
+                        type="button"
+                        onClick={toggleDictation}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+                          isListeningDictation
+                            ? 'bg-[#FF9500] text-white animate-mic-listening'
+                            : (isDark ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900')
+                        }`}
+                        title={isListeningDictation ? "Stop Dictation" : "Dictate with Voice"}
+                      >
+                        <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                          <line x1="12" y1="19" x2="12" y2="23"></line>
+                          <line x1="8" y1="23" x2="16" y2="23"></line>
+                        </svg>
+                      </button>
+                    </div>
+
+                    <button 
+                      type="button" 
+                      onClick={() => sendQuery()} 
+                      disabled={!queryInput.trim()}
+                      className={`${UI_ACCENT.solid} font-bold text-xs px-4 py-2 rounded-full active:scale-95 transition-all disabled:opacity-40 shadow-xs`}
                     >
-                      <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                        <line x1="12" y1="19" x2="12" y2="23"></line>
-                        <line x1="8" y1="23" x2="16" y2="23"></line>
-                      </svg>
+                      Send
                     </button>
                   </div>
-
-                  <button 
-                    type="button" 
-                    onClick={() => sendQuery()} 
-                    disabled={!queryInput.trim()}
-                    className={`${UI_ACCENT.solid} font-bold text-xs px-4 py-2 rounded-full active:scale-95 transition-all disabled:opacity-40 shadow-xs`}
-                  >
-                    Send
-                  </button>
+                  <p className={`text-[10px] text-center font-semibold ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                    Informational reference only. Always disconnect electrical power before servicing equipment.
+                  </p>
                 </div>
-                <p className={`text-[10px] text-center font-semibold ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                  Informational reference only. Always disconnect electrical power before servicing equipment.
-                </p>
               </div>
             </div>
-          </div>
           )}
+
 
           {/* 12. INLINE PDF VIEWER */}
           {inlinePdfViewerData && (
