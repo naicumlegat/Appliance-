@@ -328,21 +328,22 @@
       return n.toLowerCase().startsWith(b.toLowerCase()) ? n : `${b} ${n}`;
     }
 
+    // Dynamic Title Case Greeting Engine
     function getDynamicGreetingInfo(name) {
       const hour = new Date().getHours();
-      let greeting = 'Good evening';
+      let greeting = 'Good Evening!';
       let iconType = 'evening';
       if (hour >= 5 && hour < 12) {
-        greeting = 'Good morning';
+        greeting = 'Good Morning!';
         iconType = 'morning';
       } else if (hour >= 12 && hour < 17) {
-        greeting = 'Good afternoon';
+        greeting = 'Good Afternoon!';
         iconType = 'afternoon';
       }
       
       const cleanName = (name || '').trim();
       const text = (cleanName && cleanName !== 'Welcome' && cleanName !== 'Guest') 
-        ? `${greeting}, ${cleanName}` 
+        ? `${greeting.replace('!', '')}, ${cleanName}!` 
         : greeting;
       return { text, iconType };
     }
@@ -722,7 +723,7 @@
       async set(storeName, key, value) {
         try {
           const db = await this.getDB();
-          return new Promise((resolve) => {
+          return new Promise((resolve, reject) => {
             const tx = db.transaction(storeName, 'readwrite');
             const req = tx.objectStore(storeName).put(value, key);
             req.onsuccess = () => resolve();
@@ -1641,14 +1642,13 @@
         } catch(e) { return ''; }
       });
 
+      // Default name strictly set to "Welcome"; never auto-populated with email prefixes
       const [userDisplayName, setUserDisplayName] = useState(() => {
         try {
-          const saved = localStorage.getItem('app_user_session');
-          if (saved && saved.displayName) return saved.displayName;
           const savedCustom = localStorage.getItem('app_user_display_name');
           if (savedCustom) return savedCustom;
-          return '';
-        } catch(e) { return ''; }
+          return 'Welcome';
+        } catch(e) { return 'Welcome'; }
       });
       const [isEditingProfileName, setIsEditingProfileName] = useState(false);
       const [profileNameInput, setProfileNameInput] = useState('');
@@ -1690,6 +1690,7 @@
       // Receipt Lightbox & Confirmation State
       const [receiptLightboxUrl, setReceiptLightboxUrl] = useState(null);
       const [pendingDeleteReceiptApplianceId, setPendingDeleteReceiptApplianceId] = useState(null);
+      const [pendingDeleteWarrantyApplianceId, setPendingDeleteWarrantyApplianceId] = useState(null);
 
       const [isAddOpen, setIsAddOpen] = useState(false);
       const [addFormSubmitted, setAddFormSubmitted] = useState(false);
@@ -1736,7 +1737,7 @@
       const [inlinePdfViewerData, setInlinePdfViewerData] = useState(null);
       const [activeExportMenuId, setActiveExportMenuId] = useState(null);
 
-      // AI Diagnostic Chat State (Dedicated Fullscreen)
+      // AI Diagnostic Chat State (Docked Bottom Sheet with Viewport Clamping)
       const [activeAppliance, setActiveAppliance] = useState(null);
       const [messages, setMessages] = useState([]);
       const [queryInput, setQueryInput] = useState('');
@@ -1838,7 +1839,8 @@
         isDeleteAccountModalOpen ||
         inlinePdfViewerData ||
         receiptLightboxUrl ||
-        pendingDeleteReceiptApplianceId
+        pendingDeleteReceiptApplianceId ||
+        pendingDeleteWarrantyApplianceId
       );
 
       // Hard Scroll Lock with Active Touch Interception
@@ -2162,7 +2164,6 @@
             setCurrentUser(u);
             setIsPaidUser(Boolean(u.is_pro) || localStorage.getItem('is_pro_user') === 'true');
             setUserEmail(u.email || '');
-            if (u.displayName) setUserDisplayName(u.displayName);
           } catch(e) {}
         }
         const passPurchased = localStorage.getItem('passport_purchased') === 'true';
@@ -2499,6 +2500,23 @@
         triggerDebouncedSync(updated, units);
         setPendingDeleteReceiptApplianceId(null);
         showToast("Receipt deleted from storage");
+      };
+
+      const handleConfirmDeleteWarranty = async () => {
+        if (!pendingDeleteWarrantyApplianceId) return;
+        triggerHaptic('warn');
+        await ApplianceStorageDB.delete('media_store', `warrantyDoc_${pendingDeleteWarrantyApplianceId}`);
+        const updated = appliances.map(app => {
+          if (app.id !== pendingDeleteWarrantyApplianceId) return app;
+          return { ...app, warrantyDoc: null, warrantyActivated: false, updatedAt: Date.now() };
+        });
+        setAppliances(updated);
+        if (selectedAppliance && selectedAppliance.id === pendingDeleteWarrantyApplianceId) {
+          setSelectedAppliance({ ...selectedAppliance, warrantyDoc: null, warrantyActivated: false });
+        }
+        triggerDebouncedSync(updated, units);
+        setPendingDeleteWarrantyApplianceId(null);
+        showToast("Warranty document removed");
       };
 
       const processPlacardImageFile = async (file, isInlineChatTriage = false) => {
@@ -3104,7 +3122,7 @@
         setCurrentUser(null);
         setIsPaidUser(false);
         setUserEmail('');
-        setUserDisplayName('');
+        setUserDisplayName('Welcome');
         setIsLogoutModalOpen(false);
         setSettingsSubView('root');
         setIsSettingsOpen(false);
@@ -3137,7 +3155,7 @@
         setCurrentUser(null);
         setIsPaidUser(false);
         setUserEmail('');
-        setUserDisplayName('');
+        setUserDisplayName('Welcome');
         setAppliances([]);
         setUnits([{ id: 'unit_main', name: 'Main Residence', collapsed: false }]);
         setIsDeleteAccountModalOpen(false);
@@ -3148,10 +3166,11 @@
 
       const handleSaveDisplayName = (newName) => {
         const trimmed = (newName || '').trim();
-        setUserDisplayName(trimmed);
-        localStorage.setItem('app_user_display_name', trimmed);
+        const effectiveName = trimmed || 'Welcome';
+        setUserDisplayName(effectiveName);
+        localStorage.setItem('app_user_display_name', effectiveName);
         if (currentUser) {
-          const updated = { ...currentUser, displayName: trimmed };
+          const updated = { ...currentUser, displayName: effectiveName };
           setCurrentUser(updated);
           localStorage.setItem('app_user_session', JSON.stringify(updated));
         }
@@ -3215,6 +3234,7 @@
             setCurrentUser(userObj);
             setIsPaidUser(Boolean(userObj.is_pro));
             setUserEmail(userObj.email);
+            // Preserves deliberate display name; never defaults to email prefix
             if (userObj.displayName) setUserDisplayName(userObj.displayName);
             if (data.appliances && data.appliances.length > 0) setAppliances(data.appliances);
             if (data.units && data.units.length > 0) setUnits(data.units);
@@ -3622,7 +3642,7 @@
         return <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" title="Synchronized"></span>;
       };
 
-      const greetingInfo = getDynamicGreetingInfo(userDisplayName || (currentUser?.email ? currentUser.email.split('@')[0] : ''));
+      const greetingInfo = getDynamicGreetingInfo(userDisplayName);
 
       return (
         <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
@@ -4365,7 +4385,6 @@
                             Appliance Name
                           </label>
                           <input
-                            autoCapitalize="words"
                             style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                             className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
@@ -4380,7 +4399,6 @@
                               Room Nickname
                             </label>
                             <input
-                              autoCapitalize="words"
                               style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
@@ -4414,7 +4432,6 @@
                               Model SKU
                             </label>
                             <input
-                              autoCapitalize="characters"
                               style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
@@ -4428,7 +4445,6 @@
                               Serial Number
                             </label>
                             <input
-                              autoCapitalize="characters"
                               style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
@@ -4471,11 +4487,9 @@
                       </div>
                     ) : (
                       <div>
-                        {/* Clean Single-Row Appliance Title */}
                         <h2 className="text-base font-black tracking-tight leading-snug break-words">
                           {selectedAppliance.name}
                         </h2>
-                        {/* Secondary Spec Row: Brand • Model # • Nickname */}
                         <p className={`text-[13.5px] font-mono font-bold mt-0.5 truncate ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                           {selectedAppliance.brand}
                           {selectedAppliance.modelNumber ? ` • Model #${selectedAppliance.modelNumber}` : ' • Standard Platform'}
@@ -4567,9 +4581,11 @@
                             </p>
                           </>
                         ) : (
-                          <p className={`text-xs py-4 font-semibold ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                            No mechanical wear parts cataloged for this model.
-                          </p>
+                          <div className="py-8 text-center">
+                            <p className={`text-xs font-semibold ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                              No mechanical wear parts found for this model.
+                            </p>
+                          </div>
                         )}
                       </div>
                     )}
@@ -4626,22 +4642,46 @@
                                   </p>
                                 </div>
                               </div>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  triggerHaptic('light');
-                                  let docUrl = selectedAppliance.warrantyDoc.dataUrl;
-                                  if (!docUrl) {
-                                    docUrl = await ApplianceStorageDB.get('media_store', `warrantyDoc_${selectedAppliance.id}`);
-                                  }
-                                  if (docUrl) setReceiptLightboxUrl(docUrl);
-                                }}
-                                className={`text-[11.5px] font-bold px-2.5 py-1 rounded-lg active:scale-95 transition-transform ${
-                                  isDark ? 'bg-zinc-700 text-zinc-200' : 'bg-black/[0.04] text-zinc-800'
-                                }`}
-                              >
-                                View
-                              </button>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    triggerHaptic('light');
+                                    let docUrl = selectedAppliance.warrantyDoc.dataUrl;
+                                    if (!docUrl) {
+                                      docUrl = await ApplianceStorageDB.get('media_store', `warrantyDoc_${selectedAppliance.id}`);
+                                    }
+                                    if (docUrl) {
+                                      const isPdf = (selectedAppliance.warrantyDoc.name || '').toLowerCase().endsWith('.pdf') || docUrl.startsWith('data:application/pdf');
+                                      if (isPdf) {
+                                        setInlinePdfViewerData({
+                                          url: docUrl,
+                                          title: selectedAppliance.warrantyDoc.name || 'Warranty Certificate',
+                                          blob: null
+                                        });
+                                      } else {
+                                        setReceiptLightboxUrl(docUrl);
+                                      }
+                                    }
+                                  }}
+                                  className={`text-[11.5px] font-bold px-2.5 py-1 rounded-lg active:scale-95 transition-transform ${
+                                    isDark ? 'bg-zinc-700 text-zinc-200' : 'bg-black/[0.04] text-zinc-800'
+                                  }`}
+                                >
+                                  View
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPendingDeleteWarrantyApplianceId(selectedAppliance.id);
+                                  }}
+                                  className="w-7 h-7 rounded-full bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 flex items-center justify-center font-bold text-xs shrink-0 active:scale-90"
+                                  title="Delete Warranty"
+                                >
+                                  ✕
+                                </button>
+                              </div>
                             </div>
                           )}
 
@@ -4776,6 +4816,29 @@
             </div>
           )}
 
+          {/* WARRANTY DELETION MODAL */}
+          {pendingDeleteWarrantyApplianceId && (
+            <div 
+              onClick={() => setPendingDeleteWarrantyApplianceId(null)} 
+              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[98] cursor-pointer"
+            >
+              <div onClick={(e) => e.stopPropagation()} className={`rounded-[32px] p-6 w-full max-w-xs space-y-4 shadow-2xl text-center cursor-default animate-sheet-spring ${
+                isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
+              }`}>
+                <h3 className="text-base font-black">Remove Warranty Document?</h3>
+                <p className={`text-xs font-semibold leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  This will delete the archived warranty certificate from this appliance.
+                </p>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={() => setPendingDeleteWarrantyApplianceId(null)} className={`flex-1 text-xs py-2.5 rounded-2xl font-bold active:scale-95 transition-transform ${
+                    isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-900'
+                  }`}>Cancel</button>
+                  <button onClick={handleConfirmDeleteWarranty} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-xs active:scale-95 transition-transform">Delete</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 3. ADD APPLIANCE MODAL (With Precision Optical 'e.g.' Alignment) */}
           {isAddOpen && (
             <div onClick={closeAddModal} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer">
@@ -4830,7 +4893,6 @@
                         Brand *
                       </label>
                       <input
-                        autoCapitalize="words"
                         style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                         className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                           addFormSubmitted && !addForm.brand.trim() ? 'ring-2 ring-rose-500' : ''
@@ -4848,7 +4910,6 @@
                         Model #
                       </label>
                       <input
-                        autoCapitalize="characters"
                         style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                         className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                           addFormSubmitted && !addForm.model.trim() && !addForm.name.trim() ? 'ring-1 ring-amber-500/70' : ''
@@ -4867,7 +4928,6 @@
                       Product Name
                     </label>
                     <input
-                      autoCapitalize="words"
                       style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                         addFormSubmitted && !addForm.name.trim() && !addForm.model.trim() ? 'ring-1 ring-amber-500/70' : ''
@@ -4885,7 +4945,6 @@
                       Location / Room Nickname
                     </label>
                     <input
-                      autoCapitalize="words"
                       style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -4904,7 +4963,6 @@
                       <div className="flex items-center gap-2 mt-1">
                         <input
                           ref={inlineNewUnitInputRef}
-                          autoCapitalize="words"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`flex-1 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -4986,7 +5044,6 @@
                               Serial Number
                             </label>
                             <input
-                              autoCapitalize="characters"
                               style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -5032,7 +5089,6 @@
                               Retailer / Vendor
                             </label>
                             <input
-                              autoCapitalize="words"
                               style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -5155,7 +5211,6 @@
                                 <input
                                   ref={profileNameInputRef}
                                   maxLength={18}
-                                  autoCapitalize="words"
                                   style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                                   className={`text-base font-black tracking-tight text-[#FF9500] leading-none focus:outline-none px-2 py-0.5 rounded-lg border-none w-28 sm:w-36 transition-colors ${
                                     isDark ? 'bg-zinc-800 text-white' : 'bg-black/[0.05] text-[#FF9500]'
@@ -5176,14 +5231,14 @@
                                 <span 
                                   onClick={() => {
                                     triggerHaptic('light');
-                                    setProfileNameInput(userDisplayName || currentUser.email.split('@')[0] || 'Welcome');
+                                    setProfileNameInput(userDisplayName);
                                     setIsEditingProfileName(true);
                                   }}
                                   className="relative inline-flex items-center cursor-pointer transition-colors group"
                                   title="Edit display name"
                                 >
                                   <span className="text-base font-black tracking-tight text-[#FF9500] group-hover:opacity-85 leading-none">
-                                    {userDisplayName || currentUser.email.split('@')[0] || 'Welcome'}
+                                    {userDisplayName}
                                   </span>
                                   <svg className="w-2.5 h-2.5 ml-1 -mt-0.5 opacity-70 stroke-[2] align-top inline-block translate-y-[-2px] text-[#FF9500]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
@@ -5387,7 +5442,7 @@
                   </div>
                 )}
 
-                {/* SUBSCRIPTION MANAGEMENT MIDDLE SCREEN (Solid Slate Cancel Button) */}
+                {/* SUBSCRIPTION MANAGEMENT MIDDLE SCREEN */}
                 {settingsSubView === 'subscription' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -5739,7 +5794,6 @@
                           Brand / Manufacturer *
                         </label>
                         <input
-                          autoCapitalize="words"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -5756,7 +5810,6 @@
                           Model SKU *
                         </label>
                         <input
-                          autoCapitalize="characters"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -5773,7 +5826,6 @@
                           Appliance Category
                         </label>
                         <input
-                          autoCapitalize="words"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -5894,16 +5946,16 @@
                       </div>
                     </div>
 
-                    <div className="px-4">
-                      <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Downgrade to the Free Tier</h3>
-                      <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                        Downgrade to the complimentary Free Starter Tier
+                    <div>
+                      <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50 pl-3.5">Downgrade to Free Tier</h3>
+                      <p className={`text-xs font-semibold mt-0.5 pl-3.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                        Review account limits before switching
                       </p>
                     </div>
 
                     <div className={`p-4 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'apple-card-light text-zinc-900'}`}>
                       <p className="text-xs font-medium leading-relaxed">
-                        If you downgrade, your properties will be capped at 1, maximum appliances reduced to 3, and advanced AI diagnostics will return to Standard Local Diagnostics.
+                        If you downgrade, your Properties will be capped at 1, maximum Appliances reduced to 3, and Advanced Reasoning Diagnostics will return to Standard Local Diagnostics.
                       </p>
 
                       <div className="pt-2 space-y-2">
@@ -6024,10 +6076,9 @@
                           Property Address (Optional)
                         </label>
                         <input
-                          autoCapitalize="words"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
-                            isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                            isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
                           placeholder="e.g. 742 Evergreen Terrace"
                           value={passportPropertyAddress}
@@ -6040,10 +6091,9 @@
                           Owner / Client Name (Optional)
                         </label>
                         <input
-                          autoCapitalize="words"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                           className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
-                            isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                            isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
                           placeholder="e.g. Jane Doe"
                           value={passportOwnerName}
@@ -6346,7 +6396,7 @@
             </div>
           )}
 
-          {/* 5. PAYWALL MODAL (With Aligned Header Inset to Match Checkmarks) */}
+          {/* 5. PAYWALL MODAL (With Inset Header Aligned with Checkmarks) */}
           {isPaywallOpen && (
             <div 
               onClick={() => {
@@ -6476,7 +6526,6 @@
                 </div>
                 <form onSubmit={handleCreateGroup} className="space-y-3">
                   <input
-                    autoCapitalize="words"
                     style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                     className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none ${
                       isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -6574,7 +6623,7 @@
             </div>
           )}
 
-          {/* 9. DELETE ACCOUNT CONFIRMATION MODAL (Updated to "Delete") */}
+          {/* 9. DELETE ACCOUNT CONFIRMATION MODAL (Clean "Delete" Button) */}
           {isDeleteAccountModalOpen && (
             <div 
               onClick={() => setIsDeleteAccountModalOpen(false)} 
@@ -6647,7 +6696,6 @@
                     </p>
                     <input
                       type="email"
-                      autoCapitalize="none"
                       style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -6713,287 +6761,301 @@
             </div>
           )}
 
-          {/* 11. DIAGNOSTIC ASSISTANT OVERLAY */}
+          {/* 11. DIAGNOSTIC ASSISTANT BOTTOM-SHEET MODAL (With Viewport Clamping & Scroll Containment) */}
           {activeAppliance && (
             <div 
+              onClick={() => {
+                dismissActiveKeyboard();
+                if (recognitionRef.current) {
+                  try { recognitionRef.current.stop(); } catch(e){}
+                }
+                setIsListeningDictation(false);
+                setActiveAppliance(null);
+              }} 
               style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 80,
-                height: viewportHeight ? `${viewportHeight}px` : '100dvh',
-                top: viewportHeight ? `${viewportOffsetTop}px` : '0px',
-                paddingTop: 'max(16px, env(safe-area-inset-top, 16px))',
-                paddingBottom: 'max(14px, env(safe-area-inset-bottom, 12px))',
-                overscrollBehavior: 'contain'
+                top: viewportOffsetTop ? `${viewportOffsetTop}px` : '0px',
+                height: viewportHeight ? `${viewportHeight}px` : '100dvh'
               }}
-              className={`w-full flex flex-col transition-colors duration-200 animate-sheet-spring ${
-                isDark ? 'bg-black text-white' : 'bg-[#F2F2F7] text-[#111827]'
-              }`}
+              className="fixed inset-x-0 bottom-0 z-50 bg-black/80 backdrop-blur-md flex items-end justify-center cursor-pointer transition-all duration-100"
             >
-              {/* Top Bar Anchored */}
-              <div className={`px-5 pb-3 border-b flex items-center justify-between shrink-0 ${
-                isDark ? 'border-zinc-800 bg-black' : 'border-black/5 bg-[#F2F2F7]'
-              }`}>
-                <div className="min-w-0 flex-1 pr-3">
-                  <h3 className="text-sm font-black truncate leading-tight">{formatApplianceTitle(activeAppliance.brand, activeAppliance.name)}</h3>
-                  <p className={`text-[12px] mt-0.5 ${
-                    getAssistantTierLabel().includes('Advanced') 
-                      ? 'text-[#FF9500] font-bold' 
-                      : (isDark ? 'text-zinc-400 font-semibold' : 'text-zinc-500 font-semibold')
-                  }`}>
-                    {getAssistantTierLabel()}
-                  </p>
-                </div>
-                <div className="-mt-1 -mr-1">
-                  <AppleCloseButton 
-                    isDark={isDark} 
-                    onClick={() => {
-                      dismissActiveKeyboard();
-                      if (recognitionRef.current) {
-                        try { recognitionRef.current.stop(); } catch(e){}
-                      }
-                      setIsListeningDictation(false);
-                      setActiveAppliance(null);
-                    }} 
-                  />
-                </div>
-              </div>
-
-              {/* Adaptive Action Chips */}
-              <div className={`py-2 px-4 overflow-x-auto scrollbar-none pill-scroll-mask shrink-0 ${
-                isDark ? 'bg-zinc-950/40' : 'bg-white/40'
-              }`}>
-                <div className="flex items-center gap-1.5 w-max pr-6">
-                  {getAdaptiveChips(activeAppliance).map(chip => (
-                    <button
-                      key={chip}
-                      onClick={() => sendQuery(chip)}
-                      className={`text-xs px-3 py-1 rounded-full font-bold shadow-2xs active:scale-95 transition-transform whitespace-nowrap ${
-                        chip === 'Go Deeper' ? `${UI_ACCENT.solid}` : (isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-750' : 'bg-white text-zinc-700 hover:bg-zinc-50 shadow-xs')
-                      }`}
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Message Stream */}
               <div 
-                ref={chatContainerRef}
-                className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5 text-xs scrollbar-none"
+                onClick={(e) => e.stopPropagation()} 
+                style={{
+                  maxHeight: viewportHeight ? `${viewportHeight - 16}px` : '85vh',
+                  height: '85vh',
+                  paddingBottom: 'max(14px, env(safe-area-inset-bottom, 10px))'
+                }}
+                className={`w-full max-w-md rounded-t-[32px] flex flex-col cursor-default overflow-hidden animate-sheet-spring shadow-2xl ${
+                  isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
+                }`}
               >
-                {(isPaidUser || AIQuotaTracker.getStatus(false).count < FREE_TOTAL_QUOTA) && chatSystemStatus === 'offline' && (
-                  <div className="text-center my-3 py-0.5 animate-in fade-in duration-300">
-                    <p className={`text-[12px] font-medium tracking-tight ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                      Internet Connection Offline • Resuming with Local Equipment Schematics
-                    </p>
-                  </div>
-                )}
-
-                {(isPaidUser || AIQuotaTracker.getStatus(false).count < FREE_TOTAL_QUOTA) && chatSystemStatus === 'restored' && (
-                  <div className="text-center my-3 py-0.5 animate-in fade-in duration-300">
-                    <p className={`text-[12px] font-medium tracking-tight ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                      Internet Connection Restored • Advanced Diagnostics Engaged
-                    </p>
-                  </div>
-                )}
-
-                {messages.map(m => (
-                  <div key={m.id} className="space-y-2">
-                    <div className={`py-2.5 px-4 rounded-[20px] w-fit max-w-[85%] whitespace-pre-line font-medium leading-relaxed ${
-                      m.sender === 'user' 
-                        ? 'ml-auto bg-[#FF9500] text-white shadow-xs' 
-                        : (isDark ? 'mr-auto bg-zinc-800 text-zinc-200 shadow-xs' : 'mr-auto bg-white text-zinc-900 shadow-xs border border-black/5')
+                {/* Top Bar Anchored */}
+                <div className={`px-5 py-3 border-b flex items-center justify-between shrink-0 ${
+                  isDark ? 'border-zinc-800 bg-zinc-900/90' : 'border-black/5 bg-white/90'
+                }`}>
+                  <div className="min-w-0 flex-1 pr-3">
+                    <h3 className="text-sm font-black truncate leading-tight">{formatApplianceTitle(activeAppliance.brand, activeAppliance.name)}</h3>
+                    <p className={`text-[12px] mt-0.5 ${
+                      getAssistantTierLabel().includes('Advanced') 
+                        ? 'text-[#FF9500] font-bold' 
+                        : (isDark ? 'text-zinc-400 font-semibold' : 'text-zinc-500 font-semibold')
                     }`}>
-                      {m.text}
+                      {getAssistantTierLabel()}
+                    </p>
+                  </div>
+                  <div className="-mt-1 -mr-1">
+                    <AppleCloseButton 
+                      isDark={isDark} 
+                      onClick={() => {
+                        dismissActiveKeyboard();
+                        if (recognitionRef.current) {
+                          try { recognitionRef.current.stop(); } catch(e){}
+                        }
+                        setIsListeningDictation(false);
+                        setActiveAppliance(null);
+                      }} 
+                    />
+                  </div>
+                </div>
+
+                {/* Adaptive Action Chips */}
+                <div className={`py-2 px-4 overflow-x-auto scrollbar-none pill-scroll-mask shrink-0 ${
+                  isDark ? 'bg-zinc-950/40' : 'bg-black/[0.02]'
+                }`}>
+                  <div className="flex items-center gap-1.5 w-max pr-6">
+                    {getAdaptiveChips(activeAppliance).map(chip => (
+                      <button
+                        key={chip}
+                        onClick={() => sendQuery(chip)}
+                        className={`text-xs px-3 py-1 rounded-full font-bold shadow-2xs active:scale-95 transition-transform whitespace-nowrap ${
+                          chip === 'Go Deeper' ? `${UI_ACCENT.solid}` : (isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-750' : 'bg-white text-zinc-700 hover:bg-zinc-50 shadow-xs')
+                        }`}
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Message Stream with Strict Scroll Containment */}
+                <div 
+                  ref={chatContainerRef}
+                  style={{ overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch' }}
+                  className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5 text-xs scrollbar-none"
+                >
+                  {(isPaidUser || AIQuotaTracker.getStatus(false).count < FREE_TOTAL_QUOTA) && chatSystemStatus === 'offline' && (
+                    <div className="text-center my-3 py-0.5 animate-in fade-in duration-300">
+                      <p className={`text-[12px] font-medium tracking-tight ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                        Internet Connection Offline • Resuming with Local Equipment Schematics
+                      </p>
                     </div>
+                  )}
 
-                    {m.showReferralFork && (
-                      <div className={`mx-auto max-w-[92%] p-4 rounded-2xl space-y-3 shadow-xs ${
-                        isDark ? 'bg-zinc-800/80 text-zinc-200' : 'apple-card-light text-zinc-900'
+                  {(isPaidUser || AIQuotaTracker.getStatus(false).count < FREE_TOTAL_QUOTA) && chatSystemStatus === 'restored' && (
+                    <div className="text-center my-3 py-0.5 animate-in fade-in duration-300">
+                      <p className={`text-[12px] font-medium tracking-tight ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                        Internet Connection Restored • Advanced Diagnostics Engaged
+                      </p>
+                    </div>
+                  )}
+
+                  {messages.map(m => (
+                    <div key={m.id} className="space-y-2">
+                      <div className={`py-2.5 px-4 rounded-[20px] w-fit max-w-[85%] whitespace-pre-line font-medium leading-relaxed ${
+                        m.sender === 'user' 
+                          ? 'ml-auto bg-[#FF9500] text-white shadow-xs' 
+                          : (isDark ? 'mr-auto bg-zinc-800 text-zinc-200 shadow-xs' : 'mr-auto bg-white text-zinc-900 shadow-xs border border-black/5')
                       }`}>
-                        <div className="border-b border-black/5 dark:border-zinc-700/50 pb-2 text-center">
-                          <span className={`text-[11px] font-black uppercase tracking-wider ${UI_ACCENT.text} block`}>
-                            Recommended Next Steps
-                          </span>
-                          <p className="text-[12px] font-medium leading-relaxed text-zinc-500 dark:text-zinc-400 mt-1">
-                            If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically.
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 pt-0.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const wearPart = activeAppliance.replacementParts?.[0];
-                              openExternalRetailer(buildPartPurchaseUrl(activeAppliance.brand, wearPart || { name: 'Part' }, 'amazon', activeAppliance.modelNumber));
-                            }}
-                            className={`p-2.5 rounded-xl text-center flex flex-col items-center justify-center font-bold text-xs shadow-xs active:scale-95 transition-transform ${
-                              isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-[#FAFAFC] hover:bg-zinc-100 text-zinc-900'
-                            }`}
-                          >
-                            <span className="leading-tight">Order OEM Part</span>
-                            <span className="text-[10px] opacity-70 mt-0.5 font-normal">Verified Replacement ↗</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const q = `${activeAppliance.brand} certified appliance service technician repair near me`;
-                              openExternalRetailer(`https://www.google.com/search?q=${encodeURIComponent(q)}`);
-                            }}
-                            className={`p-2.5 rounded-xl text-center flex flex-col items-center justify-center font-bold text-xs shadow-xs active:scale-95 transition-transform ${
-                              isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-[#FAFAFC] hover:bg-zinc-100 text-zinc-900'
-                            }`}
-                          >
-                            <span className="leading-tight">Find a Specialist</span>
-                            <span className="text-[10px] opacity-70 mt-0.5 font-normal">Certified Local Service ↗</span>
-                          </button>
-                        </div>
-
-                        <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400 text-center font-medium pt-1 italic">
-                          Otherwise, send another message to continue troubleshooting.
-                        </p>
+                        {m.text}
                       </div>
-                    )}
 
-                    {m.showTransitionCard && (
-                      <div className={`mx-auto max-w-[92%] p-4 rounded-2xl space-y-3 shadow-xs ${
-                        isDark ? 'bg-zinc-800/80 text-zinc-200' : 'apple-card-light text-zinc-900'
-                      }`}>
-                        <div className="border-b border-black/5 dark:border-zinc-700/50 pb-2 text-center">
-                          <span className={`text-[11px] font-black uppercase tracking-wider ${UI_ACCENT.text} block`}>
-                            Diagnostic Limit Reached
-                          </span>
-                          <p className="text-[12px] font-medium leading-relaxed text-zinc-500 dark:text-zinc-400 mt-1">
-                            5 complimentary Advanced Inquiries used. Standard Diagnostic is now active.
+                      {m.showReferralFork && (
+                        <div className={`mx-auto max-w-[92%] p-4 rounded-2xl space-y-3 shadow-xs ${
+                          isDark ? 'bg-zinc-800/80 text-zinc-200' : 'apple-card-light text-zinc-900'
+                        }`}>
+                          <div className="border-b border-black/5 dark:border-zinc-700/50 pb-2 text-center">
+                            <span className={`text-[11px] font-black uppercase tracking-wider ${UI_ACCENT.text} block`}>
+                              Recommended Next Steps
+                            </span>
+                            <p className="text-[12px] font-medium leading-relaxed text-zinc-500 dark:text-zinc-400 mt-1">
+                              If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically.
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const wearPart = activeAppliance.replacementParts?.[0];
+                                openExternalRetailer(buildPartPurchaseUrl(activeAppliance.brand, wearPart || { name: 'Part' }, 'amazon', activeAppliance.modelNumber));
+                              }}
+                              className={`p-2.5 rounded-xl text-center flex flex-col items-center justify-center font-bold text-xs shadow-xs active:scale-95 transition-transform ${
+                                isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-[#FAFAFC] hover:bg-zinc-100 text-zinc-900'
+                              }`}
+                            >
+                              <span className="leading-tight">Order OEM Part</span>
+                              <span className="text-[10px] opacity-70 mt-0.5 font-normal">Verified Replacement ↗</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const q = `${activeAppliance.brand} certified appliance service technician repair near me`;
+                                openExternalRetailer(`https://www.google.com/search?q=${encodeURIComponent(q)}`);
+                              }}
+                              className={`p-2.5 rounded-xl text-center flex flex-col items-center justify-center font-bold text-xs shadow-xs active:scale-95 transition-transform ${
+                                isDark ? 'bg-zinc-700/70 hover:bg-zinc-700 text-white' : 'bg-[#FAFAFC] hover:bg-zinc-100 text-zinc-900'
+                              }`}
+                            >
+                              <span className="leading-tight">Find a Specialist</span>
+                              <span className="text-[10px] opacity-70 mt-0.5 font-normal">Certified Local Service ↗</span>
+                            </button>
+                          </div>
+
+                          <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400 text-center font-medium pt-1 italic">
+                            Otherwise, send another message to continue troubleshooting.
                           </p>
                         </div>
+                      )}
 
-                        <div className="pt-0.5">
+                      {m.showTransitionCard && (
+                        <div className={`mx-auto max-w-[92%] p-4 rounded-2xl space-y-3 shadow-xs ${
+                          isDark ? 'bg-zinc-800/80 text-zinc-200' : 'apple-card-light text-zinc-900'
+                        }`}>
+                          <div className="border-b border-black/5 dark:border-zinc-700/50 pb-2 text-center">
+                            <span className={`text-[11px] font-black uppercase tracking-wider ${UI_ACCENT.text} block`}>
+                              Diagnostic Limit Reached
+                            </span>
+                            <p className="text-[12px] font-medium leading-relaxed text-zinc-500 dark:text-zinc-400 mt-1">
+                              5 complimentary Advanced Inquiries used. Standard Diagnostic is now active.
+                            </p>
+                          </div>
+
+                          <div className="pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => { triggerHaptic('light'); setIsPaywallOpen(true); }}
+                              className={`w-full py-2.5 rounded-xl text-xs font-bold ${UI_ACCENT.solid} shadow-xs active:scale-95 transition-all flex items-center justify-center`}
+                            >
+                              Upgrade to Advanced Manager ↗
+                            </button>
+                          </div>
+
+                          <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400 text-center font-medium pt-1 italic">
+                            Or continue below with Standard Diagnostic.
+                          </p>
+                        </div>
+                      )}
+
+                      {m.showPeriodicReminder && (
+                        <div className="flex justify-center my-2">
                           <button
                             type="button"
                             onClick={() => { triggerHaptic('light'); setIsPaywallOpen(true); }}
-                            className={`w-full py-2.5 rounded-xl text-xs font-bold ${UI_ACCENT.solid} shadow-xs active:scale-95 transition-all flex items-center justify-center`}
+                            className={`text-[11.5px] font-bold py-1.5 px-3.5 rounded-full transition-all active:scale-95 flex items-center gap-1 ${
+                              isDark 
+                                ? 'bg-zinc-800 text-[#FF9500] hover:bg-zinc-750' 
+                                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 shadow-2xs'
+                            }`}
                           >
-                            Upgrade to Advanced Manager ↗
+                            <span>Using Standard Diagnostic • Upgrade to Advanced Diagnostic ➔</span>
                           </button>
                         </div>
+                      )}
+                    </div>
+                  ))}
 
-                        <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400 text-center font-medium pt-1 italic">
-                          Or continue below with Standard Diagnostic.
-                        </p>
-                      </div>
-                    )}
+                  {isThinking && (
+                    <div className={`h-7 px-3.5 rounded-full inline-flex items-center justify-center gap-1.5 mr-auto shadow-xs ${
+                      isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-white text-zinc-500 border border-black/5'
+                    }`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] imessage-dot"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] imessage-dot"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] imessage-dot"></span>
+                    </div>
+                  )}
 
-                    {m.showPeriodicReminder && (
-                      <div className="flex justify-center my-2">
+                  {streamingText && (
+                    <div className={`py-2.5 px-4 rounded-[20px] w-fit max-w-[85%] mr-auto whitespace-pre-line font-medium leading-relaxed ${
+                      isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-white text-zinc-900 border border-black/5 shadow-xs'
+                    }`}>
+                      {streamingText}
+                    </div>
+                  )}
+
+                  {needsPlacardVerification && (
+                    <div className={`p-3.5 rounded-2xl space-y-2 mt-2 ${
+                      isDark ? 'bg-zinc-800/80 border border-[#FF9500]/40' : 'bg-amber-50 border border-amber-200'
+                    }`}>
+                      <div className="flex justify-between items-center">
+                        <span className={`text-[11px] font-black uppercase tracking-wider ${UI_ACCENT.text}`}>
+                          Placard Model Verification Required
+                        </span>
                         <button
                           type="button"
-                          onClick={() => { triggerHaptic('light'); setIsPaywallOpen(true); }}
-                          className={`text-[11.5px] font-bold py-1.5 px-3.5 rounded-full transition-all active:scale-95 flex items-center gap-1 ${
-                            isDark 
-                              ? 'bg-zinc-800 text-[#FF9500] hover:bg-zinc-750' 
-                              : 'bg-amber-50 text-amber-800 hover:bg-amber-100 shadow-2xs'
+                          onClick={() => { triggerHaptic('light'); placardFileInputRef.current?.click(); }}
+                          className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg transition-colors active:scale-95 ${
+                            isDark ? 'bg-zinc-700 text-[#FF9500] hover:bg-zinc-600' : 'bg-white text-amber-700 hover:bg-amber-100 shadow-2xs'
                           }`}
                         >
-                          <span>Using Standard Diagnostic • Upgrade to Advanced Diagnostic ➔</span>
+                          <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                          </svg>
+                          <span>Snap Photo</span>
                         </button>
                       </div>
-                    )}
-                  </div>
-                ))}
-
-                {isThinking && (
-                  <div className={`h-7 px-3.5 rounded-full inline-flex items-center justify-center gap-1.5 mr-auto shadow-xs ${
-                    isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-white text-zinc-500 border border-black/5'
-                  }`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] imessage-dot"></span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] imessage-dot"></span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] imessage-dot"></span>
-                  </div>
-                )}
-
-                {streamingText && (
-                  <div className={`py-2.5 px-4 rounded-[20px] w-fit max-w-[85%] mr-auto whitespace-pre-line font-medium leading-relaxed ${
-                    isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-white text-zinc-900 border border-black/5 shadow-xs'
-                  }`}>
-                    {streamingText}
-                  </div>
-                )}
-
-                {needsPlacardVerification && (
-                  <div className={`p-3.5 rounded-2xl space-y-2 mt-2 ${
-                    isDark ? 'bg-zinc-800/80 border border-[#FF9500]/40' : 'bg-amber-50 border border-amber-200'
-                  }`}>
-                    <div className="flex justify-between items-center">
-                      <span className={`text-[11px] font-black uppercase tracking-wider ${UI_ACCENT.text}`}>
-                        Placard Model Verification Required
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => { triggerHaptic('light'); placardFileInputRef.current?.click(); }}
-                        className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-lg transition-colors active:scale-95 ${
-                          isDark ? 'bg-zinc-700 text-[#FF9500] hover:bg-zinc-600' : 'bg-white text-amber-700 hover:bg-amber-100 shadow-2xs'
-                        }`}
-                      >
-                        <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                          <circle cx="12" cy="13" r="4"></circle>
-                        </svg>
-                        <span>Snap Photo</span>
-                      </button>
+                      <p className={`text-[12px] leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        Enter the exact model SKU from the silver rating plate to reconcile factory schematics:
+                      </p>
+                      <div className="flex gap-2 pt-1">
+                        <input
+                          style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                          className={`flex-1 rounded-xl px-3.5 py-1.5 text-xs font-semibold focus:outline-none ${
+                            isDark ? 'bg-zinc-700 text-white' : 'bg-white border border-black/10 text-black'
+                          }`}
+                          placeholder="e.g. 5440i"
+                          value={placardVerifyInput}
+                          onChange={(e) => setPlacardVerifyInput(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleInlinePlacardVerification()}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleInlinePlacardVerification}
+                          className={`${UI_ACCENT.solid} font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs active:scale-95 transition-transform`}
+                        >
+                          Verify ➔
+                        </button>
+                      </div>
                     </div>
-                    <p className={`text-[12px] leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                      Enter the exact model SKU from the silver rating plate to reconcile factory schematics:
-                    </p>
-                    <div className="flex gap-2 pt-1">
+                  )}
+
+                  {isLoading && <p className="text-xs text-zinc-400 animate-pulse px-2">Analyzing...</p>}
+                </div>
+
+                {/* Docked Composer */}
+                <div className={`px-4 pt-2 pb-1 border-t flex flex-col gap-1.5 shrink-0 ${
+                  isDark ? 'border-zinc-800 bg-zinc-900' : 'border-black/5 bg-white'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <div className={`flex-1 rounded-full px-2 py-1.5 flex items-center gap-2 ${
+                      isDark ? 'bg-zinc-800 text-white' : 'bg-black/[0.04] text-zinc-900 shadow-xs'
+                    }`}>
                       <input
-                        autoCapitalize="characters"
+                        type="text"
+                        enterKeyHint="send"
+                        autoComplete="off"
+                        autoCorrect="off"
                         style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                        className={`flex-1 rounded-xl px-3.5 py-1.5 text-xs font-semibold focus:outline-none ${
-                          isDark ? 'bg-zinc-700 text-white' : 'bg-white border border-black/10 text-black'
-                        }`}
-                        placeholder="e.g. 5440i"
-                        value={placardVerifyInput}
-                        onChange={(e) => setPlacardVerifyInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleInlinePlacardVerification()}
+                        className="flex-1 bg-transparent text-xs pl-2.5 focus:outline-none placeholder:text-zinc-500"
+                        placeholder={isListeningDictation ? "Listening... Speak now" : "Describe symptoms, error codes, or sounds…"}
+                        value={queryInput}
+                        onChange={(e) => setQueryInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && sendQuery()}
+                        onFocus={() => {
+                          setTimeout(() => scrollToChatBottom(true), 120);
+                        }}
                       />
-                      <button
-                        type="button"
-                        onClick={handleInlinePlacardVerification}
-                        className={`${UI_ACCENT.solid} font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs active:scale-95 transition-transform`}
-                      >
-                        Verify ➔
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {isLoading && <p className="text-xs text-zinc-400 animate-pulse px-2">Analyzing...</p>}
-              </div>
-
-              {/* Docked Composer */}
-              <div className={`px-4 pt-2 pb-1 border-t flex flex-col gap-1.5 shrink-0 ${
-                isDark ? 'border-zinc-800 bg-black' : 'border-black/5 bg-[#F2F2F7]'
-              }`}>
-                <div className="flex items-center gap-2">
-                  <div className={`flex-1 rounded-full px-2 py-1.5 flex items-center gap-2 ${
-                    isDark ? 'bg-zinc-800 text-white' : 'bg-white text-zinc-900 border border-black/5 shadow-xs'
-                  }`}>
-                    <input
-                      type="text"
-                      enterKeyHint="send"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                      className="flex-1 bg-transparent text-xs pl-2.5 focus:outline-none placeholder:text-zinc-500"
-                      placeholder={isListeningDictation ? "Listening... Speak now" : "Describe symptoms, error codes, or sounds…"}
-                      value={queryInput}
-                      onChange={(e) => setQueryInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && sendQuery()}
-                    />
 
                     <button
                       type="button"
@@ -7028,6 +7090,7 @@
                 </p>
               </div>
             </div>
+          </div>
           )}
 
           {/* 12. INLINE PDF VIEWER */}
@@ -7040,7 +7103,9 @@
                 <button
                   onClick={() => {
                     triggerHaptic('light');
-                    URL.revokeObjectURL(inlinePdfViewerData.url);
+                    if (inlinePdfViewerData.url && inlinePdfViewerData.url.startsWith('blob:')) {
+                      URL.revokeObjectURL(inlinePdfViewerData.url);
+                    }
                     setInlinePdfViewerData(null);
                   }}
                   className="px-4 py-1.5 rounded-full text-xs font-bold bg-zinc-800 text-zinc-200 active:scale-95 transition-transform"
