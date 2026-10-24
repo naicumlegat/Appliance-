@@ -617,7 +617,6 @@
       }
     }
 
-    // Starter catalog (purely clean user-defined equipment)
     const MOCK_INITIAL_APPLIANCES = [];
 
     const BUNDLED_CHASSIS_ERRORS = {
@@ -1030,7 +1029,6 @@
       };
     }
 
-    // Complete Manufacturer Support Registry (45+ Direct Portals)
     const STATIC_BRAND_PORTALS = {
       samsung: { warranty: 'https://www.samsung.com/us/support/register/', support: 'https://www.samsung.com/us/support/contact/' },
       lg: { warranty: 'https://www.lg.com/us/support/product-registration', support: 'https://www.lg.com/us/support/contact' },
@@ -1343,7 +1341,6 @@
       );
     }
 
-    // Institutional Passport HTML Builder
     function buildInstitutionalPassportHtml(meta, items, includeMaintenanceLog = true, includeValuation = false) {
       const totalCount = items.length;
       let totalEstValue = 0;
@@ -2048,8 +2045,31 @@
         })();
       }, []);
 
+      // Strips heavy base64 images from localStorage payload to eliminate the 5MB browser quota ceiling
+      const sanitizeForLocalStorage = (list) => {
+        return list.map(item => {
+          const clean = { ...item };
+          if (clean.receiptDoc) {
+            clean.receiptDoc = {
+              name: clean.receiptDoc.name || 'Receipt.jpg',
+              uploadDate: clean.receiptDoc.uploadDate || '',
+              hasImage: Boolean(clean.receiptDoc.dataUrl || clean.receiptDoc.hasImage)
+            };
+          }
+          if (clean.warrantyDoc) {
+            clean.warrantyDoc = {
+              name: clean.warrantyDoc.name || 'Warranty.pdf',
+              uploadDate: clean.warrantyDoc.uploadDate || '',
+              hasImage: Boolean(clean.warrantyDoc.dataUrl || clean.warrantyDoc.hasImage)
+            };
+          }
+          delete clean.receipt;
+          return clean;
+        });
+      };
+
       const triggerDebouncedSync = (nextAppliances = appliances, nextUnits = units) => {
-        localStorage.setItem('user_appliances_catalog', JSON.stringify(nextAppliances));
+        localStorage.setItem('user_appliances_catalog', JSON.stringify(sanitizeForLocalStorage(nextAppliances)));
         localStorage.setItem('app_units_catalog', JSON.stringify(nextUnits));
         isDirtySync = true;
         setIsActivelySyncing(true);
@@ -2098,6 +2118,16 @@
           const data = await res.json();
           const incomingAppliances = data.appliances || data.fleet || [];
           if (Array.isArray(incomingAppliances)) {
+            // Re-hydrate local IndexedDB media cache for downloaded receipt/warranty images
+            for (const item of incomingAppliances) {
+              if (item.receiptDoc?.dataUrl) {
+                await ApplianceStorageDB.set('media_store', `receiptDoc_${item.id}`, item.receiptDoc.dataUrl);
+              }
+              if (item.warrantyDoc?.dataUrl) {
+                await ApplianceStorageDB.set('media_store', `warrantyDoc_${item.id}`, item.warrantyDoc.dataUrl);
+              }
+            }
+
             setAppliances(prev => {
               const cloudMap = new Map(incomingAppliances.map(a => [a.id, a]));
               const merged = prev.map(localItem => {
@@ -2107,7 +2137,7 @@
                 return (cloudItem.updatedAt || 0) > (localItem.updatedAt || 0) ? cloudItem : localItem;
               });
               cloudMap.forEach(newCloudItem => merged.push(newCloudItem));
-              localStorage.setItem('user_appliances_catalog', JSON.stringify(merged));
+              localStorage.setItem('user_appliances_catalog', JSON.stringify(sanitizeForLocalStorage(merged)));
               return merged;
             });
           }
@@ -2437,7 +2467,8 @@
         if (!file) return;
         try {
           const { dataUrl } = await compressImageFast(file, 900);
-          const filePayload = { name: file.name, dataUrl, uploadDate: new Date().toLocaleDateString() };
+          const filePayload = { name: file.name, uploadDate: new Date().toLocaleDateString(), hasImage: true };
+          // Persist raw compressed file strictly to IndexedDB to preserve localStorage quotas
           await ApplianceStorageDB.set('media_store', `${docType}_${applianceId}`, dataUrl);
           
           const updated = appliances.map(app => {
@@ -2446,7 +2477,7 @@
           });
           setAppliances(updated);
           if (selectedAppliance && selectedAppliance.id === applianceId) {
-            setSelectedAppliance({ ...selectedAppliance, [docType]: filePayload });
+            setSelectedAppliance({ ...selectedAppliance, [docType]: { ...filePayload, dataUrl } });
           }
           triggerDebouncedSync(updated, units);
           showToast("Document saved to archive");
@@ -2589,6 +2620,10 @@
 
         verifyCpscRecallCached(effectiveBrand, resolvedFinalModel);
 
+        if (addForm.receiptDataUrl) {
+          await ApplianceStorageDB.set('media_store', `receiptDoc_${newId}`, addForm.receiptDataUrl);
+        }
+
         const newItem = {
           id: newId,
           unitId: finalUnit.id,
@@ -2604,7 +2639,7 @@
           warrantyMonths: parsedIsoPurchaseDate ? 12 : 0,
           warrantyActivated: false,
           warrantyDoc: null,
-          receiptDoc: addForm.receiptDataUrl ? { name: addForm.receiptFileName || 'Receipt.jpg', dataUrl: addForm.receiptDataUrl, uploadDate: new Date().toLocaleDateString() } : null,
+          receiptDoc: addForm.receiptDataUrl ? { name: addForm.receiptFileName || 'Receipt.jpg', uploadDate: new Date().toLocaleDateString(), hasImage: true } : null,
           consumables: discoveredConsumables,
           replacementParts: discoveredParts,
           updatedAt: Date.now()
@@ -3338,7 +3373,6 @@
 
             <div
               onTouchStart={(e) => {
-                // Auto-close any other open swiped card when touching a new one
                 if (activeSwipingIdRef.current !== item.id && Object.keys(swipeOffsets).length > 0) {
                   setSwipeOffsets({});
                 }
@@ -3447,7 +3481,7 @@
                   </div>
                 </div>
 
-                {/* Edit Mode: Right-Aligned Up/Down Reorder Controls (Aligned directly under 'Done' button) */}
+                {/* Edit Mode: Right-Aligned Up/Down Reorder Controls (Aligned with 'Done' button column) */}
                 {isSelectMode && (
                   <div className="flex flex-col gap-0.5 shrink-0 pr-0.5">
                     <button
@@ -3775,7 +3809,7 @@
                           setSearchQuery('');
                           setIsSearchExpanded(false);
                         }}
-                        className="w-4 h-4 rounded-full bg-zinc-500/20 text-zinc-400 flex items-center justify-center text-[10px] shrink-0"
+                        className="w-7 h-7 -mr-1 rounded-full text-zinc-400 hover:text-zinc-200 flex items-center justify-center text-[12px] shrink-0 active:scale-90 transition-transform"
                       >
                         ✕
                       </button>
@@ -3969,18 +4003,36 @@
                           ) : (
                             searchQuery.trim() ? (
                               <div className={`p-4 text-center rounded-2xl ${isDark ? 'text-zinc-400 bg-zinc-900/60' : 'text-zinc-600 bg-[#FAFAFC]'}`}>
-                                <p className="text-xs font-semibold mb-2">No appliances matching "{searchQuery}"</p>
-                                <button
-                                  type="button"
-                                  onClick={() => { 
-                                    triggerHaptic('light'); 
-                                    setSearchQuery(''); 
-                                    setIsSearchExpanded(false); 
-                                  }}
-                                  className={`text-xs font-bold px-3 py-1.5 rounded-full ${UI_ACCENT.badge} active:scale-95 transition-transform`}
-                                >
-                                  Clear Search Filter
-                                </button>
+                                <p className="text-xs font-semibold mb-2">
+                                  {activeCategoryFilter !== 'All' 
+                                    ? `No ${activeCategoryFilter} appliances matching "${searchQuery}"`
+                                    : `No appliances matching "${searchQuery}"`}
+                                </p>
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => { 
+                                      triggerHaptic('light'); 
+                                      setSearchQuery(''); 
+                                      setIsSearchExpanded(false); 
+                                    }}
+                                    className={`text-xs font-bold px-3 py-1.5 rounded-full ${UI_ACCENT.badge} active:scale-95 transition-transform`}
+                                  >
+                                    Clear Search
+                                  </button>
+                                  {activeCategoryFilter !== 'All' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        triggerHaptic('light');
+                                        setActiveCategoryFilter('All');
+                                      }}
+                                      className={`text-xs font-bold px-3 py-1.5 rounded-full ${isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] text-zinc-700'} active:scale-95 transition-transform`}
+                                    >
+                                      Reset Filter
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             ) : (
                               <div className={`p-4 text-center rounded-2xl ${isDark ? 'bg-zinc-900/40' : 'bg-[#FAFAFC]'}`}>
@@ -4189,9 +4241,15 @@
                     >
                       Order on Amazon ↗
                     </button>
-                    <p className={`text-[11px] leading-tight text-center font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-500'} pt-0.5`}>
-                      Confirm model compatibility on retailer site before purchase.
-                    </p>
+                    {!isOnline ? (
+                      <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 text-center pt-0.5">
+                        Offline • Reconnect to purchase
+                      </p>
+                    ) : (
+                      <p className={`text-[11px] leading-tight text-center font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-500'} pt-0.5`}>
+                        Confirm model compatibility on retailer site before purchase.
+                      </p>
+                    )}
                   </div>
 
                   <div className="pt-1 relative h-12">
@@ -4230,436 +4288,452 @@
           })()}
 
           {/* 2. APPLIANCE DETAIL SHEET */}
-          {selectedAppliance && (
-            <div 
-              onClick={() => {
-                dismissActiveKeyboard();
-                if (isEditingApplianceSpecs) setIsEditingApplianceSpecs(false);
-                setSelectedAppliance(null);
-              }} 
-              className="fixed inset-0 z-40 bg-black/80 backdrop-blur-md flex items-end justify-center cursor-pointer transition-opacity"
-            >
+          {selectedAppliance && (() => {
+            return (
               <div 
-                onClick={(e) => e.stopPropagation()} 
-                style={{ paddingBottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
-                className={`w-full max-w-md max-h-[78vh] h-[78vh] rounded-t-[32px] flex flex-col cursor-default overflow-hidden animate-sheet-spring ${
-                  isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
-                }`}
+                onClick={() => {
+                  dismissActiveKeyboard();
+                  if (isEditingApplianceSpecs) setIsEditingApplianceSpecs(false);
+                  setSelectedAppliance(null);
+                }} 
+                className="fixed inset-0 z-40 bg-black/80 backdrop-blur-md flex items-end justify-center cursor-pointer transition-opacity"
               >
-                <div className={`sticky top-0 z-20 backdrop-blur-xl px-6 pt-4 pb-3 grid grid-cols-[64px_1fr_64px] items-center shrink-0 ${
-                  isDark ? 'bg-zinc-900/90 border-b border-zinc-800/80' : 'bg-white/90 border-b border-black/[0.03]'
-                }`}>
-                  <div className="flex justify-start">
-                    {isEditingApplianceSpecs ? (
-                      <button
-                        type="button"
-                        onClick={() => { dismissActiveKeyboard(); setIsEditingApplianceSpecs(false); }}
-                        className={`text-xs font-bold transition-opacity active:opacity-60 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
-                      >
-                        Cancel
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleStartEditingAppliance}
-                        className={`text-xs font-bold transition-opacity active:opacity-60 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </div>
+                <div 
+                  onClick={(e) => e.stopPropagation()} 
+                  style={{ paddingBottom: 'max(28px, calc(env(safe-area-inset-bottom, 0px) + 16px))' }}
+                  className={`w-full max-w-md max-h-[78vh] h-[78vh] rounded-t-[32px] flex flex-col cursor-default overflow-hidden animate-sheet-spring ${
+                    isDark ? 'bg-zinc-900 text-white' : 'apple-drawer-light text-zinc-900'
+                  }`}
+                >
+                  <div className={`sticky top-0 z-20 backdrop-blur-xl px-6 pt-4 pb-3 grid grid-cols-[64px_1fr_64px] items-center shrink-0 ${
+                    isDark ? 'bg-zinc-900/90 border-b border-zinc-800/80' : 'bg-white/90 border-b border-black/[0.03]'
+                  }`}>
+                    <div className="flex justify-start">
+                      {isEditingApplianceSpecs ? (
+                        <button
+                          type="button"
+                          onClick={() => { dismissActiveKeyboard(); setIsEditingApplianceSpecs(false); }}
+                          className={`text-xs font-bold transition-opacity active:opacity-60 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
+                        >
+                          Cancel
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleStartEditingAppliance}
+                          className={`text-xs font-bold transition-opacity active:opacity-60 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
 
-                  <div className="text-center overflow-hidden px-1">
-                    <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#FF9500] truncate block">
-                      {selectedAppliance.brand} • {selectedAppliance.category}
-                    </span>
-                  </div>
+                    <div className="text-center overflow-hidden px-1">
+                      <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#FF9500] truncate block">
+                        {selectedAppliance.brand} • {selectedAppliance.category}
+                      </span>
+                    </div>
 
-                  <div className="flex justify-end">
-                    {isEditingApplianceSpecs ? (
-                      <button
-                        type="button"
-                        onClick={handleSaveEditedAppliance}
-                        className={`${UI_ACCENT.solid} px-3.5 py-1 rounded-full text-xs font-bold shadow-xs active:scale-95 transition-transform`}
-                      >
-                        Save
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => { dismissActiveKeyboard(); setSelectedAppliance(null); }}
-                        className={`px-3.5 py-1 rounded-full text-xs font-bold shadow-xs active:scale-95 transition-transform ${
-                          isDark ? 'bg-zinc-800 text-white' : 'bg-black/[0.04] text-zinc-900'
-                        }`}
-                      >
-                        Done
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="px-6 pt-3.5 pb-2 shrink-0">
-                  {isEditingApplianceSpecs ? (
-                    <div className="space-y-3 animate-in fade-in duration-150">
-                      <div>
-                        <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                          Appliance Name
-                        </label>
-                        <input
-                          autoCapitalize="words"
-                          style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                          className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
-                            isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                    <div className="flex justify-end">
+                      {isEditingApplianceSpecs ? (
+                        <button
+                          type="button"
+                          onClick={handleSaveEditedAppliance}
+                          className={`${UI_ACCENT.solid} px-3.5 py-1 rounded-full text-xs font-bold shadow-xs active:scale-95 transition-transform`}
+                        >
+                          Save
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => { dismissActiveKeyboard(); setSelectedAppliance(null); }}
+                          className={`px-3.5 py-1 rounded-full text-xs font-bold shadow-xs active:scale-95 transition-transform ${
+                            isDark ? 'bg-zinc-800 text-white' : 'bg-black/[0.04] text-zinc-900'
                           }`}
-                          value={editApplianceForm.name}
-                          onChange={(e) => setEditApplianceForm(prev => ({ ...prev, name: e.target.value }))}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2.5">
+                        >
+                          Done
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="px-6 pt-3.5 pb-2 shrink-0">
+                    {isEditingApplianceSpecs ? (
+                      <div className="space-y-3 animate-in fade-in duration-150">
                         <div>
-                          <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                            Room Nickname
+                          <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                            Appliance Name
                           </label>
                           <input
                             autoCapitalize="words"
                             style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                            className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
+                            className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
                               isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                             }`}
-                            placeholder="e.g. Kitchen"
-                            value={editApplianceForm.nickname}
-                            onChange={(e) => setEditApplianceForm(prev => ({ ...prev, nickname: e.target.value }))}
+                            value={editApplianceForm.name}
+                            onChange={(e) => setEditApplianceForm(prev => ({ ...prev, name: e.target.value }))}
                           />
                         </div>
-                        <div>
-                          <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                            Property
-                          </label>
-                          <select
-                            style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                            className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
-                              isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
-                            }`}
-                            value={editApplianceForm.unitId}
-                            onChange={(e) => setEditApplianceForm(prev => ({ ...prev, unitId: e.target.value }))}
-                          >
-                            {units.map(u => (
-                              <option key={u.id} value={u.id} className={isDark ? 'bg-zinc-900 text-white' : 'bg-white text-black'}>{u.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <div>
-                          <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                            Model SKU
-                          </label>
-                          <input
-                            autoCapitalize="characters"
-                            style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                            className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
-                              isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
-                            }`}
-                            value={editApplianceForm.modelNumber}
-                            onChange={(e) => setEditApplianceForm(prev => ({ ...prev, modelNumber: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                            Serial Number
-                          </label>
-                          <input
-                            autoCapitalize="characters"
-                            style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                            className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
-                              isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
-                            }`}
-                            value={editApplianceForm.serialNumber}
-                            onChange={(e) => setEditApplianceForm(prev => ({ ...prev, serialNumber: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <div>
-                          <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                            Purchase Date
-                          </label>
-                          <input
-                            style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                            className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
-                              isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
-                            }`}
-                            placeholder="MM/DD/YYYY"
-                            value={editApplianceForm.purchaseDate}
-                            onChange={(e) => setEditApplianceForm(prev => ({ ...prev, purchaseDate: formatToMMDDYYYY(e.target.value) }))}
-                          />
-                        </div>
-                        <div>
-                          <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                            Purchase Price
-                          </label>
-                          <input
-                            style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                            className={`w-full rounded-xl px-3 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
-                              isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
-                            }`}
-                            placeholder="e.g. $1,299.00"
-                            value={editApplianceForm.purchasePrice}
-                            onChange={(e) => setEditApplianceForm(prev => ({ ...prev, purchasePrice: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      {/* Clean Single-Row Appliance Title */}
-                      <h2 className="text-base font-black tracking-tight leading-snug break-words">
-                        {selectedAppliance.name}
-                      </h2>
-                      {/* Secondary Spec Row: Brand • Model # • Nickname (Strict Left Alignment) */}
-                      <p className={`text-[13.5px] font-mono font-bold mt-0.5 truncate ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                        {selectedAppliance.brand}
-                        {selectedAppliance.modelNumber ? ` • Model #${selectedAppliance.modelNumber}` : ' • Standard Platform'}
-                        {selectedAppliance.nickname ? ` • ${selectedAppliance.nickname}` : ''}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="px-6 pt-1 shrink-0">
-                  <div className={`p-1 rounded-xl flex gap-1 ${isDark ? 'bg-zinc-800/70' : 'bg-black/[0.04]'}`}>
-                    {[{ id: 'parts', label: 'Mechanical Parts' }, { id: 'docs', label: 'Warranty & Receipt' }].map(tab => (
-                      <button
-                        key={tab.id}
-                        onClick={() => { triggerHaptic('light'); setDetailTab(tab.id); }}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          detailTab === tab.id
-                            ? (isDark ? 'bg-zinc-700 text-white shadow-xs' : 'bg-white text-zinc-900 shadow-xs')
-                            : (isDark ? 'text-zinc-400 hover:text-zinc-200' : 'text-zinc-500 hover:text-zinc-800')
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex-1 px-6 py-4 overflow-y-auto space-y-4 pb-20">
-                  {detailTab === 'parts' && (
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                            Replacement Components
-                          </p>
-                          <p className={`text-[11px] font-semibold ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                            Verified high-wear motors, valves, & pumps
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); openAssistant(selectedAppliance); }}
-                          className={`text-xs font-bold ${UI_ACCENT.text} hover:opacity-80 cursor-pointer`}
-                        >
-                          Ask Manual 💬
-                        </button>
-                      </div>
-
-                      {selectedAppliance.replacementParts?.length > 0 ? (
-                        <>
-                          {selectedAppliance.replacementParts.map((p, pIdx) => (
-                            <div key={p.partNumber || pIdx} className={`rounded-2xl p-3.5 flex justify-between items-center ${
-                              isDark ? 'bg-zinc-800/60' : 'apple-card-light'
-                            }`}>
-                              <div className="pr-2 min-w-0">
-                                <p className="text-[13.5px] font-bold truncate">{p.name}</p>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyPartSku(p.partNumber)}
-                                  className={`text-[11px] font-mono font-semibold mt-0.5 inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${
-                                    copiedPartSku === p.partNumber 
-                                      ? (isDark ? 'text-zinc-100 font-bold' : 'text-zinc-900 font-bold') 
-                                      : (isDark ? 'text-zinc-400' : 'text-zinc-600')
-                                  }`}
-                                >
-                                  <span>{copiedPartSku === p.partNumber ? '✓ Copied!' : `Part #: ${p.partNumber}`}</span>
-                                </button>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  onClick={() => openExternalRetailer(buildPartPurchaseUrl(selectedAppliance.brand, p, 'oem', selectedAppliance.modelNumber))}
-                                  className={`text-[12px] font-bold px-3 py-1.5 rounded-full transition-all active:scale-95 ${
-                                    isDark ? 'bg-zinc-700/80 text-zinc-200 hover:bg-zinc-700' : 'bg-black/[0.04] text-zinc-900'
-                                  }`}
-                                >
-                                  OEM ↗
-                                </button>
-                                <button
-                                  onClick={() => openExternalRetailer(buildPartPurchaseUrl(selectedAppliance.brand, p, 'amazon', selectedAppliance.modelNumber))}
-                                  className={`${UI_ACCENT.solid} text-[12px] font-bold px-3 py-1.5 rounded-full shadow-xs active:scale-95 transition-transform`}
-                                >
-                                  Amazon ↗
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                          <p className={`text-[11px] leading-tight text-center font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-500'} pt-0.5`}>
-                            Confirm model compatibility on retailer site before purchase.
-                          </p>
-                        </>
-                      ) : (
-                        <p className={`text-xs py-4 font-semibold ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                          No mechanical wear parts cataloged for this model.
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {detailTab === 'docs' && (
-                    <div className="space-y-3">
-                      <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC]'}`}>
-                        <div className="flex justify-between items-start">
+                        <div className="grid grid-cols-2 gap-2.5">
                           <div>
-                            <p className="text-xs font-black">Manufacturer Warranty</p>
-                            {(() => {
-                              const wInfo = calculateApplianceWarrantyStatus(selectedAppliance);
-                              return (
-                                <p className={`text-[11.5px] font-semibold leading-tight mt-0.5 ${
-                                  wInfo.status === 'active' ? 'text-emerald-500 font-bold' : (wInfo.isExpired ? 'text-rose-500 font-bold' : (isDark ? 'text-zinc-400' : 'text-zinc-500'))
-                                }`}>
-                                  {wInfo.label}
-                                </p>
-                              );
-                            })()}
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                triggerHaptic('light');
-                                sessionStorage.setItem('pending_warranty_appliance_id', selectedAppliance.id);
-                                openExternalRetailer(resolveOfficialLinks(selectedAppliance, dynamicPortals).warranty);
-                              }}
-                              className={`${UI_ACCENT.solid} h-7 px-3 inline-flex items-center justify-center text-xs font-bold rounded-lg shadow-xs whitespace-nowrap active:scale-95 transition-transform`}
-                            >
-                              Activate
-                            </button>
-                            <label className={`h-7 px-3 inline-flex items-center justify-center cursor-pointer text-xs font-bold rounded-lg shadow-xs whitespace-nowrap transition-colors ${
-                              isDark ? 'bg-zinc-700/80 hover:bg-zinc-700 text-white' : 'bg-white hover:bg-zinc-50 text-zinc-900 border border-black/10'
-                            }`}>
-                              Upload
-                              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(selectedAppliance.id, 'warrantyDoc', e)} />
+                            <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                              Room Nickname
                             </label>
+                            <input
+                              autoCapitalize="words"
+                              style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                              className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
+                                isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                              }`}
+                              placeholder="e.g. Kitchen"
+                              value={editApplianceForm.nickname}
+                              onChange={(e) => setEditApplianceForm(prev => ({ ...prev, nickname: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                              Property
+                            </label>
+                            <select
+                              style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                              className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
+                                isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                              }`}
+                              value={editApplianceForm.unitId}
+                              onChange={(e) => setEditApplianceForm(prev => ({ ...prev, unitId: e.target.value }))}
+                            >
+                              {units.map(u => (
+                                <option key={u.id} value={u.id} className={isDark ? 'bg-zinc-900 text-white' : 'bg-white text-black'}>{u.name}</option>
+                              ))}
+                            </select>
                           </div>
                         </div>
-
-                        {selectedAppliance.warrantyDoc && (
-                          <div className={`mt-2 p-2.5 rounded-xl flex items-center justify-between ${
-                            isDark ? 'bg-zinc-800/90' : 'apple-card-light'
-                          }`}>
-                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                              <span className="text-sm">📄</span>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold truncate">{selectedAppliance.warrantyDoc.name || 'Warranty Certificate'}</p>
-                                <p className={`text-[11px] font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                                  Archived • {selectedAppliance.warrantyDoc.uploadDate}
-                                </p>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                triggerHaptic('light');
-                                if (selectedAppliance.warrantyDoc.dataUrl) setReceiptLightboxUrl(selectedAppliance.warrantyDoc.dataUrl);
-                              }}
-                              className={`text-[11.5px] font-bold px-2.5 py-1 rounded-lg active:scale-95 transition-transform ${
-                                isDark ? 'bg-zinc-700 text-zinc-200' : 'bg-black/[0.04] text-zinc-800'
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                              Model SKU
+                            </label>
+                            <input
+                              autoCapitalize="characters"
+                              style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                              className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
+                                isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                               }`}
-                            >
-                              View
-                            </button>
+                              value={editApplianceForm.modelNumber}
+                              onChange={(e) => setEditApplianceForm(prev => ({ ...prev, modelNumber: e.target.value }))}
+                            />
                           </div>
-                        )}
-
-                        <div className={`pt-2 border-t flex items-center justify-between ${isDark ? 'border-zinc-700/50' : 'border-black/5'}`}>
-                          <span className={`text-[11px] font-semibold ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Manufacturer repair inquiry</span>
-                          <button
-                            onClick={() => openExternalRetailer(resolveOfficialLinks(selectedAppliance, dynamicPortals).support)}
-                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg flex items-center gap-1 active:scale-95 transition-transform ${
-                              isDark ? 'bg-zinc-700/80 hover:bg-zinc-750 text-zinc-300' : 'bg-white hover:bg-zinc-50 text-zinc-900 border border-black/10'
-                            }`}
-                          >
-                            <span>Official Support</span>
-                            <span className="text-[10px]">↗</span>
-                          </button>
+                          <div>
+                            <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                              Serial Number
+                            </label>
+                            <input
+                              autoCapitalize="characters"
+                              style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                              className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
+                                isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                              }`}
+                              value={editApplianceForm.serialNumber}
+                              onChange={(e) => setEditApplianceForm(prev => ({ ...prev, serialNumber: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                              Purchase Date
+                            </label>
+                            <input
+                              style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                              className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
+                                isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                              }`}
+                              placeholder="MM/DD/YYYY"
+                              value={editApplianceForm.purchaseDate}
+                              onChange={(e) => setEditApplianceForm(prev => ({ ...prev, purchaseDate: formatToMMDDYYYY(e.target.value) }))}
+                            />
+                          </div>
+                          <div>
+                            <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                              Purchase Price
+                            </label>
+                            <input
+                              style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                              className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
+                                isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                              }`}
+                              placeholder="e.g. $1,299.00"
+                              value={editApplianceForm.purchasePrice}
+                              onChange={(e) => setEditApplianceForm(prev => ({ ...prev, purchasePrice: e.target.value }))}
+                            />
+                          </div>
                         </div>
                       </div>
+                    ) : (
+                      <div>
+                        {/* Clean Single-Row Appliance Title */}
+                        <h2 className="text-base font-black tracking-tight leading-snug break-words">
+                          {selectedAppliance.name}
+                        </h2>
+                        {/* Secondary Spec Row: Brand • Model # • Nickname */}
+                        <p className={`text-[13.5px] font-mono font-bold mt-0.5 truncate ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                          {selectedAppliance.brand}
+                          {selectedAppliance.modelNumber ? ` • Model #${selectedAppliance.modelNumber}` : ' • Standard Platform'}
+                          {selectedAppliance.nickname ? ` • ${selectedAppliance.nickname}` : ''}
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
-                      <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC]'}`}>
+                  <div className="px-6 pt-1 shrink-0">
+                    <div className={`p-1 rounded-xl flex gap-1 ${isDark ? 'bg-zinc-800/70' : 'bg-black/[0.04]'}`}>
+                      {[{ id: 'parts', label: 'Mechanical Parts' }, { id: 'docs', label: 'Warranty & Receipt' }].map(tab => (
+                        <button
+                          key={tab.id}
+                          onClick={() => { triggerHaptic('light'); setDetailTab(tab.id); }}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            detailTab === tab.id
+                              ? (isDark ? 'bg-zinc-700 text-white shadow-xs' : 'bg-white text-zinc-900 shadow-xs')
+                              : (isDark ? 'text-zinc-400 hover:text-zinc-200' : 'text-zinc-500 hover:text-zinc-800')
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 px-6 py-4 overflow-y-auto space-y-4 pb-20">
+                    {detailTab === 'parts' && (
+                      <div className="space-y-3">
                         <div className="flex justify-between items-center">
                           <div>
-                            <p className="text-xs font-black">Purchase Receipt</p>
-                            <p className={`text-[11px] font-semibold leading-tight ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Proof of purchase & invoice storage</p>
+                            <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                              Replacement Components
+                            </p>
+                            <p className={`text-[11px] font-semibold ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                              Verified high-wear motors, valves, & pumps
+                            </p>
                           </div>
-                          <label className={`${UI_ACCENT.solid} h-7 px-3 inline-flex items-center justify-center text-xs font-bold rounded-lg shadow-xs cursor-pointer whitespace-nowrap active:scale-95 transition-transform`}>
-                            Upload
-                            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(selectedAppliance.id, 'receiptDoc', e)} />
-                          </label>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); openAssistant(selectedAppliance); }}
+                            className={`text-xs font-bold ${UI_ACCENT.text} hover:opacity-80 cursor-pointer`}
+                          >
+                            Ask Manual 💬
+                          </button>
                         </div>
 
-                        {selectedAppliance.receiptDoc && (
-                          <div className={`mt-2 p-2.5 rounded-xl flex items-center justify-between ${
-                            isDark ? 'bg-zinc-800/90' : 'apple-card-light'
-                          }`}>
-                            <div 
-                              onClick={() => setReceiptLightboxUrl(selectedAppliance.receiptDoc.dataUrl)}
-                              className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
-                            >
-                              <div className="w-12 h-12 rounded-lg bg-black/10 overflow-hidden shrink-0 border border-black/5">
-                                <img src={selectedAppliance.receiptDoc.dataUrl} alt="Receipt" className="w-full h-full object-cover" />
+                        {selectedAppliance.replacementParts?.length > 0 ? (
+                          <>
+                            {selectedAppliance.replacementParts.map((p, pIdx) => (
+                              <div key={p.partNumber || pIdx} className={`rounded-2xl p-3.5 flex justify-between items-center ${
+                                isDark ? 'bg-zinc-800/60' : 'apple-card-light'
+                              }`}>
+                                <div className="pr-2 min-w-0">
+                                  <p className="text-[13.5px] font-bold truncate">{p.name}</p>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyPartSku(p.partNumber)}
+                                    className={`text-[11px] font-mono font-semibold mt-0.5 inline-flex items-center gap-1 cursor-pointer hover:opacity-80 ${
+                                      copiedPartSku === p.partNumber 
+                                        ? (isDark ? 'text-zinc-100 font-bold' : 'text-zinc-900 font-bold') 
+                                        : (isDark ? 'text-zinc-400' : 'text-zinc-600')
+                                    }`}
+                                  >
+                                    <span>{copiedPartSku === p.partNumber ? '✓ Copied!' : `Part #: ${p.partNumber}`}</span>
+                                  </button>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    onClick={() => openExternalRetailer(buildPartPurchaseUrl(selectedAppliance.brand, p, 'oem', selectedAppliance.modelNumber))}
+                                    className={`text-[12px] font-bold px-3 py-1.5 rounded-full transition-all active:scale-95 ${
+                                      isDark ? 'bg-zinc-700/80 text-zinc-200 hover:bg-zinc-700' : 'bg-black/[0.04] text-zinc-900'
+                                    }`}
+                                  >
+                                    OEM ↗
+                                  </button>
+                                  <button
+                                    onClick={() => openExternalRetailer(buildPartPurchaseUrl(selectedAppliance.brand, p, 'amazon', selectedAppliance.modelNumber))}
+                                    className={`${UI_ACCENT.solid} text-[12px] font-bold px-3 py-1.5 rounded-full shadow-xs active:scale-95 transition-transform`}
+                                  >
+                                    Amazon ↗
+                                  </button>
+                                </div>
                               </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold truncate">Purchase Invoice</p>
-                                <p className={`text-[11px] font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                                  Tap to expand • {selectedAppliance.receiptDoc.uploadDate}
-                                </p>
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPendingDeleteReceiptApplianceId(selectedAppliance.id);
-                              }}
-                              className="w-7 h-7 rounded-full bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 flex items-center justify-center font-bold text-xs ml-2 shrink-0 active:scale-90"
-                              title="Delete Receipt"
-                            >
-                              ✕
-                            </button>
-                          </div>
+                            ))}
+                            <p className={`text-[11px] leading-tight text-center font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-500'} pt-0.5`}>
+                              Confirm model compatibility on retailer site before purchase.
+                            </p>
+                          </>
+                        ) : (
+                          <p className={`text-xs py-4 font-semibold ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                            No mechanical wear parts cataloged for this model.
+                          </p>
                         )}
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  <div className="flex justify-center pt-6 pb-2">
-                    <button
-                      type="button"
-                      onClick={() => { dismissActiveKeyboard(); setSelectedAppliance(null); }}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-md active:scale-90 transition-transform ${
-                        isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-black/[0.05] text-[#111827] hover:bg-black/[0.08]'
-                      }`}
-                      title="Close Details"
-                    >
-                      ✕
-                    </button>
+                    {detailTab === 'docs' && (
+                      <div className="space-y-3">
+                        <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC]'}`}>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-xs font-black">Manufacturer Warranty</p>
+                              {(() => {
+                                const wInfo = calculateApplianceWarrantyStatus(selectedAppliance);
+                                return (
+                                  <p className={`text-[11.5px] font-semibold leading-tight mt-0.5 ${
+                                    wInfo.status === 'active' ? 'text-emerald-500 font-bold' : (wInfo.isExpired ? 'text-rose-500 font-bold' : (isDark ? 'text-zinc-400' : 'text-zinc-500'))
+                                  }`}>
+                                    {wInfo.label}
+                                  </p>
+                                );
+                              })()}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  triggerHaptic('light');
+                                  sessionStorage.setItem('pending_warranty_appliance_id', selectedAppliance.id);
+                                  openExternalRetailer(resolveOfficialLinks(selectedAppliance, dynamicPortals).warranty);
+                                }}
+                                className={`${UI_ACCENT.solid} h-7 px-3 inline-flex items-center justify-center text-xs font-bold rounded-lg shadow-xs whitespace-nowrap active:scale-95 transition-transform`}
+                              >
+                                Activate
+                              </button>
+                              <label className={`h-7 px-3 inline-flex items-center justify-center cursor-pointer text-xs font-bold rounded-lg shadow-xs whitespace-nowrap transition-colors ${
+                                isDark ? 'bg-zinc-700/80 hover:bg-zinc-700 text-white' : 'bg-white hover:bg-zinc-50 text-zinc-900 border border-black/10'
+                              }`}>
+                                Upload
+                                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(selectedAppliance.id, 'warrantyDoc', e)} />
+                              </label>
+                            </div>
+                          </div>
+
+                          {selectedAppliance.warrantyDoc && (
+                            <div className={`mt-2 p-2.5 rounded-xl flex items-center justify-between ${
+                              isDark ? 'bg-zinc-800/90' : 'apple-card-light'
+                            }`}>
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <span className="text-sm">📄</span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-bold truncate">{selectedAppliance.warrantyDoc.name || 'Warranty Certificate'}</p>
+                                  <p className={`text-[11px] font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                                    Archived • {selectedAppliance.warrantyDoc.uploadDate}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  triggerHaptic('light');
+                                  let docUrl = selectedAppliance.warrantyDoc.dataUrl;
+                                  if (!docUrl) {
+                                    docUrl = await ApplianceStorageDB.get('media_store', `warrantyDoc_${selectedAppliance.id}`);
+                                  }
+                                  if (docUrl) setReceiptLightboxUrl(docUrl);
+                                }}
+                                className={`text-[11.5px] font-bold px-2.5 py-1 rounded-lg active:scale-95 transition-transform ${
+                                  isDark ? 'bg-zinc-700 text-zinc-200' : 'bg-black/[0.04] text-zinc-800'
+                                }`}
+                              >
+                                View
+                              </button>
+                            </div>
+                          )}
+
+                          <div className={`pt-2 border-t flex items-center justify-between ${isDark ? 'border-zinc-700/50' : 'border-black/5'}`}>
+                            <span className={`text-[11px] font-semibold ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Manufacturer repair inquiry</span>
+                            <button
+                              onClick={() => openExternalRetailer(resolveOfficialLinks(selectedAppliance, dynamicPortals).support)}
+                              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg flex items-center gap-1 active:scale-95 transition-transform ${
+                                isDark ? 'bg-zinc-700/80 hover:bg-zinc-750 text-zinc-300' : 'bg-white hover:bg-zinc-50 text-zinc-900 border border-black/10'
+                              }`}
+                            >
+                              <span>Official Support</span>
+                              <span className="text-[10px]">↗</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC]'}`}>
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="text-xs font-black">Purchase Receipt</p>
+                              <p className={`text-[11px] font-semibold leading-tight ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Proof of purchase & invoice storage</p>
+                            </div>
+                            <label className={`${UI_ACCENT.solid} h-7 px-3 inline-flex items-center justify-center text-xs font-bold rounded-lg shadow-xs cursor-pointer whitespace-nowrap active:scale-95 transition-transform`}>
+                              Upload
+                              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(selectedAppliance.id, 'receiptDoc', e)} />
+                            </label>
+                          </div>
+
+                          {selectedAppliance.receiptDoc && (
+                            <div className={`mt-2 p-2.5 rounded-xl flex items-center justify-between ${
+                              isDark ? 'bg-zinc-800/90' : 'apple-card-light'
+                            }`}>
+                              <div 
+                                onClick={async () => {
+                                  let rUrl = selectedAppliance.receiptDoc.dataUrl;
+                                  if (!rUrl) {
+                                    rUrl = await ApplianceStorageDB.get('media_store', `receiptDoc_${selectedAppliance.id}`);
+                                  }
+                                  if (rUrl) setReceiptLightboxUrl(rUrl);
+                                }}
+                                className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
+                              >
+                                <div className="w-12 h-12 rounded-lg bg-black/10 overflow-hidden shrink-0 border border-black/5 flex items-center justify-center text-base">
+                                  {selectedAppliance.receiptDoc.dataUrl ? (
+                                    <img src={selectedAppliance.receiptDoc.dataUrl} alt="Receipt" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span>🧾</span>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-bold truncate">Purchase Invoice</p>
+                                  <p className={`text-[11px] font-medium ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                                    Tap to expand • {selectedAppliance.receiptDoc.uploadDate}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPendingDeleteReceiptApplianceId(selectedAppliance.id);
+                                }}
+                                className="w-7 h-7 rounded-full bg-rose-500/15 text-rose-500 hover:bg-rose-500/25 flex items-center justify-center font-bold text-xs ml-2 shrink-0 active:scale-90"
+                                title="Delete Receipt"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-center pt-6 pb-2">
+                      <button
+                        type="button"
+                        onClick={() => { dismissActiveKeyboard(); setSelectedAppliance(null); }}
+                        className={`w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-md active:scale-90 transition-transform ${
+                          isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-black/[0.05] text-[#111827] hover:bg-black/[0.08]'
+                        }`}
+                        title="Close Details"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* RECEIPT LIGHTBOX */}
           {receiptLightboxUrl && (
@@ -4702,7 +4776,7 @@
             </div>
           )}
 
-          {/* 3. ADD APPLIANCE MODAL */}
+          {/* 3. ADD APPLIANCE MODAL (With Precision Optical 'e.g.' Alignment) */}
           {isAddOpen && (
             <div onClick={closeAddModal} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer">
               <div 
@@ -4714,7 +4788,7 @@
                 }`}
               >
                 <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
-                  <h3 className="text-base font-black tracking-tight pt-0.5">Add Appliance</h3>
+                  <h3 className="text-base font-black tracking-tight pt-0.5 pl-3.5">Add Appliance</h3>
                   <div className="-mt-1 -mr-1">
                     <AppleCloseButton isDark={isDark} onClick={closeAddModal} />
                   </div>
@@ -4752,13 +4826,13 @@
                 <form onSubmit={handleAddEquipmentSubmit} className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                      <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                         Brand *
                       </label>
                       <input
                         autoCapitalize="words"
                         style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                        className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
+                        className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                           addFormSubmitted && !addForm.brand.trim() ? 'ring-2 ring-rose-500' : ''
                         } ${
                           isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -4770,13 +4844,13 @@
                       />
                     </div>
                     <div>
-                      <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                      <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                         Model #
                       </label>
                       <input
                         autoCapitalize="characters"
                         style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                        className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
+                        className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                           addFormSubmitted && !addForm.model.trim() && !addForm.name.trim() ? 'ring-1 ring-amber-500/70' : ''
                         } ${
                           isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -4789,13 +4863,13 @@
                   </div>
 
                   <div>
-                    <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                       Product Name
                     </label>
                     <input
                       autoCapitalize="words"
                       style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                      className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
+                      className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none transition-colors ${
                         addFormSubmitted && !addForm.name.trim() && !addForm.model.trim() ? 'ring-1 ring-amber-500/70' : ''
                       } ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
@@ -4807,13 +4881,13 @@
                   </div>
 
                   <div>
-                    <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                       Location / Room Nickname
                     </label>
                     <input
                       autoCapitalize="words"
                       style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                      className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                      className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                         isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                       }`}
                       placeholder="e.g. Kitchen, Master Bedroom"
@@ -4823,7 +4897,7 @@
                   </div>
 
                   <div className="pt-1">
-                    <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                    <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                       Property Group
                     </label>
                     {addForm.isAddingNewUnitInline ? (
@@ -4832,7 +4906,7 @@
                           ref={inlineNewUnitInputRef}
                           autoCapitalize="words"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                          className={`flex-1 rounded-xl p-2.5 text-xs font-semibold focus:outline-none ${
+                          className={`flex-1 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
                           placeholder="Property Name (e.g. Vacation Home)"
@@ -4866,7 +4940,7 @@
                     ) : (
                       <select
                         style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                        className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                        className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                           isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                         }`}
                         value={addForm.selectedUnitId}
@@ -4888,7 +4962,7 @@
                   </div>
 
                   {lookupStatus && (
-                    <p className={`text-[12px] font-bold ${UI_ACCENT.text} animate-pulse px-1`}>{lookupStatus}</p>
+                    <p className={`text-[12px] font-bold ${UI_ACCENT.text} animate-pulse px-3.5`}>{lookupStatus}</p>
                   )}
 
                   <div className="pt-2 border-t border-black/10 dark:border-zinc-800/80">
@@ -4900,21 +4974,21 @@
                       }}
                       className={`text-xs font-bold ${UI_ACCENT.text} flex items-center justify-between w-full py-1`}
                     >
-                      <span>Passport & Warranty Details (Optional)</span>
-                      <span className="text-[10px]">{addForm.isPassportDetailsOpen ? '▲' : '▼'}</span>
+                      <span className="pl-3.5">Passport &amp; Warranty Details (Optional)</span>
+                      <span className="text-[10px] pr-1">{addForm.isPassportDetailsOpen ? '▲' : '▼'}</span>
                     </button>
 
                     {addForm.isPassportDetailsOpen && (
                       <div className="space-y-3 pt-2">
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                            <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                               Serial Number
                             </label>
                             <input
                               autoCapitalize="characters"
                               style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                              className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
+                              className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
                               placeholder="e.g. SN-8841029"
@@ -4923,12 +4997,12 @@
                             />
                           </div>
                           <div>
-                            <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                            <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                               Purchase Date
                             </label>
                             <input
                               style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                              className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
+                              className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
                               placeholder="MM/DD/YYYY"
@@ -4940,12 +5014,12 @@
 
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                            <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                               Purchase Price
                             </label>
                             <input
                               style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                              className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
+                              className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
                               placeholder="e.g. $1,299.00"
@@ -4954,13 +5028,13 @@
                             />
                           </div>
                           <div>
-                            <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                            <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                               Retailer / Vendor
                             </label>
                             <input
                               autoCapitalize="words"
                               style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                              className={`w-full rounded-xl p-2 text-xs font-semibold mt-1 focus:outline-none ${
+                              className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-1 focus:outline-none ${
                                 isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
                               placeholder="e.g. Best Buy, Ferguson"
@@ -5038,7 +5112,7 @@
                       isDark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'
                     }`}
                   >
-                    Maybe later
+                    Maybe Later
                   </button>
                 </div>
               </div>
@@ -5066,7 +5140,6 @@
                 
                 {settingsSubView === 'root' && (
                   <div className="space-y-3.5">
-                    {/* Aligned to px-4 to match the inner text boundary of the cards below */}
                     <div className="flex justify-between items-start pt-1 pb-1 px-4">
                       <div className="min-w-0 flex-1 pr-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -5314,7 +5387,7 @@
                   </div>
                 )}
 
-                {/* SUBSCRIPTION MANAGEMENT MIDDLE SCREEN */}
+                {/* SUBSCRIPTION MANAGEMENT MIDDLE SCREEN (Solid Slate Cancel Button) */}
                 {settingsSubView === 'subscription' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -5372,7 +5445,7 @@
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); triggerHaptic('light'); setSettingsSubView('cancel'); }}
-                            className="w-full py-2.5 rounded-xl text-xs font-bold text-rose-500 dark:text-rose-400 bg-rose-500/[0.08] dark:bg-rose-500/15 border border-rose-500/20 active:bg-rose-500/20 transition-all active:scale-95"
+                            className="w-full py-2.5 rounded-xl text-xs font-bold text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-zinc-800/90 border border-rose-200/80 dark:border-zinc-700/60 active:bg-rose-100 dark:active:bg-zinc-750 transition-all active:scale-95 shadow-xs"
                           >
                             Cancel Subscription
                           </button>
@@ -5653,7 +5726,7 @@
                       </div>
                     </div>
 
-                    <div className="px-3">
+                    <div className="px-3.5">
                       <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Request Missing Manual</h3>
                       <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-200' : 'text-zinc-500'}`}>
                         Submit unindexed appliances for automated schematic ingestion
@@ -5662,13 +5735,13 @@
 
                     <form onSubmit={handleMissingManualSubmit} className="space-y-3 pt-1">
                       <div>
-                        <label className={`text-[12.5px] font-bold tracking-tight block px-3 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Brand / Manufacturer *
                         </label>
                         <input
                           autoCapitalize="words"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                          className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                          className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
                           placeholder="e.g. Sub-Zero, Bosch"
@@ -5679,13 +5752,13 @@
                       </div>
 
                       <div>
-                        <label className={`text-[12.5px] font-bold tracking-tight block px-3 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Model SKU *
                         </label>
                         <input
                           autoCapitalize="characters"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                          className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                          className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
                           placeholder="e.g. B36CL80ENS"
@@ -5696,13 +5769,13 @@
                       </div>
 
                       <div>
-                        <label className={`text-[12.5px] font-bold tracking-tight block px-3 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Appliance Category
                         </label>
                         <input
                           autoCapitalize="words"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                          className={`w-full rounded-xl px-3 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                          className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                           }`}
                           placeholder="e.g. Refrigeration, Dishwashing"
@@ -5809,7 +5882,7 @@
                   </div>
                 )}
 
-                {/* 1. CANCEL SUBSCRIPTION SUBVIEW */}
+                {/* 1. CANCEL MEMBERSHIP SUBVIEW (Downgrade to Free Tier) */}
                 {settingsSubView === 'cancel' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -5822,7 +5895,7 @@
                     </div>
 
                     <div className="px-4">
-                      <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Cancel Membership</h3>
+                      <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Downgrade to the Free Tier</h3>
                       <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                         Downgrade to the complimentary Free Starter Tier
                       </p>
@@ -5830,7 +5903,7 @@
 
                     <div className={`p-4 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60 text-zinc-200' : 'apple-card-light text-zinc-900'}`}>
                       <p className="text-xs font-medium leading-relaxed">
-                        If you downgrade, your properties will be capped at 1, maximum appliances reduced to 3, and advanced AI diagnostics will return to standard local checks.
+                        If you downgrade, your properties will be capped at 1, maximum appliances reduced to 3, and advanced AI diagnostics will return to Standard Local Diagnostics.
                       </p>
 
                       <div className="pt-2 space-y-2">
@@ -5851,7 +5924,7 @@
                           }}
                           className="w-full py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-xs active:scale-95 transition-transform"
                         >
-                          Confirm Cancellation &amp; Downgrade
+                          Confirm and Cancel
                         </button>
                         <button
                           type="button"
@@ -5907,7 +5980,7 @@
                   </div>
                 )}
 
-                {/* 3. PASSPORT COMPILER & CONFIGURATION SUBVIEW */}
+                {/* 3. PASSPORT COMPILER & CONFIGURATION SUBVIEW (With Precision Optical 'e.g.' Alignment) */}
                 {settingsSubView === 'passport' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -5919,21 +5992,21 @@
                       </div>
                     </div>
 
-                    <div className="px-4">
-                      <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50">Compile Audit Ledger</h3>
-                      <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    <div>
+                      <h3 className="text-base font-black tracking-tight text-zinc-900 dark:text-zinc-50 pl-3.5">Compile Audit Ledger</h3>
+                      <p className={`text-xs font-semibold mt-0.5 pl-3.5 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                         {getPassportRemainingTimeString()} on active pass
                       </p>
                     </div>
 
                     <div className="space-y-3 text-xs">
                       <div>
-                        <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Property Scope
                         </label>
                         <select
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                          className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                          className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                           }`}
                           value={passportScopeUnitId}
@@ -5947,13 +6020,13 @@
                       </div>
 
                       <div>
-                        <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Property Address (Optional)
                         </label>
                         <input
                           autoCapitalize="words"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                          className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                          className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                           }`}
                           placeholder="e.g. 742 Evergreen Terrace"
@@ -5963,13 +6036,13 @@
                       </div>
 
                       <div>
-                        <label className={`text-[12.5px] font-bold tracking-tight block ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                        <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
                           Owner / Client Name (Optional)
                         </label>
                         <input
                           autoCapitalize="words"
                           style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                          className={`w-full rounded-xl p-2.5 text-xs font-semibold mt-1 focus:outline-none ${
+                          className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold mt-1 focus:outline-none ${
                             isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
                           }`}
                           placeholder="e.g. Jane Doe"
@@ -6085,8 +6158,8 @@
                       {unacknowledgedNotifications.length === 0 
                         ? 'No new alerts' 
                         : (unacknowledgedNotifications.length === 1 
-                            ? '1 appliance requires your attention' 
-                            : `${unacknowledgedNotifications.length} appliances require your attention`)}
+                            ? '1 item requires your attention' 
+                            : `${unacknowledgedNotifications.length} items require your attention`)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 -mt-1 -mr-1">
@@ -6273,7 +6346,7 @@
             </div>
           )}
 
-          {/* 5. PAYWALL MODAL */}
+          {/* 5. PAYWALL MODAL (With Aligned Header Inset to Match Checkmarks) */}
           {isPaywallOpen && (
             <div 
               onClick={() => {
@@ -6291,7 +6364,7 @@
                 }`}
               >
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="pl-3.5">
                     <span className={`text-[11px] font-black uppercase tracking-wider ${UI_ACCENT.text}`}>Advanced Manager</span>
                     <h3 className="text-lg font-black tracking-tight mt-0.5">Appliance Engine Pro</h3>
                   </div>
@@ -6501,7 +6574,7 @@
             </div>
           )}
 
-          {/* 9. DELETE ACCOUNT CONFIRMATION MODAL */}
+          {/* 9. DELETE ACCOUNT CONFIRMATION MODAL (Updated to "Delete") */}
           {isDeleteAccountModalOpen && (
             <div 
               onClick={() => setIsDeleteAccountModalOpen(false)} 
@@ -6530,7 +6603,7 @@
                     Cancel
                   </button>
                   <button onClick={handleDeleteAccountForever} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs py-2.5 rounded-2xl font-bold shadow-xs active:scale-95 transition-transform">
-                    Delete Forever
+                    Delete
                   </button>
                 </div>
               </div>
@@ -6879,7 +6952,7 @@
                       <input
                         autoCapitalize="characters"
                         style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                        className={`flex-1 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none ${
+                        className={`flex-1 rounded-xl px-3.5 py-1.5 text-xs font-semibold focus:outline-none ${
                           isDark ? 'bg-zinc-700 text-white' : 'bg-white border border-black/10 text-black'
                         }`}
                         placeholder="e.g. 5440i"
@@ -6916,7 +6989,7 @@
                       autoCorrect="off"
                       style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                       className="flex-1 bg-transparent text-xs pl-2.5 focus:outline-none placeholder:text-zinc-500"
-                      placeholder={isListeningDictation ? "Listening... Speak now" : "Describe issue, sound, or symptom..."}
+                      placeholder={isListeningDictation ? "Listening... Speak now" : "Describe symptoms, error codes, or sounds…"}
                       value={queryInput}
                       onChange={(e) => setQueryInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && sendQuery()}
