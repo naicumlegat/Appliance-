@@ -1573,7 +1573,7 @@
     let isDirtySync = false;
     let lastPullTime = 0;
 
-    function App() {
+        function App() {
       const [toastMessage, setToastMessage] = useState(null);
       const toastTimerRef = useRef(null);
 
@@ -1593,7 +1593,10 @@
       // System Inline Chat Connectivity Markers
       const [chatSystemStatus, setChatSystemStatus] = useState(null);
 
-      // Dual-Anchor Visual Viewport Tracking: Tracks keyboard displacement and viewport boundaries
+      // AI Diagnostic Chat State (Declared early so viewport listener can reference it)
+      const [activeAppliance, setActiveAppliance] = useState(null);
+
+      // Dual-Anchor Visual Viewport Tracking State
       const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== 'undefined' && window.visualViewport ? window.visualViewport.height : 0));
       const [viewportOffsetTop, setViewportOffsetTop] = useState(() => (typeof window !== 'undefined' && window.visualViewport ? window.visualViewport.offsetTop : 0));
 
@@ -1621,11 +1624,15 @@
         };
       }, []);
 
+      // Visual Viewport Hook (Neutralizes auto-scroll when chat is active)
       useEffect(() => {
         if (typeof window === 'undefined' || !window.visualViewport) return;
         const handleViewportChange = () => {
           setViewportHeight(window.visualViewport.height);
           setViewportOffsetTop(window.visualViewport.offsetTop);
+          if (activeAppliance && typeof window !== 'undefined') {
+            window.scrollTo(0, 0);
+          }
         };
         window.visualViewport.addEventListener('resize', handleViewportChange);
         window.visualViewport.addEventListener('scroll', handleViewportChange);
@@ -1633,7 +1640,8 @@
           window.visualViewport.removeEventListener('resize', handleViewportChange);
           window.visualViewport.removeEventListener('scroll', handleViewportChange);
         };
-      }, []);
+      }, [activeAppliance]);
+
 
       const [units, setUnits] = useState(() => {
         try {
@@ -1838,7 +1846,6 @@
       const [activeExportMenuId, setActiveExportMenuId] = useState(null);
 
       // AI Diagnostic Chat State
-      const [activeAppliance, setActiveAppliance] = useState(null);
       const [messages, setMessages] = useState([]);
       const [queryInput, setQueryInput] = useState('');
       const [isLoading, setIsLoading] = useState(false);
@@ -5382,8 +5389,7 @@
                         <AppleCloseButton isDark={isDark} onClick={() => setIsSettingsOpen(false)} />
                       </div>
                     </div>
-
-                    {/* CARD 1: PLAN TIER */}
+       {/* CARD 1: PLAN TIER */}
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
                       <div>
                         <div className="flex items-center gap-2">
@@ -5397,10 +5403,10 @@
                           </span>
                         </div>
 
-                        <p className={`text-[12px] font-semibold leading-normal mt-1.5 truncate ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                        <p className={`text-[11.5px] font-semibold leading-normal mt-1.5 whitespace-nowrap overflow-hidden text-ellipsis ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
                           {isPaidUser 
-                            ? `Using ${totalItemsUsed}/${maxItems} Appliances • ${totalGroupsUsed}/${maxGroups} Properties • ${aiUsed} Advanced Inquiries`
-                            : `Using ${totalItemsUsed}/${maxItems} Appliances • ${totalGroupsUsed}/${maxGroups} Properties • ${aiQuotaStatus.isLocked ? 'Standard Diagnostics' : `${aiUsed}/${FREE_TOTAL_QUOTA} Complimentary Inquiries`}`}
+                            ? `${totalItemsUsed}/${maxItems} Appliances • ${totalGroupsUsed}/${maxGroups} Properties • ${aiUsed} Advanced Inquiries`
+                            : `${totalItemsUsed}/${maxItems} Appliances • ${totalGroupsUsed}/${maxGroups} Properties • ${aiQuotaStatus.isLocked ? 'Standard Diagnostics' : `${aiUsed}/${FREE_TOTAL_QUOTA} Complimentary Inquiries`}`}
                         </p>
                       </div>
 
@@ -5417,22 +5423,22 @@
                       </button>
                     </div>
 
-                    {/* CARD 2: PASSPORT */}
+                                          {/* CARD 2: PASSPORT (Active Shifted Inward & Ledger Preserved) */}
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-1.5">
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-black tracking-tight truncate">Home Appliance Passport (PDF &amp; CSV)</p>
-                          <p className={`text-[11.5px] font-semibold leading-normal mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                          <p className={`text-[10.5px] font-semibold tracking-tight leading-normal mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
                             Verified Home Appliance &amp; Maintenance Ledger
                           </p>
                         </div>
-                        <div className="flex justify-end items-center shrink-0 pl-1">
+                        <div className="flex justify-end items-center shrink-0 pl-1.5 mr-3">
                           {isPassportUnlocked() ? (
-                            <span className="text-[12.5px] font-bold text-emerald-500">
+                            <span className="text-[15px] font-black tracking-tight text-emerald-500 leading-none">
                               Active
                             </span>
                           ) : (
-                            <span className="text-[15px] font-black tracking-tight text-[#FF9500]">
+                            <span className="text-[15px] font-black tracking-tight text-[#FF9500] leading-none">
                               $2.99
                             </span>
                           )}
@@ -5461,6 +5467,7 @@
                         </button>
                       )}
                     </div>
+
 
                     {/* CARD 3: NOTIFICATIONS */}
                     <div 
@@ -6898,7 +6905,7 @@
             </div>
           )}
 
-          {/* 11. DIAGNOSTIC ASSISTANT BOTTOM-SHEET MODAL */}
+                    {/* 11. DIAGNOSTIC ASSISTANT BOTTOM-SHEET MODAL (Fixed Viewport Clamping & Locked Scrolling) */}
           {activeAppliance && (
             <div 
               onClick={() => {
@@ -6910,17 +6917,18 @@
                 setActiveAppliance(null);
               }} 
               style={{
-                top: viewportOffsetTop ? `${viewportOffsetTop}px` : '0px',
-                height: viewportHeight ? `${viewportHeight}px` : '100dvh',
-                touchAction: 'none'
+                top: `${viewportOffsetTop || 0}px`,
+                height: `${viewportHeight || (typeof window !== 'undefined' ? window.innerHeight : 0)}px`,
+                touchAction: 'none',
+                overscrollBehavior: 'none'
               }}
-              className="fixed inset-x-0 bottom-0 z-50 bg-black/80 backdrop-blur-md flex items-end justify-center cursor-pointer transition-all duration-100 overflow-hidden"
+              className="fixed inset-x-0 z-50 bg-black/80 backdrop-blur-md flex items-end justify-center cursor-pointer overflow-hidden select-none"
             >
               <div 
                 onClick={(e) => e.stopPropagation()} 
                 style={{
-                  maxHeight: isKeyboardActive ? `${viewportHeight - 12}px` : '78vh',
-                  height: isKeyboardActive ? `${viewportHeight - 12}px` : '78vh',
+                  height: isKeyboardActive ? '100%' : '78vh',
+                  maxHeight: isKeyboardActive ? '100%' : '78vh',
                   touchAction: 'none'
                 }}
                 className={`w-full max-w-md rounded-t-[32px] flex flex-col cursor-default overflow-hidden animate-sheet-spring shadow-2xl ${
@@ -6931,7 +6939,7 @@
                 <div 
                   style={{ touchAction: 'none' }}
                   className={`px-5 py-3 border-b flex items-center justify-between shrink-0 select-none ${
-                    isDark ? 'border-zinc-800 bg-zinc-900/90' : 'border-black/5 bg-white/90'
+                    isDark ? 'border-zinc-800 bg-zinc-900/95' : 'border-black/5 bg-white/95'
                   }`}
                 >
                   <div className="min-w-0 flex-1 pr-3">
@@ -7212,7 +7220,7 @@
                   {isLoading && <p className={`text-xs animate-pulse px-2 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Analyzing...</p>}
                 </div>
 
-                {/* Docked Composer */}
+                {/* Docked Composer (Safe Input Focus & Neutralized Auto-Scroll) */}
                 <div 
                   style={{ 
                     touchAction: 'none',
@@ -7238,8 +7246,15 @@
                         onChange={(e) => setQueryInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && sendQuery()}
                         onFocus={() => {
-                          setTimeout(() => scrollToChatBottom(true), 60);
-                          setTimeout(() => scrollToChatBottom(true), 280);
+                          if (typeof window !== 'undefined') window.scrollTo(0, 0);
+                          setTimeout(() => {
+                            if (typeof window !== 'undefined') window.scrollTo(0, 0);
+                            scrollToChatBottom(true);
+                          }, 60);
+                          setTimeout(() => {
+                            if (typeof window !== 'undefined') window.scrollTo(0, 0);
+                            scrollToChatBottom(true);
+                          }, 250);
                         }}
                       />
 
@@ -7278,6 +7293,8 @@
               </div>
             </div>
           )}
+
+          
 
           {/* 12. INLINE PDF VIEWER */}
           {inlinePdfViewerData && (
