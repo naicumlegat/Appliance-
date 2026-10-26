@@ -39,7 +39,7 @@
       background-color: #000000;
     }
 
-    /* Fixed Input Typography: Proportional to field titles & Prevents iOS zoom */
+    /* Fixed Input Typography: Prevents unwanted iOS auto-zoom & aligns labels */
     input, textarea, select {
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif !important;
       font-size: 14px !important;
@@ -226,7 +226,7 @@
   </script>
 
   <script type="text/babel">
-    const { useState, useEffect, useRef, useCallback } = React;
+    const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
     const UI_ACCENT = {
       badge: 'bg-[#FF9500]/15 text-amber-700 dark:text-[#FF9500]',
@@ -248,19 +248,26 @@
     const PRO_MAX_GROUPS = 5;
     const PRO_MAX_PER_GROUP = 15;
 
-    let isDirtySync = false;
-    let lastPullTime = 0;
+    // =========================================================================
+    // PLATFORM & HARDWARE ABSTRACTION LAYER (Decoupled for Mobile Porting)
+    // =========================================================================
+
+    const PlatformHaptics = {
+      trigger(type = 'light') {
+        const isEnabled = localStorage.getItem('app_notif_haptics') !== 'false';
+        if (!isEnabled) return;
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try {
+            if (type === 'light') navigator.vibrate(10);
+            else if (type === 'success') navigator.vibrate([15, 30, 20]);
+            else if (type === 'arm' || type === 'warn') navigator.vibrate([25, 40, 30]);
+          } catch(e) {}
+        }
+      }
+    };
 
     function triggerHaptic(type = 'light') {
-      const isEnabled = localStorage.getItem('app_notif_haptics') !== 'false';
-      if (!isEnabled) return;
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        try {
-          if (type === 'light') navigator.vibrate(10);
-          else if (type === 'success') navigator.vibrate([15, 30, 20]);
-          else if (type === 'arm' || type === 'warn') navigator.vibrate([25, 40, 30]);
-        } catch(e) {}
-      }
+      PlatformHaptics.trigger(type);
     }
 
     function dismissActiveKeyboard() {
@@ -269,7 +276,33 @@
       }
     }
 
-    // Headless Retailer Deep Link
+    // Cryptographic Session Token & Header Manager
+    const AuthTokenManager = {
+      TOKEN_KEY: 'app_session_hmac_token',
+      getToken() {
+        return localStorage.getItem(this.TOKEN_KEY) || '';
+      },
+      setToken(token) {
+        if (token) localStorage.setItem(this.TOKEN_KEY, token);
+        else localStorage.removeItem(this.TOKEN_KEY);
+      },
+      clearToken() {
+        localStorage.removeItem(this.TOKEN_KEY);
+      },
+      buildAuthHeaders(email = '') {
+        const headers = { 'Content-Type': 'application/json' };
+        const token = this.getToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        if (email) {
+          headers['X-User-Email'] = email;
+        }
+        return headers;
+      }
+    };
+
+    // Low-Overhead Headless Retailer Deep Link
     function openExternalRetailer(url) {
       if (!url) return;
       triggerHaptic('light');
@@ -282,175 +315,100 @@
       document.body.removeChild(link);
     }
 
-    // iOS-Style Slider Toggle in Signature Orange
-    function AppleToggle({ checked, onChange, disabled = false }) {
-      return (
-        <button
-          type="button"
-          role="switch"
-          aria-checked={checked}
-          disabled={disabled}
-          onClick={(e) => {
-            e.stopPropagation();
-            triggerHaptic('light');
-            onChange(!checked);
-          }}
-          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 ${
-            checked ? 'bg-[#FF9500]' : 'bg-black/10 dark:bg-zinc-800'
-          }`}
-        >
-          <span
-            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-              checked ? 'translate-x-5' : 'translate-x-0'
-            }`}
-          />
-        </button>
-      );
+    // Platform Storage Adapter (IndexedDB with Quota Protection)
+    const ApplianceStorageDB = {
+      dbPromise: null,
+      getDB() {
+        if (!this.dbPromise) {
+          this.dbPromise = new Promise((resolve, reject) => {
+            const req = indexedDB.open('ApplianceEngineDB', 1);
+            req.onupgradeneeded = (e) => {
+              const db = e.target.result;
+              if (!db.objectStoreNames.contains('passport_pdfs')) db.createObjectStore('passport_pdfs');
+              if (!db.objectStoreNames.contains('media_store')) db.createObjectStore('media_store');
+              if (!db.objectStoreNames.contains('manuals_cache')) db.createObjectStore('manuals_cache');
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+        }
+        return this.dbPromise;
+      },
+      async get(storeName, key) {
+        try {
+          const db = await this.getDB();
+          return new Promise((resolve) => {
+            const tx = db.transaction(storeName, 'readonly');
+            const req = tx.objectStore(storeName).get(key);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+          });
+        } catch (e) { return null; }
+      },
+      async set(storeName, key, value) {
+        try {
+          const db = await this.getDB();
+          return new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const req = tx.objectStore(storeName).put(value, key);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+          });
+        } catch (e) {}
+      },
+      async delete(storeName, key) {
+        try {
+          const db = await this.getDB();
+          return new Promise((resolve) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const req = tx.objectStore(storeName).delete(key);
+            req.onsuccess = () => resolve();
+            req.onerror = () => resolve();
+          });
+        } catch (e) {}
+      }
+    };
+
+    async function runAutomatedStorageMaintenance(isPaidUser) {
+      const now = Date.now();
+      const lastRun = Number(localStorage.getItem('last_storage_maintenance_ts') || 0);
+      if (now - lastRun < STORAGE_CLEANUP_INTERVAL_MS) return;
+
+      try {
+        const db = await ApplianceStorageDB.getDB();
+        const tx = db.transaction('passport_pdfs', 'readwrite');
+        const store = tx.objectStore('passport_pdfs');
+        const cursorReq = store.openCursor();
+
+        cursorReq.onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const passId = String(cursor.key);
+            const timestamp = Number(passId.replace('pass_', ''));
+            if (timestamp && (now - timestamp > STORAGE_CLEANUP_INTERVAL_MS)) {
+              cursor.delete();
+            }
+            cursor.continue();
+          }
+        };
+
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith('chat_history_')) {
+            try {
+              const session = JSON.parse(localStorage.getItem(key) || '{}');
+              const maxRetention = isPaidUser ? (7 * 86400000) : (24 * 86400000);
+              if (session.timestamp && (now - session.timestamp > maxRetention)) {
+                localStorage.removeItem(key);
+              }
+            } catch (err) {}
+          }
+        });
+
+        localStorage.setItem('last_storage_maintenance_ts', now.toString());
+      } catch (err) {}
     }
 
-    function formatApplianceTitle(brand = '', name = '') {
-      const b = (brand || '').trim();
-      const n = (name || '').trim();
-      if (!b) return n || 'Appliance';
-      if (!n) return b;
-      return n.toLowerCase().startsWith(b.toLowerCase()) ? n : `${b} ${n}`;
-    }
-
-    // Dynamic Title Case Greeting Engine
-    function getDynamicGreetingInfo(name) {
-      const hour = new Date().getHours();
-      let greeting = 'Good Evening!';
-      let iconType = 'evening';
-      if (hour >= 5 && hour < 12) {
-        greeting = 'Good Morning!';
-        iconType = 'morning';
-      } else if (hour >= 12 && hour < 17) {
-        greeting = 'Good Afternoon!';
-        iconType = 'afternoon';
-      }
-      
-      const cleanName = (name || '').trim();
-      const text = (cleanName && cleanName !== 'Welcome' && cleanName !== 'Guest') 
-        ? `${greeting.replace('!', '')}, ${cleanName}!` 
-        : greeting;
-      return { text, iconType };
-    }
-
-    function getDegradationColor(percent) {
-      const p = Math.max(0, Math.min(100, percent));
-      let r, g, b;
-
-      if (p > 50) {
-        const t = (100 - p) / 50;
-        r = Math.round(16 + (245 - 16) * t);
-        g = Math.round(185 + (158 - 185) * t);
-        b = Math.round(129 + (11 - 129) * t);
-      } else if (p > 20) {
-        const t = (50 - p) / 30;
-        r = Math.round(245 + (249 - 245) * t);
-        g = Math.round(158 + (115 - 158) * t);
-        b = Math.round(11 + (22 - 11) * t);
-      } else {
-        const t = (20 - p) / 20;
-        r = Math.round(249 + (225 - 249) * t);
-        g = Math.round(115 + (29 - 115) * t);
-        b = Math.round(22 + (72 - 22) * t);
-      }
-
-      return {
-        rgbString: `rgb(${r}, ${g}, ${b})`,
-        bgStyle: { backgroundColor: `rgb(${r}, ${g}, ${b})` }
-      };
-    }
-
-    // Apple SF Symbols-Grade Silhouettes
-    function CategorySilhouette({ category = '', isDark }) {
-      const cat = (category || '').toLowerCase();
-      const strokeClass = "stroke-[1.8] stroke-linecap-round stroke-linejoin-round";
-      
-      const containerClass = `w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-        isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-black/[0.04] text-zinc-700'
-      }`;
-
-      if (cat.includes('refrigerat') || cat.includes('fridge') || cat.includes('freezer')) {
-        return (
-          <div className={containerClass}>
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <rect x="5" y="2.5" width="14" height="19" rx="3" className={strokeClass} />
-              <line x1="5" y1="13.5" x2="19" y2="13.5" className={strokeClass} />
-              <line x1="12" y1="2.5" x2="12" y2="13.5" className={strokeClass} />
-              <line x1="10" y1="7" x2="10" y2="9.5" className={strokeClass} />
-              <line x1="14" y1="7" x2="14" y2="9.5" className={strokeClass} />
-              <line x1="9" y1="17" x2="15" y2="17" className={strokeClass} />
-            </svg>
-          </div>
-        );
-      }
-
-      if (cat.includes('air') || cat.includes('purif') || cat.includes('dehumid')) {
-        return (
-          <div className={containerClass}>
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M6 5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5z" className={strokeClass} />
-              <circle cx="12" cy="10" r="3.2" className={strokeClass} />
-              <circle cx="12" cy="10" r="1.2" fill="currentColor" stroke="none" />
-              <line x1="9" y1="16" x2="15" y2="16" className={strokeClass} />
-              <line x1="10" y1="18.5" x2="14" y2="18.5" className={strokeClass} />
-            </svg>
-          </div>
-        );
-      }
-
-      if (cat.includes('hvac') || cat.includes('heat') || cat.includes('air cond')) {
-        return (
-          <div className={containerClass}>
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <rect x="3.5" y="3.5" width="17" height="17" rx="3.5" className={strokeClass} />
-              <circle cx="12" cy="12" r="5" className={strokeClass} />
-              <path d="M12 7.5v9M7.5 12h9" className={strokeClass} />
-            </svg>
-          </div>
-        );
-      }
-
-      if (cat.includes('dish')) {
-        return (
-          <div className={containerClass}>
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <rect x="4.5" y="3" width="15" height="18" rx="2.5" className={strokeClass} />
-              <line x1="4.5" y1="7.5" x2="19.5" y2="7.5" className={strokeClass} />
-              <circle cx="8" cy="5.25" r="0.8" fill="currentColor" stroke="none" />
-              <circle cx="10.5" cy="5.25" r="0.8" fill="currentColor" stroke="none" />
-              <line x1="8.5" y1="14" x2="15.5" y2="14" className={strokeClass} />
-            </svg>
-          </div>
-        );
-      }
-
-      if (cat.includes('laundry') || cat.includes('washer') || cat.includes('dryer')) {
-        return (
-          <div className={containerClass}>
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <rect x="4.5" y="2.5" width="15" height="19" rx="3" className={strokeClass} />
-              <circle cx="12" cy="13" r="5" className={strokeClass} />
-              <circle cx="12" cy="13" r="2.5" className={strokeClass} />
-              <line x1="7.5" y1="5.5" x2="11" y2="5.5" className={strokeClass} />
-            </svg>
-          </div>
-        );
-      }
-
-      return (
-        <div className={containerClass}>
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <circle cx="12" cy="12" r="3" className={strokeClass} />
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" className={strokeClass} />
-          </svg>
-        </div>
-      );
-    }
-
-    // Direct Calendar Export with Regex Telephone Mask Protection
+    // Direct Calendar (.ics) Export with Regex Mask Protection
     function exportConsumableToIcs(appliance, consumable) {
       triggerHaptic('success');
       const intervalMonths = consumable.intervalMonths || 6;
@@ -606,184 +564,59 @@
       }
     }
 
-    const MOCK_INITIAL_APPLIANCES = [];
-
-    const BUNDLED_CHASSIS_ERRORS = {
-      "refrigeration": {
-        "DF": "Defrost cycle active. Compressor and fans paused while defrost heater melts coil frost.",
-        "E1": "Freezer compartment thermistor open/short circuit.",
-        "E2": "Refrigerator compartment temperature sensor out of spec.",
-        "SY CF": "Communication loss between main board and UI display.",
-        "FF": "Freezer evaporator fan motor stall or harness disconnect.",
-        "22E": "Refrigerator evaporator fan motor feedback fault."
-      },
-      "dishwashing": {
-        "E1": "Water fill timeout. Screen restricted or water supply closed.",
-        "E4": "Basepan leak float switch tripped. Water detected in bottom tray.",
-        "E15": "Water in base pan safety float tripped.",
-        "E22": "Filter mesh restricted or water standing in sump.",
-        "E24": "Drain pump restricted or drain hose check valve blocked.",
-        "I20": "Drain timeout. Pressure chamber or pump impeller clogged."
-      },
-      "laundry": {
-        "F21": "Long drain. Coin trap or pump filter basket clogged.",
-        "F02": "Drain failure. Verify drain hose siphon break height.",
-        "LE": "Drive motor tachometer hall-sensor or rotor position error.",
-        "OE": "Drain timeout. Filter restricted or drain pump winding open.",
-        "IE": "Water inlet valve timeout. Water faucets closed or mesh screens clogged.",
-        "UE": "Unbalanced load detected during high-speed extraction spin."
-      },
-      "hvac": {
-        "E1": "Indoor evaporator coil temperature sensor fault.",
-        "E4": "Compressor discharge line thermal overheat trip.",
-        "FL": "Condensate drain pan full. High-water float safety switch open.",
-        "CODE 33": "High limit thermal switch open. Severely restricted air filter.",
-        "CODE 13": "Limit circuit lockout. Airflow severely impeded across heat exchanger."
-      },
-      "air quality": {
-        "E1": "BLDC fan motor hall sensor pulse missing.",
-        "C1": "PM2.5 laser scattering optical chamber baseline drift."
-      }
-    };
-
-    class ErrorBoundary extends React.Component {
-      constructor(props) {
-        super(props);
-        this.state = { hasError: false, error: null };
-      }
-      static getDerivedStateFromError(error) {
-        return { hasError: true, error };
-      }
-      componentDidCatch(error, errorInfo) {
-        console.error("ErrorBoundary caught:", error, errorInfo);
-      }
-      render() {
-        if (this.state.hasError) {
-          return (
-            <div className="min-h-screen bg-black text-white p-6 flex flex-col justify-center items-center text-center">
-              <div className="w-12 h-12 rounded-full bg-rose-500/20 text-[#E11D48] flex items-center justify-center font-bold text-xl mb-4">✕</div>
-              <h2 className="text-lg font-black tracking-tight mb-2">Display Rendering Recovered</h2>
-              <p className="text-xs text-zinc-400 max-w-xs mb-4 leading-relaxed">
-                {String(this.state.error?.message || "A localized display error occurred.")}
-              </p>
-              <button 
-                onClick={() => { localStorage.clear(); window.location.reload(); }}
-                className={`${UI_ACCENT.solid} font-bold text-xs px-5 py-2.5 rounded-2xl shadow-sm active:scale-95 transition-transform`}
-              >
-                Clear Cache & Reload
-              </button>
-            </div>
-          );
-        }
-        return this.props.children;
-      }
+    function formatApplianceTitle(brand = '', name = '') {
+      const b = (brand || '').trim();
+      const n = (name || '').trim();
+      if (!b) return n || 'Appliance';
+      if (!n) return b;
+      return n.toLowerCase().startsWith(b.toLowerCase()) ? n : `${b} ${n}`;
     }
 
-    const ApplianceStorageDB = {
-      dbPromise: null,
-      getDB() {
-        if (!this.dbPromise) {
-          this.dbPromise = new Promise((resolve, reject) => {
-            const req = indexedDB.open('ApplianceEngineDB', 1);
-            req.onupgradeneeded = (e) => {
-              const db = e.target.result;
-              if (!db.objectStoreNames.contains('passport_pdfs')) db.createObjectStore('passport_pdfs');
-              if (!db.objectStoreNames.contains('media_store')) db.createObjectStore('media_store');
-              if (!db.objectStoreNames.contains('manuals_cache')) db.createObjectStore('manuals_cache');
-            };
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-          });
-        }
-        return this.dbPromise;
-      },
-      async get(storeName, key) {
-        try {
-          const db = await this.getDB();
-          return new Promise((resolve) => {
-            const tx = db.transaction(storeName, 'readonly');
-            const req = tx.objectStore(storeName).get(key);
-            req.onsuccess = () => resolve(req.result || null);
-            req.onerror = () => resolve(null);
-          });
-        } catch (e) { return null; }
-      },
-      async set(storeName, key, value) {
-        try {
-          const db = await this.getDB();
-          return new Promise((resolve, reject) => {
-            const tx = db.transaction(storeName, 'readwrite');
-            const req = tx.objectStore(storeName).put(value, key);
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
-          });
-        } catch (e) {}
-      },
-      async delete(storeName, key) {
-        try {
-          const db = await this.getDB();
-          return new Promise((resolve) => {
-            const tx = db.transaction(storeName, 'readwrite');
-            const req = tx.objectStore(storeName).delete(key);
-            req.onsuccess = () => resolve();
-            req.onerror = () => resolve();
-          });
-        } catch (e) {}
+    // Dynamic Title Case Greeting Engine
+    function getDynamicGreetingInfo(name) {
+      const hour = new Date().getHours();
+      let greeting = 'Good Evening!';
+      let iconType = 'evening';
+      if (hour >= 5 && hour < 12) {
+        greeting = 'Good Morning!';
+        iconType = 'morning';
+      } else if (hour >= 12 && hour < 17) {
+        greeting = 'Good Afternoon!';
+        iconType = 'afternoon';
       }
-    };
-
-    async function runAutomatedStorageMaintenance(isPaidUser) {
-      const now = Date.now();
-      const lastRun = Number(localStorage.getItem('last_storage_maintenance_ts') || 0);
-      if (now - lastRun < STORAGE_CLEANUP_INTERVAL_MS) return;
-
-      try {
-        const db = await ApplianceStorageDB.getDB();
-        const tx = db.transaction('passport_pdfs', 'readwrite');
-        const store = tx.objectStore('passport_pdfs');
-        const cursorReq = store.openCursor();
-
-        cursorReq.onsuccess = (e) => {
-          const cursor = e.target.result;
-          if (cursor) {
-            const passId = String(cursor.key);
-            const timestamp = Number(passId.replace('pass_', ''));
-            if (timestamp && (now - timestamp > STORAGE_CLEANUP_INTERVAL_MS)) {
-              cursor.delete();
-            }
-            cursor.continue();
-          }
-        };
-
-        Object.keys(localStorage).forEach((key) => {
-          if (key.startsWith('chat_history_')) {
-            try {
-              const session = JSON.parse(localStorage.getItem(key) || '{}');
-              const maxRetention = isPaidUser ? (7 * 86400000) : (24 * 86400000);
-              if (session.timestamp && (now - session.timestamp > maxRetention)) {
-                localStorage.removeItem(key);
-              }
-            } catch (err) {}
-          }
-        });
-
-        localStorage.setItem('last_storage_maintenance_ts', now.toString());
-      } catch (err) {}
+      
+      const cleanName = (name || '').trim();
+      const text = (cleanName && cleanName !== 'Welcome' && cleanName !== 'Guest') 
+        ? `${greeting.replace('!', '')}, ${cleanName}!` 
+        : greeting;
+      return { text, iconType };
     }
 
-    let html2pdfLoadingPromise = null;
-    function loadPdfEngineLazy() {
-      if (window.html2pdf) return Promise.resolve(window.html2pdf);
-      if (html2pdfLoadingPromise) return html2pdfLoadingPromise;
+    function getDegradationColor(percent) {
+      const p = Math.max(0, Math.min(100, percent));
+      let r, g, b;
 
-      html2pdfLoadingPromise = new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-        script.onload = () => resolve(window.html2pdf);
-        script.onerror = () => reject(new Error("Could not load PDF engine."));
-        document.body.appendChild(script);
-      });
-      return html2pdfLoadingPromise;
+      if (p > 50) {
+        const t = (100 - p) / 50;
+        r = Math.round(16 + (245 - 16) * t);
+        g = Math.round(185 + (158 - 185) * t);
+        b = Math.round(129 + (11 - 129) * t);
+      } else if (p > 20) {
+        const t = (50 - p) / 30;
+        r = Math.round(245 + (249 - 245) * t);
+        g = Math.round(158 + (115 - 158) * t);
+        b = Math.round(11 + (22 - 11) * t);
+      } else {
+        const t = (20 - p) / 20;
+        r = Math.round(249 + (225 - 249) * t);
+        g = Math.round(115 + (29 - 115) * t);
+        b = Math.round(22 + (72 - 22) * t);
+      }
+
+      return {
+        rgbString: `rgb(${r}, ${g}, ${b})`,
+        bgStyle: { backgroundColor: `rgb(${r}, ${g}, ${b})` }
+      };
     }
 
     /**
@@ -1124,6 +957,95 @@
       }
     };
 
+    let html2pdfLoadingPromise = null;
+    function loadPdfEngineLazy() {
+      if (window.html2pdf) return Promise.resolve(window.html2pdf);
+      if (html2pdfLoadingPromise) return html2pdfLoadingPromise;
+
+      html2pdfLoadingPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+        script.onload = () => resolve(window.html2pdf);
+        script.onerror = () => reject(new Error("Could not load PDF engine."));
+        document.body.appendChild(script);
+      });
+      return html2pdfLoadingPromise;
+    }
+
+    // Strips heavy base64 images from localStorage payload to eliminate the 5MB browser quota ceiling
+    function sanitizeForLocalStorage(list) {
+      return list.map(item => {
+        const clean = { ...item };
+        if (clean.receiptDoc) {
+          clean.receiptDoc = {
+            name: clean.receiptDoc.name || 'Receipt.jpg',
+            uploadDate: clean.receiptDoc.uploadDate || '',
+            hasImage: Boolean(clean.receiptDoc.dataUrl || clean.receiptDoc.hasImage)
+          };
+        }
+        if (clean.warrantyDoc) {
+          clean.warrantyDoc = {
+            name: clean.warrantyDoc.name || 'Warranty.pdf',
+            uploadDate: clean.warrantyDoc.uploadDate || '',
+            hasImage: Boolean(clean.warrantyDoc.dataUrl || clean.warrantyDoc.hasImage)
+          };
+        }
+        delete clean.receipt;
+        return clean;
+      });
+    }
+
+    /* === END OF PART 1 / READY FOR PART 2 === */
+    /* === START OF PART 2 === */
+
+    const BUNDLED_CHASSIS_ERRORS = {
+      "refrigeration": {
+        "DF": "Defrost cycle active. Compressor and fans paused while defrost heater melts coil frost.",
+        "E1": "Freezer compartment thermistor open/short circuit.",
+        "E2": "Refrigerator compartment temperature sensor out of spec.",
+        "SY CF": "Communication loss between main board and UI display.",
+        "FF": "Freezer evaporator fan motor stall or harness disconnect.",
+        "22E": "Refrigerator evaporator fan motor feedback fault."
+      },
+      "dishwashing": {
+        "E1": "Water fill timeout. Screen restricted or water supply closed.",
+        "E4": "Basepan leak float switch tripped. Water detected in bottom tray.",
+        "E15": "Water in base pan safety float tripped.",
+        "E22": "Filter mesh restricted or water standing in sump.",
+        "E24": "Drain pump restricted or drain hose check valve blocked.",
+        "I20": "Drain timeout. Pressure chamber or pump impeller clogged."
+      },
+      "laundry": {
+        "F21": "Long drain. Coin trap or pump filter basket clogged.",
+        "F02": "Drain failure. Verify drain hose siphon break height.",
+        "LE": "Drive motor tachometer hall-sensor or rotor position error.",
+        "OE": "Drain timeout. Filter restricted or drain pump winding open.",
+        "IE": "Water inlet valve timeout. Water faucets closed or mesh screens clogged.",
+        "UE": "Unbalanced load detected during high-speed extraction spin."
+      },
+      "hvac": {
+        "E1": "Indoor evaporator coil temperature sensor fault.",
+        "E4": "Compressor discharge line thermal overheat trip.",
+        "FL": "Condensate drain pan full. High-water float safety switch open.",
+        "CODE 33": "High limit thermal switch open. Severely restricted air filter.",
+        "CODE 13": "Limit circuit lockout. Airflow severely impeded across heat exchanger."
+      },
+      "air quality": {
+        "E1": "BLDC fan motor hall sensor pulse missing.",
+        "C1": "PM2.5 laser scattering optical chamber baseline drift."
+      },
+      "cooking": {
+        "F1": "Electronic control board internal microprocessor watchdog timeout.",
+        "F3": "Oven temperature sensor probe (RTD) open or shorted.",
+        "F9": "Door latch motor assembly failure or lock switch misalignment.",
+        "E0": "Induction cooktop line voltage fluctuation or heat sink sensor fault."
+      }
+    };
+
+    /**
+     * Smarter Offline & Local Heuristic Diagnostic Engine
+     * Supports 6 equipment families, negative-feedback branching, and state progression.
+     */
     const ExpertDiagnosticEngine = {
       diagnosticTrees: {
         "air_quality_sensor": [
@@ -1150,6 +1072,16 @@
           `Step 1 (Filter & Hose Check): Inspect the coin trap or pump filter basket for debris, hairpins, or small objects. Also check that the drain hose is free of kinks.\n\nIs the drain path completely clear of obstructions?`,
           `Step 2 (Impeller Spin): With power disconnected, check the small drain pump impeller with a fingertip. Does it turn freely without grinding or sticking?`,
           `Conclusion: The drain pump motor is jammed or its internal drive winding has worn out.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your Drain Pump Assembly likely needs replacement.\n\n[RECOMMEND_TECH]`
+        ],
+        "hvac_airflow": [
+          `Step 1 (Filter Pressure Check): Slide out the return air filter. Hold it up to the light. Can you clearly see light through the pleats, or is it opaque with dust?\n\nDid removing or replacing the filter allow air to blow normally?`,
+          `Step 2 (Coil Inspection): Look at the copper lines feeding into the indoor coil cabinet. Is there frost or ice accumulating on the brass suction valve or copper piping?`,
+          `Conclusion: Evaporator coil freeze-up due to airflow restriction or low refrigerant.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, a licensed HVAC technician should verify refrigerant charge and coil delta-T.\n\n[RECOMMEND_TECH]`
+        ],
+        "cooking_burner": [
+          `Step 1 (Igniter Cap Alignment): Disconnect power or gas supply valve. Verify that the cast burner caps are seated completely flat in their index grooves, not tilted.\n\nAre all burner caps aligned and sitting flat?`,
+          `Step 2 (Electrode Needle Clean): Use a dry toothbrush to gently clean the white ceramic spark electrode and surrounding gas port slots of any grease or spillover residue.\n\nDid cleaning the electrode restore steady ignition?`,
+          `Conclusion: The spark ignition module or flame-sensing thermocouple has failed.\n\nWe've tried every troubleshooting step I can think of for this issue.\n\nBased on what I could assess, your Spark Igniter Module or Valve Switch Harness needs replacement.\n\n[RECOMMEND_TECH]`
         ]
       },
 
@@ -1181,7 +1113,8 @@
         const triggers = [
           'no', 'nope', "didn't work", "did not work", 'still red', 'still bad', 'still warm',
           'no change', 'did that', 'tried that', 'same', 'nothing happened', 'not working',
-          'failed', 'wont spin', "won't spin", 'does not spin', 'stiff', 'grinding', 'yes it rattles'
+          'failed', 'wont spin', "won't spin", 'does not spin', 'stiff', 'grinding', 'yes it rattles',
+          'still frozen', 'still iced', 'still clicking', 'opaque', 'dirty'
         ];
         return triggers.some(t => normalized === t || normalized.startsWith(t) || normalized.includes(t));
       },
@@ -1194,6 +1127,8 @@
           if (text.includes('Damper Airflow Check') || text.includes('Frost Buildup Inspection')) return 'refrig_temp';
           if (text.includes('Starter Rattle Check') || text.includes('compressor attempt to start')) return 'refrig_relay';
           if (text.includes('Filter & Hose Check') || text.includes('Impeller Spin')) return 'drain_general';
+          if (text.includes('Filter Pressure Check') || text.includes('Coil Inspection')) return 'hvac_airflow';
+          if (text.includes('Igniter Cap Alignment') || text.includes('Electrode Needle Clean')) return 'cooking_burner';
         }
         return null;
       },
@@ -1217,20 +1152,20 @@
 
         const lastAssistantMsg = [...history].reverse().find(m => m.sender === 'assistant')?.text || '';
 
-        const hazardKeywords = ['smoke', 'burning smell', 'spark', 'sparks', 'fire', 'shock', 'arcing'];
+        const hazardKeywords = ['smoke', 'burning smell', 'spark', 'sparks', 'fire', 'shock', 'arcing', 'gas smell', 'sulfur'];
         if (hazardKeywords.some(k => q.includes(k))) {
-          return `⚠️ **CRITICAL ELECTRICAL HAZARD DETECTED**\n\n` +
-                 `1. Disconnect power at the main home breaker immediately.\n` +
-                 `2. Do not touch bare metal surfaces or wiring.\n\n` +
+          return `⚠️ **CRITICAL ELECTRICAL OR GAS HAZARD DETECTED**\n\n` +
+                 `1. Disconnect power at the main home breaker immediately (or shut off the equipment gas valve).\n` +
+                 `2. Do not touch bare metal surfaces, switches, or internal wiring.\n\n` +
                  `Is electrical power disconnected at the breaker, and is the area safe to inspect?`;
         }
 
-        if (lastAssistantMsg.includes('CRITICAL ELECTRICAL HAZARD')) {
+        if (lastAssistantMsg.includes('CRITICAL ELECTRICAL OR GAS HAZARD')) {
           if (q.includes('yes') || q.includes('cut') || q.includes('safe') || q.includes('off')) {
             return `Breaker disconnect confirmed.\n\n` +
                    `Because an active thermal or electrical hazard occurred, inspecting internal high-voltage components carries risk.\n\n` +
                    `We've tried every troubleshooting step I can think of for this issue.\n\n` +
-                   `Based on what I could assess, an internal wiring harness or electronic relay likely needs replacement.\n\n` +
+                   `Based on what I could assess, an internal wiring harness, electronic relay, or valve assembly likely needs replacement.\n\n` +
                    `[RECOMMEND_TECH]`;
           }
         }
@@ -1252,7 +1187,7 @@
 
         const errMatch = await this.lookupErrorCode(category, rawQuery);
         if (errMatch) {
-          return `Fault code **${errMatch.code}** confirmed for this appliance: ${errMatch.desc}\n\nBefore ordering replacement sensors, inspect the wiring harness plug for loose pins or dust.`;
+          return `Fault code **${errMatch.code}** confirmed for this equipment platform: ${errMatch.desc}\n\nBefore ordering replacement sensors, inspect the wiring harness plug for loose pins or dust.`;
         }
 
         if (category === 'Air Quality' || cleanTitle.toLowerCase().includes('purifier')) {
@@ -1270,6 +1205,18 @@
           }
           if (q.includes('warm') || q.includes('not cooling') || q.includes('freezer') || q.includes('temp')) {
             return this.diagnosticTrees['refrig_temp'][0];
+          }
+        }
+
+        if (category === 'HVAC' || cleanTitle.toLowerCase().includes('heat pump') || cleanTitle.toLowerCase().includes('furnace')) {
+          if (q.includes('freeze') || q.includes('ice') || q.includes('airflow') || q.includes('filter') || q.includes('cold air')) {
+            return this.diagnosticTrees['hvac_airflow'][0];
+          }
+        }
+
+        if (category === 'Cooking' || cleanTitle.toLowerCase().includes('range') || cleanTitle.toLowerCase().includes('oven')) {
+          if (q.includes('ignit') || q.includes('click') || q.includes('spark') || q.includes('burner') || q.includes('flame')) {
+            return this.diagnosticTrees['cooking_burner'][0];
           }
         }
 
@@ -1309,9 +1256,13 @@
       if (cat.includes('hvac') || cat.includes('heat') || cat.includes('ac')) {
         return ['Coil freeze protocol', 'Outdoor fan stopped', 'Filter pressure drop', 'Go Deeper'];
       }
+      if (cat.includes('cook') || cat.includes('range') || cat.includes('oven')) {
+        return ['Igniter clicking continuously', 'Oven temp inaccurate', 'Burner flame uneven', 'Go Deeper'];
+      }
       return ['Routine power reset', 'Inspect wear parts', 'Clear error code', 'Go Deeper'];
     }
 
+    // Zero-Shift Apple UI Components
     function AppleCloseButton({ onClick, isDark }) {
       return (
         <button
@@ -1330,6 +1281,166 @@
       );
     }
 
+    function AppleToggle({ checked, onChange, disabled = false }) {
+      return (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          disabled={disabled}
+          onClick={(e) => {
+            e.stopPropagation();
+            triggerHaptic('light');
+            onChange(!checked);
+          }}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 ${
+            checked ? 'bg-[#FF9500]' : 'bg-black/10 dark:bg-zinc-800'
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+              checked ? 'translate-x-5' : 'translate-x-0'
+            }`}
+          />
+        </button>
+      );
+    }
+
+    // Apple SF Symbols-Grade Silhouettes
+    function CategorySilhouette({ category = '', isDark }) {
+      const cat = (category || '').toLowerCase();
+      const strokeClass = "stroke-[1.8] stroke-linecap-round stroke-linejoin-round";
+      
+      const containerClass = `w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+        isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-black/[0.04] text-zinc-700'
+      }`;
+
+      if (cat.includes('refrigerat') || cat.includes('fridge') || cat.includes('freezer')) {
+        return (
+          <div className={containerClass}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="5" y="2.5" width="14" height="19" rx="3" className={strokeClass} />
+              <line x1="5" y1="13.5" x2="19" y2="13.5" className={strokeClass} />
+              <line x1="12" y1="2.5" x2="12" y2="13.5" className={strokeClass} />
+              <line x1="10" y1="7" x2="10" y2="9.5" className={strokeClass} />
+              <line x1="14" y1="7" x2="14" y2="9.5" className={strokeClass} />
+              <line x1="9" y1="17" x2="15" y2="17" className={strokeClass} />
+            </svg>
+          </div>
+        );
+      }
+
+      if (cat.includes('air') || cat.includes('purif') || cat.includes('dehumid')) {
+        return (
+          <div className={containerClass}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M6 5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5z" className={strokeClass} />
+              <circle cx="12" cy="10" r="3.2" className={strokeClass} />
+              <circle cx="12" cy="10" r="1.2" fill="currentColor" stroke="none" />
+              <line x1="9" y1="16" x2="15" y2="16" className={strokeClass} />
+              <line x1="10" y1="18.5" x2="14" y2="18.5" className={strokeClass} />
+            </svg>
+          </div>
+        );
+      }
+
+      if (cat.includes('hvac') || cat.includes('heat') || cat.includes('air cond')) {
+        return (
+          <div className={containerClass}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="3.5" y="3.5" width="17" height="17" rx="3.5" className={strokeClass} />
+              <circle cx="12" cy="12" r="5" className={strokeClass} />
+              <path d="M12 7.5v9M7.5 12h9" className={strokeClass} />
+            </svg>
+          </div>
+        );
+      }
+
+      if (cat.includes('dish')) {
+        return (
+          <div className={containerClass}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="4.5" y="3" width="15" height="18" rx="2.5" className={strokeClass} />
+              <line x1="4.5" y1="7.5" x2="19.5" y2="7.5" className={strokeClass} />
+              <circle cx="8" cy="5.25" r="0.8" fill="currentColor" stroke="none" />
+              <circle cx="10.5" cy="5.25" r="0.8" fill="currentColor" stroke="none" />
+              <line x1="8.5" y1="14" x2="15.5" y2="14" className={strokeClass} />
+            </svg>
+          </div>
+        );
+      }
+
+      if (cat.includes('laundry') || cat.includes('washer') || cat.includes('dryer')) {
+        return (
+          <div className={containerClass}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="4.5" y="2.5" width="15" height="19" rx="3" className={strokeClass} />
+              <circle cx="12" cy="13" r="5" className={strokeClass} />
+              <circle cx="12" cy="13" r="2.5" className={strokeClass} />
+              <line x1="7.5" y1="5.5" x2="11" y2="5.5" className={strokeClass} />
+            </svg>
+          </div>
+        );
+      }
+
+      if (cat.includes('cook') || cat.includes('range') || cat.includes('oven')) {
+        return (
+          <div className={containerClass}>
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="4" y="3" width="16" height="18" rx="2.5" className={strokeClass} />
+              <circle cx="8" cy="6.5" r="1.2" className={strokeClass} />
+              <circle cx="12" cy="6.5" r="1.2" className={strokeClass} />
+              <circle cx="16" cy="6.5" r="1.2" className={strokeClass} />
+              <rect x="6.5" y="10.5" width="11" height="8" rx="1.5" className={strokeClass} />
+            </svg>
+          </div>
+        );
+      }
+
+      return (
+        <div className={containerClass}>
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="3" className={strokeClass} />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" className={strokeClass} />
+          </svg>
+        </div>
+      );
+    }
+
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      componentDidCatch(error, errorInfo) {
+        console.error("ErrorBoundary caught:", error, errorInfo);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="min-h-screen bg-black text-white p-6 flex flex-col justify-center items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-rose-500/20 text-[#E11D48] flex items-center justify-center font-bold text-xl mb-4">✕</div>
+              <h2 className="text-lg font-black tracking-tight mb-2">Display Rendering Recovered</h2>
+              <p className="text-xs text-zinc-400 max-w-xs mb-4 leading-relaxed">
+                {String(this.state.error?.message || "A localized display error occurred.")}
+              </p>
+              <button 
+                onClick={() => { localStorage.clear(); window.location.reload(); }}
+                className={`${UI_ACCENT.solid} font-bold text-xs px-5 py-2.5 rounded-2xl shadow-sm active:scale-95 transition-transform`}
+              >
+                Clear Cache & Reload
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // Institutional Passport Audit PDF Engine
     function buildInstitutionalPassportHtml(meta, items, includeMaintenanceLog = true, includeValuation = false) {
       const totalCount = items.length;
       let totalEstValue = 0;
@@ -1455,6 +1566,13 @@
       html += '</div></div>';
       return html;
     }
+
+    /* === END OF PART 2 / READY FOR PART 3 === */
+    /* === START OF CORRECTED PART 3 === */
+
+    let isDirtySync = false;
+    let lastPullTime = 0;
+
     function App() {
       const [toastMessage, setToastMessage] = useState(null);
       const toastTimerRef = useRef(null);
@@ -1544,7 +1662,7 @@
         } catch(e) { return []; }
       });
 
-      // Search & Category Filters (Nickname indexed, Vendor strictly excluded)
+      // Search & Category Filters
       const [searchQuery, setSearchQuery] = useState('');
       const [isSearchExpanded, setIsSearchExpanded] = useState(false);
       const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
@@ -1586,7 +1704,6 @@
 
       const isDark = appearanceSetting === 'system' ? systemIsDark : appearanceSetting === 'dark';
 
-      // Dynamic System Keyboard, Document Canvas & Background Synchronization
       useEffect(() => {
         if (typeof document !== 'undefined') {
           document.documentElement.classList.toggle('dark', isDark);
@@ -1595,13 +1712,9 @@
           document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
           
           const metaTheme = document.getElementById('theme-color-meta');
-          if (metaTheme) {
-            metaTheme.setAttribute('content', isDark ? '#000000' : '#F2F2F7');
-          }
-          let metaScheme = document.getElementById('color-scheme-meta');
-          if (metaScheme) {
-            metaScheme.setAttribute('content', isDark ? 'dark' : 'light');
-          }
+          if (metaTheme) metaTheme.setAttribute('content', isDark ? '#000000' : '#F2F2F7');
+          const metaScheme = document.getElementById('color-scheme-meta');
+          if (metaScheme) metaScheme.setAttribute('content', isDark ? 'dark' : 'light');
         }
       }, [isDark]);
 
@@ -1630,7 +1743,6 @@
         } catch(e) { return ''; }
       });
 
-      // Default name strictly set to "Welcome"; never auto-populated with email prefixes
       const [userDisplayName, setUserDisplayName] = useState(() => {
         try {
           const savedCustom = localStorage.getItem('app_user_display_name');
@@ -1725,19 +1837,20 @@
       const [inlinePdfViewerData, setInlinePdfViewerData] = useState(null);
       const [activeExportMenuId, setActiveExportMenuId] = useState(null);
 
-            // AI Diagnostic Chat State (Docked Bottom Sheet with Viewport Clamping)
+      // AI Diagnostic Chat State
       const [activeAppliance, setActiveAppliance] = useState(null);
       const [messages, setMessages] = useState([]);
       const [queryInput, setQueryInput] = useState('');
       const [isLoading, setIsLoading] = useState(false);
       const [isThinking, setIsThinking] = useState(false);
       const [streamingText, setStreamingText] = useState('');
+      const [dynamicAiChips, setDynamicAiChips] = useState([]);
       const [needsPlacardVerification, setNeedsPlacardVerification] = useState(false);
       const [placardVerifyInput, setPlacardVerifyInput] = useState('');
       const chatTouchStartRef = useRef({ x: 0, y: 0 });
       const isKeyboardActive = viewportHeight > 0 && viewportHeight < (window.innerHeight - 80);
 
-      // Speech Dictation Hook
+      // Speech Dictation Hook with Safe Mic Track Deallocation
       const [isListeningDictation, setIsListeningDictation] = useState(false);
       const recognitionRef = useRef(null);
 
@@ -1762,24 +1875,15 @@
             setQueryInput(transcript);
           };
 
-          rec.onerror = () => {
-            setIsListeningDictation(false);
-          };
-
-          rec.onend = () => {
-            setIsListeningDictation(false);
-          };
-
+          rec.onerror = () => setIsListeningDictation(false);
+          rec.onend = () => setIsListeningDictation(false);
           recognitionRef.current = rec;
         }
       }, []);
 
-      // Auto-terminate microphone stream immediately when AI chat view closes
       useEffect(() => {
         if (!activeAppliance && isListeningDictation && recognitionRef.current) {
-          try {
-            recognitionRef.current.stop();
-          } catch (e) {}
+          try { recognitionRef.current.stop(); } catch (e) {}
           setIsListeningDictation(false);
         }
       }, [activeAppliance, isListeningDictation]);
@@ -1833,7 +1937,6 @@
         pendingDeleteWarrantyApplianceId
       );
 
-      // Hard Scroll Lock with Active Touch Interception
       useEffect(() => {
         if (isAnyModalActive) {
           if (!isAddGroupModalOpen && !deleteTargetGroup && !isBulkDeleteModalOpen) {
@@ -1846,12 +1949,8 @@
           document.body.style.overflow = 'hidden';
 
           const handleTouchPrevent = (e) => {
-            if (e.target.closest('.overflow-y-auto, .overflow-y-scroll, .overflow-x-auto, textarea, input, select')) {
-              return;
-            }
-            if (e.cancelable) {
-              e.preventDefault();
-            }
+            if (e.target.closest('.overflow-y-auto, .overflow-y-scroll, .overflow-x-auto, textarea, input, select')) return;
+            if (e.cancelable) e.preventDefault();
           };
           document.addEventListener('touchmove', handleTouchPrevent, { passive: false });
 
@@ -1886,7 +1985,6 @@
 
       const inlineNewUnitInputRef = useRef(null);
 
-      // Cleanly resets add form state and completely purges attachments on dismissal
       const closeAddModal = useCallback(() => {
         dismissActiveKeyboard();
         setIsAddOpen(false);
@@ -1937,39 +2035,6 @@
         return quota.count < FREE_TOTAL_QUOTA ? "Advanced Diagnostic" : "Standard Diagnostic";
       };
 
-      const handleConfirmInlineNewProperty = (e) => {
-        if (e) { e.preventDefault(); e.stopPropagation(); }
-        dismissActiveKeyboard();
-        const trimmed = addForm.newUnitInlineName.trim();
-        if (!trimmed) {
-          setAddForm(prev => ({ ...prev, isAddingNewUnitInline: false }));
-          return;
-        }
-
-        const maxGroups = isPaidUser ? PRO_MAX_GROUPS : FREE_MAX_GROUPS;
-        if (units.length >= maxGroups) {
-          triggerHaptic('warn');
-          setIsCapacityModalOpen(true);
-          setAddForm(prev => ({ ...prev, isAddingNewUnitInline: false }));
-          return;
-        }
-
-        const existing = units.find(u => u.name.toLowerCase() === trimmed.toLowerCase());
-        if (existing) {
-          setAddForm(prev => ({ ...prev, selectedUnitId: existing.id, isAddingNewUnitInline: false, newUnitInlineName: '' }));
-          triggerHaptic('light');
-          return;
-        }
-
-        const newUnit = { id: `unit_${Date.now()}`, name: trimmed, collapsed: false };
-        const nextUnits = [...units, newUnit];
-        setUnits(nextUnits);
-        triggerDebouncedSync(appliances, nextUnits);
-        setAddForm(prev => ({ ...prev, selectedUnitId: newUnit.id, isAddingNewUnitInline: false, newUnitInlineName: '' }));
-        triggerHaptic('success');
-        showToast(`Property "${trimmed}" created`);
-      };
-
       const [isAnalyzing, setIsAnalyzing] = useState(false);
       const [lookupStatus, setLookupStatus] = useState('');
       const debounceAbortRef = useRef(null);
@@ -1981,7 +2046,6 @@
       const [authLoading, setAuthLoading] = useState(false);
       const [otpCooldownSeconds, setOtpCooldownSeconds] = useState(0);
 
-      // Spring Swipe-to-Delete Coordinate Tracker
       const [swipeOffsets, setSwipeOffsets] = useState({});
       const touchStartPosRef = useRef({ x: 0, y: 0 });
       const touchIsHorizontalRef = useRef(null);
@@ -2001,6 +2065,7 @@
         return () => mediaQuery.removeEventListener('change', handler);
       }, []);
 
+      // Ingest Brand Portals and Sync Pass State on Mount
       useEffect(() => {
         (async () => {
           runAutomatedStorageMaintenance(isPaidUser);
@@ -2009,7 +2074,6 @@
             await ApplianceStorageDB.set('manuals_cache', 'chassis_error_catalog', BUNDLED_CHASSIS_ERRORS);
           }
           
-          // Ingest Verified Brand Portals from Cloudflare D1
           try {
             const portalRes = await fetch(`${WORKER_ENDPOINT}/api/portals`);
             if (portalRes.ok) {
@@ -2024,7 +2088,6 @@
             if (cachedPortals) setDynamicPortals(cachedPortals);
           }
 
-          // Hydrate Preloaded Catalog Cache
           try {
             const res = await fetch(`${WORKER_ENDPOINT}/api/catalog/sync`);
             if (res.ok) {
@@ -2034,32 +2097,33 @@
               }
             }
           } catch (e) {}
+
+          const email = currentUser?.email || userEmail;
+          if (email) {
+            try {
+              const verifyRes = await fetch(`${WORKER_ENDPOINT}/api/verify-pass`, {
+                method: 'POST',
+                headers: AuthTokenManager.buildAuthHeaders(email),
+                body: JSON.stringify({ email })
+              });
+              if (verifyRes.ok) {
+                const passData = await verifyRes.json();
+                if (passData.active) {
+                  setPassportPurchased(true);
+                  localStorage.setItem('passport_purchased', 'true');
+                  if (passData.expiresAt) {
+                    const firstUsed = passData.expiresAt - PASSPORT_WINDOW_MS;
+                    setPassportFirstUsedTimestamp(firstUsed);
+                    localStorage.setItem('passport_first_used', firstUsed.toString());
+                  }
+                }
+              }
+            } catch(e) {}
+          }
         })();
       }, []);
 
-      // Strips heavy base64 images from localStorage payload to eliminate the 5MB browser quota ceiling
-      const sanitizeForLocalStorage = (list) => {
-        return list.map(item => {
-          const clean = { ...item };
-          if (clean.receiptDoc) {
-            clean.receiptDoc = {
-              name: clean.receiptDoc.name || 'Receipt.jpg',
-              uploadDate: clean.receiptDoc.uploadDate || '',
-              hasImage: Boolean(clean.receiptDoc.dataUrl || clean.receiptDoc.hasImage)
-            };
-          }
-          if (clean.warrantyDoc) {
-            clean.warrantyDoc = {
-              name: clean.warrantyDoc.name || 'Warranty.pdf',
-              uploadDate: clean.warrantyDoc.uploadDate || '',
-              hasImage: Boolean(clean.warrantyDoc.dataUrl || clean.warrantyDoc.hasImage)
-            };
-          }
-          delete clean.receipt;
-          return clean;
-        });
-      };
-
+      // Debounced Cloud Sync with Bearer Authentication
       const triggerDebouncedSync = (nextAppliances = appliances, nextUnits = units) => {
         localStorage.setItem('user_appliances_catalog', JSON.stringify(sanitizeForLocalStorage(nextAppliances)));
         localStorage.setItem('app_units_catalog', JSON.stringify(nextUnits));
@@ -2077,10 +2141,7 @@
           try {
             const res = await fetch(`${WORKER_ENDPOINT}/api/backup`, {
               method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'X-User-Email': email
-              },
+              headers: AuthTokenManager.buildAuthHeaders(email),
               body: JSON.stringify({ appliances: nextAppliances, groups: nextUnits })
             });
             if (res.ok) {
@@ -2105,12 +2166,11 @@
           setIsActivelySyncing(true);
           const res = await fetch(`${WORKER_ENDPOINT}/api/sync`, {
             method: 'GET',
-            headers: { 'X-User-Email': email }
+            headers: AuthTokenManager.buildAuthHeaders(email)
           });
           const data = await res.json();
           const incomingAppliances = data.appliances || data.fleet || [];
           if (Array.isArray(incomingAppliances)) {
-            // Re-hydrate local IndexedDB media cache for downloaded receipt/warranty images
             for (const item of incomingAppliances) {
               if (item.receiptDoc?.dataUrl) {
                 await ApplianceStorageDB.set('media_store', `receiptDoc_${item.id}`, item.receiptDoc.dataUrl);
@@ -2206,7 +2266,7 @@
           const res = await fetch(`${WORKER_ENDPOINT}/api/discover`, {
             method: 'POST',
             signal: debounceAbortRef.current.signal,
-            headers: { 'Content-Type': 'application/json' },
+            headers: AuthTokenManager.buildAuthHeaders(currentUser?.email || userEmail),
             body: JSON.stringify({ brand: b, modelOrQuery: m })
           });
           const data = await res.json();
@@ -2226,7 +2286,7 @@
         }
       }, [addForm.brand, addForm.model]);
 
-      // --- REORDER MECHANICS FOR EDIT MODE ---
+      // Reorder Mechanics
       const moveUnitOrder = (index, direction) => {
         triggerHaptic('light');
         const targetIndex = index + direction;
@@ -2270,6 +2330,10 @@
         showToast(`Copied Part #: ${sku}`);
         setTimeout(() => setCopiedPartSku(null), 1800);
       };
+
+      // =========================================================================
+      // ACTION HANDLERS: EDIT, CONSUMABLES, DOCUMENTS, EQUIPMENT & AUTH
+      // =========================================================================
 
       const handleStartEditingAppliance = () => {
         if (!selectedAppliance) return;
@@ -2330,7 +2394,6 @@
         showToast("Appliance specifications updated");
       };
 
-      // Persistent "Replaced Today" State Sync
       const handleTriggerMarkReplacedWithLiveCountdown = (applianceId, consumableIndex) => {
         triggerHaptic('success');
         const targetAppliance = appliances.find(a => a.id === applianceId);
@@ -2459,7 +2522,6 @@
         try {
           const { dataUrl } = await compressImageFast(file, 900);
           const filePayload = { name: file.name, uploadDate: new Date().toLocaleDateString(), hasImage: true };
-          // Persist raw compressed file strictly to IndexedDB to preserve localStorage quotas
           await ApplianceStorageDB.set('media_store', `${docType}_${applianceId}`, dataUrl);
           
           const updated = appliances.map(app => {
@@ -2519,7 +2581,7 @@
 
           const res = await fetch(`${WORKER_ENDPOINT}/api/scan-label`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: AuthTokenManager.buildAuthHeaders(currentUser?.email || userEmail),
             body: JSON.stringify({ imageBase64: base64, mimeType })
           });
           const data = await res.json();
@@ -2553,6 +2615,39 @@
           setIsAnalyzing(false);
           setLookupStatus('');
         }
+      };
+
+      const handleConfirmInlineNewProperty = (e) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        dismissActiveKeyboard();
+        const trimmed = addForm.newUnitInlineName.trim();
+        if (!trimmed) {
+          setAddForm(prev => ({ ...prev, isAddingNewUnitInline: false }));
+          return;
+        }
+
+        const maxGroups = isPaidUser ? PRO_MAX_GROUPS : FREE_MAX_GROUPS;
+        if (units.length >= maxGroups) {
+          triggerHaptic('warn');
+          setIsCapacityModalOpen(true);
+          setAddForm(prev => ({ ...prev, isAddingNewUnitInline: false }));
+          return;
+        }
+
+        const existing = units.find(u => u.name.toLowerCase() === trimmed.toLowerCase());
+        if (existing) {
+          setAddForm(prev => ({ ...prev, selectedUnitId: existing.id, isAddingNewUnitInline: false, newUnitInlineName: '' }));
+          triggerHaptic('light');
+          return;
+        }
+
+        const newUnit = { id: `unit_${Date.now()}`, name: trimmed, collapsed: false };
+        const nextUnits = [...units, newUnit];
+        setUnits(nextUnits);
+        triggerDebouncedSync(appliances, nextUnits);
+        setAddForm(prev => ({ ...prev, selectedUnitId: newUnit.id, isAddingNewUnitInline: false, newUnitInlineName: '' }));
+        triggerHaptic('success');
+        showToast(`Property "${trimmed}" created`);
       };
 
       const handleAddEquipmentSubmit = async (e) => {
@@ -2591,14 +2686,14 @@
         let detectedCategory = '';
         let resolvedCanonicalName = fallbackTitle;
 
-         const abortCtrl = new AbortController();
+        const abortCtrl = new AbortController();
         const timeoutId = setTimeout(() => abortCtrl.abort(), 9000);
 
         try {
           const res = await fetch(`${WORKER_ENDPOINT}/api/discover`, {
             method: 'POST',
             signal: abortCtrl.signal,
-            headers: { 'Content-Type': 'application/json' },
+            headers: AuthTokenManager.buildAuthHeaders(currentUser?.email || userEmail),
             body: JSON.stringify({ 
               brand: effectiveBrand, 
               modelOrQuery: effectiveModel || effectiveName,
@@ -2691,6 +2786,7 @@
         dismissActiveKeyboard();
         triggerHaptic('light');
         setActiveAppliance(item);
+        setDynamicAiChips([]);
         setNeedsPlacardVerification(false);
         const cleanTitle = formatApplianceTitle(item.brand, item.name);
         const storedChat = localStorage.getItem(`chat_history_${item.id}`);
@@ -2715,7 +2811,7 @@
         }]);
       };
 
-      const executeStreamingAnswer = (finalText, isFifthNotice = false, isPeriodicNotice = false) => {
+      const executeStreamingAnswer = (finalText, isFifthNotice = false, isPeriodicNotice = false, actionChips = []) => {
         const hasRecommendTechToken = finalText.includes('[RECOMMEND_TECH]');
         let cleanedText = finalText.replace('[RECOMMEND_TECH]', '').trim();
         cleanedText = cleanedText.replace(/If you aren't comfortable handling the equipment yourself, I recommend having a specialist review the device physically\.?/gi, '').trim();
@@ -2728,6 +2824,9 @@
           if (idx >= words.length) {
             clearInterval(timer);
             setStreamingText('');
+            if (Array.isArray(actionChips) && actionChips.length > 0) {
+              setDynamicAiChips(actionChips);
+            }
             const nextMsg = {
               id: Date.now().toString(),
               sender: 'assistant',
@@ -2748,7 +2847,7 @@
           idx += 1;
           setStreamingText(words.slice(0, idx).join(' '));
           scrollToChatBottom(false);
-        }, 40);
+        }, 35);
       };
 
       const sendQuery = async (text) => {
@@ -2786,8 +2885,8 @@
             if (manualAnswer.includes('cabinet placard below:')) {
               setNeedsPlacardVerification(true);
             }
-            executeStreamingAnswer(manualAnswer, false, standardCount % 10 === 0);
-          }, 850);
+            executeStreamingAnswer(manualAnswer, false, standardCount % 10 === 0, []);
+          }, 800);
           return;
         }
 
@@ -2798,10 +2897,7 @@
           try {
             const res = await fetch(`${WORKER_ENDPOINT}/api/chat`, {
               method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'X-User-Email': currentUser?.email || userEmail || ''
-              },
+              headers: AuthTokenManager.buildAuthHeaders(currentUser?.email || userEmail),
               body: JSON.stringify({
                 appliance: activeAppliance,
                 messages: updated.slice(-6),
@@ -2811,7 +2907,7 @@
             const data = await res.json();
             setIsThinking(false);
             const isFifthFree = !isPaidUser && quotaAfter.count === FREE_TOTAL_QUOTA;
-            executeStreamingAnswer(data.reply || "Diagnostic guidance completed.", isFifthFree, false);
+            executeStreamingAnswer(data.reply || "Diagnostic guidance completed.", isFifthFree, false, data.actionChips || []);
           } catch (err) {
             setIsThinking(false);
             setChatSystemStatus('offline');
@@ -2819,9 +2915,9 @@
             if (offlineAnswer.includes('cabinet placard below:')) {
               setNeedsPlacardVerification(true);
             }
-            executeStreamingAnswer(offlineAnswer, false, false);
+            executeStreamingAnswer(offlineAnswer, false, false, []);
           }
-        }, 850);
+        }, 800);
       };
 
       const handleInlinePlacardVerification = () => {
@@ -2848,7 +2944,7 @@
 
           const postAuditNotice = `✓ Model verified: ${formatApplianceTitle(activeAppliance.brand, entered)}.\n\n` +
             `Notice: On this model, verify that the bottom access cover clicks shut firmly. A slight misplacement can disconnect the internal power switch.`;
-          executeStreamingAnswer(postAuditNotice, false, false);
+          executeStreamingAnswer(postAuditNotice, false, false, []);
           setPlacardVerifyInput('');
         }, 700);
       };
@@ -2946,17 +3042,6 @@
         const totalMinutes = Math.ceil(remainingMs / (1000 * 60));
         if (totalMinutes < 60) return `${totalMinutes}m Remaining`;
         return `${Math.ceil(totalMinutes / 60)}h Remaining`;
-      };
-
-      const handleSimulatedPassportPurchase = () => {
-        const now = Date.now();
-        setPassportPurchased(true);
-        setPassportFirstUsedTimestamp(now);
-        localStorage.setItem('passport_purchased', 'true');
-        localStorage.setItem('passport_first_used', now.toString());
-        setSettingsSubView('passport');
-        triggerHaptic('success');
-        showToast("72-Hour Pass Activated ($2.99)");
       };
 
       const getScopedPassportItems = () => {
@@ -3109,6 +3194,7 @@
 
       const handleLogout = () => {
         triggerHaptic('warn');
+        AuthTokenManager.clearToken();
         localStorage.removeItem('app_user_session');
         localStorage.removeItem('is_pro_user');
         localStorage.removeItem('billing_interval');
@@ -3129,7 +3215,7 @@
           if (email) {
             await fetch(`${WORKER_ENDPOINT}/api/auth/account`, {
               method: 'DELETE',
-              headers: { 'Content-Type': 'application/json', 'X-User-Email': email }
+              headers: AuthTokenManager.buildAuthHeaders(email)
             }).catch(() => {});
           }
         } catch(e) {}
@@ -3144,6 +3230,7 @@
           tx3.objectStore('manuals_cache').clear();
         } catch(e) {}
 
+        AuthTokenManager.clearToken();
         localStorage.clear();
         setCurrentUser(null);
         setIsPaidUser(false);
@@ -3223,11 +3310,13 @@
           const data = await res.json();
           if (data.user || res.ok) {
             const userObj = data.user || { email: authEmailInput.trim().toLowerCase(), is_pro: false, billing_interval: 'monthly' };
+            if (data.token) {
+              AuthTokenManager.setToken(data.token);
+            }
             localStorage.setItem('app_user_session', JSON.stringify(userObj));
             setCurrentUser(userObj);
             setIsPaidUser(Boolean(userObj.is_pro));
             setUserEmail(userObj.email);
-            // Preserves deliberate display name; never defaults to email prefix
             if (userObj.displayName) setUserDisplayName(userObj.displayName);
             if (data.appliances && data.appliances.length > 0) setAppliances(data.appliances);
             if (data.units && data.units.length > 0) setUnits(data.units);
@@ -3283,29 +3372,36 @@
         }, 1100);
       };
 
-      const allDueNotifications = [];
-      appliances.forEach(app => {
-        (app.consumables || []).forEach((c, idx) => {
-          const status = calculateConsumableStatus(c, app);
-          const intervalMonths = c.intervalMonths || 6;
-          const baseMs = new Date(c.lastReplaced || app.purchaseDate || Date.now()).getTime();
-          const totalSpanMs = intervalMonths * 30.4375 * 24 * 60 * 60 * 1000;
-          const remainingDays = Math.ceil((baseMs + totalSpanMs - Date.now()) / (24 * 60 * 60 * 1000));
+      // COMPUTED NOTIFICATIONS & ALERT COUNTS
+      const allDueNotifications = useMemo(() => {
+        const list = [];
+        appliances.forEach(app => {
+          (app.consumables || []).forEach((c, idx) => {
+            const status = calculateConsumableStatus(c, app);
+            const intervalMonths = c.intervalMonths || 6;
+            const baseMs = new Date(c.lastReplaced || app.purchaseDate || Date.now()).getTime();
+            const totalSpanMs = intervalMonths * 30.4375 * 24 * 60 * 60 * 1000;
+            const remainingDays = Math.ceil((baseMs + totalSpanMs - Date.now()) / (24 * 60 * 60 * 1000));
 
-          if (remainingDays <= notifLeadDays || status.badgeType === 'past_due' || status.badgeType === 'due_now') {
-            const key = `notif_${app.id}_${idx}_${c.lastReplaced || app.purchaseDate || 'initial'}`;
-            allDueNotifications.push({
-              key,
-              appliance: app,
-              consumable: c,
-              index: idx,
-              status
-            });
-          }
+            if (remainingDays <= notifLeadDays || status.badgeType === 'past_due' || status.badgeType === 'due_now') {
+              const key = `notif_${app.id}_${idx}_${c.lastReplaced || app.purchaseDate || 'initial'}`;
+              list.push({
+                key,
+                appliance: app,
+                consumable: c,
+                index: idx,
+                status
+              });
+            }
+          });
         });
-      });
+        return list;
+      }, [appliances, notifLeadDays]);
 
-      const unacknowledgedNotifications = allDueNotifications.filter(n => !acknowledgedAlertKeys.includes(n.key));
+      const unacknowledgedNotifications = useMemo(() => {
+        return allDueNotifications.filter(n => !acknowledgedAlertKeys.includes(n.key));
+      }, [allDueNotifications, acknowledgedAlertKeys]);
+
       const unreadAlertCount = unacknowledgedNotifications.length;
 
       const acknowledgeAlert = (key) => {
@@ -3326,30 +3422,35 @@
         showToast("All alerts cleared");
       };
 
-      const availableCategories = ['All', 'Filter Due', ...Array.from(new Set(appliances.map(a => a.category || 'Appliance')))];
+      // Performance Memoized Filter Computation
+      const filteredAppliancesMap = useMemo(() => {
+        const q = searchQuery.toLowerCase().trim();
+        return appliances.filter(item => {
+          if (q) {
+            const matchesSearch = 
+              (item.name || '').toLowerCase().includes(q) ||
+              (item.brand || '').toLowerCase().includes(q) ||
+              (item.modelNumber || '').toLowerCase().includes(q) ||
+              (item.nickname || '').toLowerCase().includes(q);
+            if (!matchesSearch) return false;
+          }
 
-      const isApplianceMatchingFilter = (item) => {
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase().trim();
-          const matchesSearch = 
-            (item.name || '').toLowerCase().includes(q) ||
-            (item.brand || '').toLowerCase().includes(q) ||
-            (item.modelNumber || '').toLowerCase().includes(q) ||
-            (item.nickname || '').toLowerCase().includes(q);
-          if (!matchesSearch) return false;
-        }
+          if (activeCategoryFilter === 'All') return true;
+          if (activeCategoryFilter === 'Filter Due') {
+            return (item.consumables || []).some(c => {
+              const st = calculateConsumableStatus(c, item);
+              return st.badgeType === 'past_due' || st.badgeType === 'due_now';
+            });
+          }
+          return (item.category || 'Appliance') === activeCategoryFilter;
+        });
+      }, [appliances, searchQuery, activeCategoryFilter]);
 
-        if (activeCategoryFilter === 'All') return true;
-        if (activeCategoryFilter === 'Filter Due') {
-          return (item.consumables || []).some(c => {
-            const st = calculateConsumableStatus(c, item);
-            return st.badgeType === 'past_due' || st.badgeType === 'due_now';
-          });
-        }
-        return (item.category || 'Appliance') === activeCategoryFilter;
-      };
+      const availableCategories = useMemo(() => {
+        return ['All', 'Filter Due', ...Array.from(new Set(appliances.map(a => a.category || 'Appliance')))];
+      }, [appliances]);
 
-      // Main Appliance Card with Spring Swipe-to-Delete and Right-Aligned Reorder Controls
+      // Main Appliance Card with Swipe-to-Delete and Reorder Mechanics
       const renderApplianceCard = (item, itemIndex, totalInGroup) => {
         const isSelected = selectedIds.includes(item.id);
         const currentOffset = swipeOffsets[item.id] || 0;
@@ -3358,7 +3459,6 @@
 
         return (
           <div key={item.id} className="relative overflow-hidden rounded-[20px]">
-            {/* iOS Spring Trash Action Reveal */}
             <div className="absolute inset-y-0 right-0 w-24 bg-rose-600 flex items-center justify-center rounded-r-[20px]">
               <button
                 onClick={(e) => { e.stopPropagation(); handleDeleteSingleAppliance(item.id); }}
@@ -3400,7 +3500,6 @@
                 const absX = Math.abs(deltaX);
                 const absY = Math.abs(deltaY);
 
-                // Strict Axis Lock: 16px threshold + 2.5:1 ratio over vertical displacement
                 if (touchIsHorizontalRef.current === null) {
                   if (absX > 16 && absX > absY * 2.5) {
                     touchIsHorizontalRef.current = true;
@@ -3411,7 +3510,6 @@
 
                 if (!touchIsHorizontalRef.current) return;
 
-                // Rubber-banding curve beyond -96px latch point
                 const damped = deltaX < 0
                   ? (deltaX < -96 ? -96 - Math.pow(Math.abs(deltaX + 96), 0.7) : deltaX)
                   : Math.min(18, Math.sign(deltaX) * Math.pow(absX, 0.65));
@@ -3443,7 +3541,6 @@
               } ${isSelected ? 'ring-2 ring-[#FF9500]' : ''}`}
             >
               <div className="px-3 pt-2.5 pb-2 flex items-center gap-2.5">
-                {/* Edit Mode: Left Selection Checkmark Circle */}
                 {isSelectMode && (
                   <div
                     onClick={() => toggleSelectId(item.id)}
@@ -3461,7 +3558,6 @@
                   </div>
                 )}
 
-                {/* Card Primary Content */}
                 <div
                   onClick={() => {
                     if (currentOffset < -10) { setSwipeOffsets(prev => ({ ...prev, [item.id]: 0 })); return; }
@@ -3494,7 +3590,6 @@
                   </div>
                 </div>
 
-                {/* Edit Mode: Right-Aligned Up/Down Reorder Controls (Aligned with 'Done' button column) */}
                 {isSelectMode && (
                   <div className="flex flex-col gap-0.5 shrink-0 pr-0.5">
                     <button
@@ -3636,6 +3731,9 @@
       };
 
       const greetingInfo = getDynamicGreetingInfo(userDisplayName);
+
+    /* === END OF CORRECTED PART 3 / READY FOR PART 4 === */
+    /* === START OF PART 4 === */
 
       return (
         <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
@@ -3916,7 +4014,7 @@
             <main className="flex-1 px-2 space-y-3 pb-28 pt-1">
               <div className="space-y-3.5">
                 {units.map((unit, unitIdx) => {
-                  const unitAppliances = appliances.filter(a => a.unitId === unit.id && isApplianceMatchingFilter(a));
+                  const unitAppliances = filteredAppliancesMap.filter(a => a.unitId === unit.id);
 
                   return (
                     <div
@@ -3948,7 +4046,6 @@
 
                         {isSelectMode ? (
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Property Group Up/Down Reorder Controls */}
                             <div className="flex items-center gap-1">
                               <button
                                 type="button"
@@ -4086,6 +4183,8 @@
               </div>
             </main>
           </div>
+
+          {/* BULK ACTION BAR */}
           {isSelectMode && (
             <div className={`fixed bottom-4 inset-x-3 max-w-md mx-auto z-40 rounded-2xl p-3.5 shadow-2xl flex items-center justify-between ${
               isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
@@ -4110,6 +4209,7 @@
               </button>
             </div>
           )}
+
           {/* 1. CONSUMABLE ACTION DRAWER */}
           {activeConsumableSheet && (() => {
             const currentLiveAppliance = appliances.find(a => a.id === activeConsumableSheet.appliance.id) || activeConsumableSheet.appliance;
@@ -4455,7 +4555,7 @@
                             <input
                               style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
-                                isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                                isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
                               placeholder="MM/DD/YYYY"
                               value={editApplianceForm.purchaseDate}
@@ -4469,7 +4569,7 @@
                             <input
                               style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
                               className={`w-full rounded-xl px-3.5 py-2 text-xs font-semibold mt-0.5 focus:outline-none ${
-                                isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black'
+                                isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
                               }`}
                               placeholder="e.g. $1,299.00"
                               value={editApplianceForm.purchasePrice}
@@ -4832,7 +4932,10 @@
             </div>
           )}
 
-          {/* 3. ADD APPLIANCE MODAL (With Precision Optical 'e.g.' Alignment) */}
+    /* === END OF PART 4 / READY FOR PART 5 === */
+    /* === START OF PART 5 === */
+
+          {/* 3. ADD APPLIANCE MODAL */}
           {isAddOpen && (
             <div onClick={closeAddModal} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer">
               <div 
@@ -5110,7 +5213,7 @@
             </div>
           )}
 
-          {/* CAPACITY REACHED MODAL (Native Apple Spark Vector Badge) */}
+          {/* CAPACITY REACHED MODAL */}
           {isCapacityModalOpen && (
             <div 
               onClick={() => setIsCapacityModalOpen(false)} 
@@ -5314,7 +5417,7 @@
                       </button>
                     </div>
 
-                                        {/* CARD 2: PASSPORT (Single-Row Subtitle) */}
+                    {/* CARD 2: PASSPORT */}
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0 flex-1">
@@ -5335,7 +5438,6 @@
                           )}
                         </div>
                       </div>
-
 
                       <button
                         onClick={(e) => {
@@ -5436,7 +5538,7 @@
                   </div>
                 )}
 
-                {/* SUBSCRIPTION MANAGEMENT MIDDLE SCREEN */}
+                {/* SUBSCRIPTION MANAGEMENT */}
                 {settingsSubView === 'subscription' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -5928,7 +6030,7 @@
                   </div>
                 )}
 
-                {/* 1. CANCEL MEMBERSHIP SUBVIEW (Downgrade to Free Tier) */}
+                {/* 1. CANCEL MEMBERSHIP SUBVIEW */}
                 {settingsSubView === 'cancel' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -6016,7 +6118,28 @@
                       <div className="pt-2">
                         <button
                           type="button"
-                          onClick={handleSimulatedPassportPurchase}
+                          onClick={async () => {
+                            const now = Date.now();
+                            setPassportPurchased(true);
+                            setPassportFirstUsedTimestamp(now);
+                            localStorage.setItem('passport_purchased', 'true');
+                            localStorage.setItem('passport_first_used', now.toString());
+
+                            const email = currentUser?.email || userEmail;
+                            if (email) {
+                              try {
+                                await fetch(`${WORKER_ENDPOINT}/api/activate-pass`, {
+                                  method: 'POST',
+                                  headers: AuthTokenManager.buildAuthHeaders(email),
+                                  body: JSON.stringify({ email, plan: '72_hour_pass' })
+                                });
+                              } catch(e) {}
+                            }
+
+                            setSettingsSubView('passport');
+                            triggerHaptic('success');
+                            showToast("72-Hour Pass Activated ($2.99)");
+                          }}
                           className={`w-full py-3 rounded-xl text-xs font-bold ${UI_ACCENT.solid} shadow-xs active:scale-95 transition-transform`}
                         >
                           Activate 72-Hour Pass ($2.99) ➔
@@ -6026,7 +6149,7 @@
                   </div>
                 )}
 
-                {/* 3. PASSPORT COMPILER & CONFIGURATION SUBVIEW (With Precision Optical 'e.g.' Alignment) */}
+                {/* 3. PASSPORT COMPILER & CONFIGURATION SUBVIEW */}
                 {settingsSubView === 'passport' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-start pb-2 border-b border-black/[0.04] dark:border-zinc-800/80">
@@ -6177,6 +6300,9 @@
               </div>
             </div>
           )}
+
+    /* === END OF PART 5 / READY FOR PART 6 === */
+    /* === START OF PART 6 === */
 
           {/* NOTIFICATION CENTER DRAWER */}
           {isNotificationsOpen && (
@@ -6390,7 +6516,7 @@
             </div>
           )}
 
-          {/* 5. PAYWALL MODAL (With Inset Header Aligned with Checkmarks) */}
+          {/* 5. PAYWALL MODAL */}
           {isPaywallOpen && (
             <div 
               onClick={() => {
@@ -6462,7 +6588,7 @@
 
                 <div className="flex flex-col gap-2 pt-1">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       triggerHaptic('success');
                       setIsPaidUser(true);
                       localStorage.setItem('is_pro_user', 'true');
@@ -6475,6 +6601,18 @@
                       };
                       localStorage.setItem('app_user_session', JSON.stringify(updatedUser));
                       setCurrentUser(updatedUser);
+
+                      const email = updatedUser.email;
+                      if (email) {
+                        try {
+                          await fetch(`${WORKER_ENDPOINT}/api/activate-pass`, {
+                            method: 'POST',
+                            headers: AuthTokenManager.buildAuthHeaders(email),
+                            body: JSON.stringify({ email, plan: 'pro_subscription', billingInterval: paywallPlanChoice })
+                          });
+                        } catch(e) {}
+                      }
+
                       setIsPaywallOpen(false);
                       setSettingsSubView('root');
                       setIsSettingsOpen(true);
@@ -6617,7 +6755,7 @@
             </div>
           )}
 
-          {/* 9. DELETE ACCOUNT CONFIRMATION MODAL (Clean "Delete" Button) */}
+          {/* 9. DELETE ACCOUNT CONFIRMATION MODAL */}
           {isDeleteAccountModalOpen && (
             <div 
               onClick={() => setIsDeleteAccountModalOpen(false)} 
@@ -6669,7 +6807,7 @@
                   isDark ? 'bg-zinc-900 text-white' : 'apple-card-light text-zinc-900'
                 }`}
               >
-                                <div className="relative flex items-center justify-center pb-0.5">
+                <div className="relative flex items-center justify-center pb-0.5">
                   <h3 className="text-base font-black tracking-tight">Account Login</h3>
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 -mr-1">
                     <AppleCloseButton 
@@ -6760,7 +6898,7 @@
             </div>
           )}
 
-                    {/* 11. DIAGNOSTIC ASSISTANT BOTTOM-SHEET MODAL (78vh Matching Details Sheet, High-Contrast Light Mode & Rigid Touch Lock) */}
+          {/* 11. DIAGNOSTIC ASSISTANT BOTTOM-SHEET MODAL */}
           {activeAppliance && (
             <div 
               onClick={() => {
@@ -6833,22 +6971,35 @@
                   }`}
                 >
                   <div className="flex items-center gap-1.5 w-max pr-6">
-                    {getAdaptiveChips(activeAppliance).map(chip => (
-                      <button
-                        key={chip}
-                        type="button"
-                        onClick={() => sendQuery(chip)}
-                        className={`text-xs px-3 py-1 rounded-full font-bold shadow-2xs active:scale-95 transition-transform whitespace-nowrap ${
-                          chip === 'Go Deeper' ? `${UI_ACCENT.solid}` : (isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-750' : 'bg-white text-zinc-800 hover:bg-zinc-50 shadow-xs border border-black/5')
-                        }`}
-                      >
-                        {chip}
-                      </button>
-                    ))}
+                    {dynamicAiChips.length > 0 ? (
+                      dynamicAiChips.map(chip => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => sendQuery(chip)}
+                          className="text-xs px-3 py-1 rounded-full font-bold shadow-2xs active:scale-95 transition-transform whitespace-nowrap bg-[#FF9500]/15 text-[#FF9500] border border-[#FF9500]/30"
+                        >
+                          {chip}
+                        </button>
+                      ))
+                    ) : (
+                      getAdaptiveChips(activeAppliance).map(chip => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => sendQuery(chip)}
+                          className={`text-xs px-3 py-1 rounded-full font-bold shadow-2xs active:scale-95 transition-transform whitespace-nowrap ${
+                            chip === 'Go Deeper' ? `${UI_ACCENT.solid}` : (isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-750' : 'bg-white text-zinc-800 hover:bg-zinc-50 shadow-xs border border-black/5')
+                          }`}
+                        >
+                          {chip}
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
 
-                {/* Message Stream with Drag-to-Dismiss Keyboard & High-Contrast Light Mode */}
+                {/* Message Stream */}
                 <div 
                   ref={chatContainerRef}
                   onTouchStart={(e) => {
@@ -7061,7 +7212,7 @@
                   {isLoading && <p className={`text-xs animate-pulse px-2 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Analyzing...</p>}
                 </div>
 
-                {/* Docked Composer with Adaptive Keyboard Padding & Dual-Tick Scroll Anchor */}
+                {/* Docked Composer */}
                 <div 
                   style={{ 
                     touchAction: 'none',
@@ -7127,7 +7278,6 @@
               </div>
             </div>
           )}
-
 
           {/* 12. INLINE PDF VIEWER */}
           {inlinePdfViewerData && (
