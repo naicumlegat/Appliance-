@@ -4275,12 +4275,20 @@
             </div>
           )}
 
-          {/* Dashboard Feed Wrapper */}
+                    {/* Dashboard Feed Wrapper */}
           <div className={activeAppliance ? "hidden" : "contents"}>
-                        {/* LIVING FROSTED LENS HEADER with Optimized Ceiling, Spatial Gap & Scaled Controls */}
+            {/* Global full-screen backdrop to dismiss filter dropdown from anywhere */}
+            {isFilterDropdownOpen && (
+              <div 
+                className="fixed inset-0 z-30" 
+                onClick={() => setIsFilterDropdownOpen(false)} 
+              />
+            )}
+
+            {/* LIVING FROSTED LENS HEADER with Optimized Ceiling, Spatial Gap & Scaled Controls */}
             <header 
               style={{ paddingTop: 'max(36px, calc(env(safe-area-inset-top, 44px) + 8px))' }}
-              className={`px-3 pb-3.5 sticky top-0 z-20 will-change-transform transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              className={`px-3 pb-3.5 sticky top-0 ${isFilterDropdownOpen ? 'z-40' : 'z-20'} will-change-transform transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 isDark ? 'apple-liquid-header-dark' : 'apple-liquid-header-light'
               } ${
                 isHeaderVisible 
