@@ -24,7 +24,218 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" crossorigin="anonymous"></script>
 
-  <style>
+    <style>
+        
+
+		/* Snappy iOS Card Content Swap (220ms Fluid Spring) */
+    @keyframes apple-card-swap {
+      0% {
+        opacity: 0;
+        transform: scale(0.985) translateY(4px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+    .apple-card-swap {
+      animation: apple-card-swap 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      will-change: transform, opacity;
+    }
+
+   /* ==========================================================================
+       1. EMPTY STATE: DUAL LIQUID WATER CAUSTIC AURA
+       ========================================================================== */
+       
+        /* Layer 1: Expressive Liquid Undertow (Clockwise 8.5s) */
+    @keyframes apple-water-undertow {
+      0% {
+        transform: rotate(0deg) scale(0.92);
+        border-radius: 40% 60% 70% 30% / 42% 45% 55% 58%;
+      }
+      33% {
+        transform: rotate(115deg) scale(1.18);
+        border-radius: 65% 35% 42% 58% / 58% 38% 62% 42%;
+      }
+      66% {
+        transform: rotate(240deg) scale(1.04);
+        border-radius: 35% 65% 58% 42% / 45% 68% 32% 55%;
+      }
+      100% {
+        transform: rotate(360deg) scale(0.92);
+        border-radius: 40% 60% 70% 30% / 42% 45% 55% 58%;
+      }
+    }
+
+    /* Layer 2: Counter Caustic Swell (Counter-Clockwise 11.5s) */
+    @keyframes apple-water-surface {
+      0% {
+        transform: rotate(360deg) scale(1.12);
+        border-radius: 62% 38% 35% 65% / 54% 34% 66% 46%;
+      }
+      33% {
+        transform: rotate(235deg) scale(0.90);
+        border-radius: 38% 62% 64% 36% / 42% 64% 36% 58%;
+      }
+      66% {
+        transform: rotate(110deg) scale(1.22);
+        border-radius: 68% 32% 40% 60% / 60% 40% 60% 40%;
+      }
+      100% {
+        transform: rotate(0deg) scale(1.12);
+        border-radius: 62% 38% 35% 65% / 54% 34% 66% 46%;
+      }
+    }
+
+    .apple-undertow-layer {
+      background: conic-gradient(
+        from 180deg at 50% 50%,
+        rgba(255, 149, 0, 0.72) 0deg,
+        rgba(234, 88, 12, 0.68) 120deg,
+        rgba(244, 63, 94, 0.62) 220deg,
+        rgba(251, 191, 36, 0.72) 310deg,
+        rgba(255, 149, 0, 0.72) 360deg
+      );
+      filter: blur(22px);
+      animation: apple-water-undertow 8.5s cubic-bezier(0.42, 0.08, 0.52, 0.96) infinite;
+      will-change: transform, border-radius;
+    }
+
+    .apple-surface-layer {
+      background: conic-gradient(
+        from 0deg at 50% 50%,
+        rgba(251, 113, 133, 0.58) 0deg,
+        rgba(255, 149, 0, 0.62) 90deg,
+        rgba(253, 164, 175, 0.50) 190deg,
+        rgba(249, 115, 22, 0.62) 280deg,
+        rgba(251, 113, 133, 0.58) 360deg
+      );
+      filter: blur(18px);
+      mix-blend-mode: screen;
+      animation: apple-water-surface 11.5s cubic-bezier(0.42, 0.08, 0.52, 0.96) infinite;
+      will-change: transform, border-radius;
+    }
+
+    .apple-frosted-lens {
+      backdrop-filter: blur(24px) saturate(150%);
+      -webkit-backdrop-filter: blur(24px) saturate(150%);
+      box-shadow: 
+        inset 0 1px 1px rgba(255, 255, 255, 0.4),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.15),
+        0 6px 18px -4px rgba(234, 88, 12, 0.16);
+    }
+
+    /* ==========================================================================
+       2. AI CHAT MODAL: APPLE INTELLIGENCE SHADERS
+       ========================================================================== */
+
+    /* Fluid Thinking Perimeter / Ribbon */
+    @keyframes siri-fluid-edge {
+      0% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+
+    .apple-chat-thinking-ribbon {
+      background: linear-gradient(
+        90deg,
+        rgba(255, 149, 0, 0) 0%,
+        rgba(255, 149, 0, 0.85) 25%,
+        rgba(244, 63, 94, 0.8) 50%,
+        rgba(251, 191, 36, 0.85) 75%,
+        rgba(255, 149, 0, 0) 100%
+      );
+      background-size: 200% 200%;
+      animation: siri-fluid-edge 3s ease-in-out infinite;
+    }
+
+    /* Assistant Thinking Resonating Orb */
+    @keyframes apple-thinking-orb {
+      0%, 100% {
+        transform: scale(0.92);
+        opacity: 0.55;
+      }
+      50% {
+        transform: scale(1.16);
+        opacity: 0.95;
+      }
+    }
+
+    .apple-thinking-orb {
+      animation: apple-thinking-orb 2.4s ease-in-out infinite;
+    }
+
+    /* iOS 18 Spring Bubble Entrance */
+    @keyframes apple-bubble-spring {
+      0% {
+        opacity: 0;
+        transform: scale(0.96) translateY(8px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .apple-bubble-enter {
+      animation: apple-bubble-spring 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      will-change: transform, opacity;
+    }
+
+	  /* Tactile Frosted Apple Home Tiles (Daylight Specular Bevel) */
+    .apple-tile-dark {
+      background: rgba(24, 24, 27, 0.75);
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+        0 2px 8px -1px rgba(0, 0, 0, 0.35);
+    }
+
+    .apple-tile-light {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.95),
+        0 1px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+        /* Ambient Corner Hearth Bloom (Concept 1) */
+    .apple-corner-bloom {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 220px;
+      height: 130px;
+      pointer-events: none;
+      border-top-right-radius: 22px;
+      background: radial-gradient(
+        circle at 100% 0%, 
+        rgba(255, 149, 0, 0.22) 0%, 
+        rgba(244, 63, 94, 0.10) 45%, 
+        transparent 75%
+      );
+      z-index: 10;
+    }
+    html:not(.dark) .apple-corner-bloom {
+      background: radial-gradient(
+        circle at 100% 0%, 
+        rgba(255, 149, 0, 0.14) 0%, 
+        rgba(244, 63, 94, 0.06) 45%, 
+        transparent 75%
+      );
+    }
+
+
     /* iOS Standard Root Baseline */
     html {
       font-size: 17px;
@@ -177,34 +388,44 @@
       animation: mic-listen-pulse 1.4s infinite cubic-bezier(0.4, 0, 0.6, 1);
     }
 
-    /* Typing Dots */
-    @keyframes imessage-wave {
-      0%, 100% { opacity: 0.35; transform: scale(0.85); }
-      50% { opacity: 1; }
+     /* Apple Intelligence Thinking Ribbon */
+    @keyframes siri-fluid-edge {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
     }
-    .imessage-dot {
-      animation: imessage-wave 1.2s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-    }
-    .imessage-dot:nth-child(1) { animation-delay: 0s; }
-    .imessage-dot:nth-child(2) { animation-delay: 0.2s; }
-    .imessage-dot:nth-child(3) { animation-delay: 0.4s; }
-
-    @keyframes shake-rejection {
-      0%, 100% { transform: translateX(0); }
-      20%, 60% { transform: translateX(-3px); }
-      40%, 80% { transform: translateX(3px); }
-    }
-    .animate-shake {
-      animation: shake-rejection 0.25s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    .apple-chat-thinking-ribbon {
+      background: linear-gradient(
+        90deg,
+        rgba(255, 149, 0, 0) 0%,
+        rgba(255, 149, 0, 0.85) 25%,
+        rgba(244, 63, 94, 0.8) 50%,
+        rgba(251, 191, 36, 0.85) 75%,
+        rgba(255, 149, 0, 0) 100%
+      );
+      background-size: 200% 200%;
+      animation: siri-fluid-edge 3s ease-in-out infinite;
     }
 
-    @keyframes starter-chip-fade {
-      0% { opacity: 0; transform: translateY(4px); }
-      100% { opacity: 1; transform: translateY(0); }
+    /* Assistant Thinking Orb */
+    @keyframes apple-thinking-orb {
+      0%, 100% { transform: scale(0.92); opacity: 0.55; }
+      50% { transform: scale(1.16); opacity: 0.95; }
     }
-    .animate-starter-chip {
-      animation: starter-chip-fade 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    .apple-thinking-orb {
+      animation: apple-thinking-orb 2.4s ease-in-out infinite;
     }
+
+    /* iOS 18 Spring Bubble Entrance */
+    @keyframes apple-bubble-spring {
+      0% { opacity: 0; transform: scale(0.96) translateY(8px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .apple-bubble-enter {
+      animation: apple-bubble-spring 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      will-change: transform, opacity;
+    }
+
   </style>
 </head>
 <body class="font-sans antialiased selection:bg-[#FF9500]/30">
@@ -995,8 +1216,6 @@
       });
     }
 
-    /* === END OF PART 1 / READY FOR PART 2 === */
-    /* === START OF PART 2 === */
 
     const BUNDLED_CHASSIS_ERRORS = {
       "refrigeration": {
@@ -1567,8 +1786,6 @@
       return html;
     }
 
-    /* === END OF PART 2 / READY FOR PART 3 === */
-    /* === START OF CORRECTED PART 3 === */
 
     let isDirtySync = false;
     let lastPullTime = 0;
@@ -1717,23 +1934,6 @@
         window.addEventListener('scroll', handleWindowScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleWindowScroll);
       }, [isSearchExpanded, searchQuery, isSelectMode]);
-
-
-
-      const ALL_STARTER_CATEGORIES = [
-        '+ Refrigerator', '+ HVAC Heat Pump', '+ Air Purifier', 
-        '+ Dishwasher', '+ Washing Machine', '+ Water Heater', 
-        '+ Range / Oven', '+ Microwave', '+ Dehumidifier'
-      ];
-      const [starterChipSet, setStarterChipSet] = useState(['+ Refrigerator', '+ HVAC Heat Pump', '+ Air Purifier']);
-
-      useEffect(() => {
-        const timer = setInterval(() => {
-          const shuffled = [...ALL_STARTER_CATEGORIES].sort(() => 0.5 - Math.random());
-          setStarterChipSet(shuffled.slice(0, 3));
-        }, 3500);
-        return () => clearInterval(timer);
-      }, []);
 
       const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
       const [acknowledgedAlertKeys, setAcknowledgedAlertKeys] = useState(() => {
@@ -3781,9 +3981,6 @@
 
       const greetingInfo = getDynamicGreetingInfo(userDisplayName);
 
-    /* === END OF CORRECTED PART 3 / READY FOR PART 4 === */
-    /* === START OF PART 4 === */
-
       return (
         <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
           isDark ? 'bg-black text-white' : 'bg-[#F2F2F7] text-[#111827]'
@@ -3816,7 +4013,7 @@
             </div>
           )}
 
-            {/* Underlay Concealment Wrapper: Hides dashboard completely while full-screen AI chat is active */}
+                    {/* Underlay Concealment Wrapper: Hides dashboard completely while full-screen AI chat is active */}
           <div className={activeAppliance ? "hidden" : "contents"}>
             {/* UNIFIED STICKY FROSTED APP HEADER with Dynamic Island Ceiling Guard & Quick-Return Motion */}
             <header 
@@ -3917,20 +4114,20 @@
                 </div>
               </div>
 
-              {/* Row 2: Counts, Search Bar, Category Filter & Edit */}
-              <div className="pl-[14px] pr-2 pt-3 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className={`text-[12.5px] font-black tracking-wide uppercase shrink-0 transition-opacity duration-200 ${
+              {/* Row 2: Counts, Search Bar, Category Filter & Edit (Zero-Shift Locked Height) */}
+              <div className="pl-[14px] pr-2 pt-3 flex items-center justify-between gap-2 h-11">
+                <div className="flex items-center gap-2 min-w-0 flex-1 h-8">
+                  <span className={`text-[12.5px] font-black tracking-wide uppercase shrink-0 whitespace-nowrap h-8 flex items-center transition-opacity duration-200 ${
                     isSearchExpanded ? 'opacity-40' : 'opacity-100'
                   } ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                     {appliances.length} Appliances
                   </span>
 
                   <div
-                    className={`relative flex items-center rounded-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                    className={`relative h-8 flex items-center rounded-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                       isSearchExpanded
-                        ? `flex-1 py-1 pl-3 pr-2 ${isDark ? 'bg-zinc-900' : 'apple-card-light'}`
-                        : `w-8 h-8 justify-center cursor-pointer shrink-0 ${
+                        ? `flex-1 min-w-0 pl-2.5 pr-1 ${isDark ? 'bg-zinc-900 border border-white/10' : 'apple-card-light border border-black/5'}`
+                        : `w-8 justify-center cursor-pointer shrink-0 ${
                             isDark ? 'bg-zinc-900 hover:bg-zinc-800' : 'bg-black/[0.04] hover:bg-black/[0.07]'
                           }`
                     }`}
@@ -3949,39 +4146,43 @@
                     </svg>
 
                     {isSearchExpanded && (
-                      <input
-                        ref={searchInputRef}
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search here…"
-                        style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
-                        className="w-full bg-transparent text-[13px] font-medium focus:outline-none ml-2 pr-1 placeholder:text-zinc-500"
-                        onBlur={() => {
-                          if (!searchQuery.trim()) {
-                            setIsSearchExpanded(false);
-                          }
-                        }}
-                      />
-                    )}
+                      <div className="flex items-center flex-1 min-w-0 h-full ml-1.5">
+                        <input
+                          ref={searchInputRef}
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Search here…"
+                          style={{ fontSize: '14px', colorScheme: isDark ? 'dark' : 'light' }}
+                          className="min-w-0 flex-1 h-full bg-transparent text-[13px] font-medium focus:outline-none placeholder:text-zinc-500 leading-none"
+                          onBlur={() => {
+                            if (!searchQuery.trim()) {
+                              setIsSearchExpanded(false);
+                            }
+                          }}
+                        />
 
-                    {isSearchExpanded && searchQuery && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          triggerHaptic('light');
-                          setSearchQuery('');
-                          setIsSearchExpanded(false);
-                        }}
-                        className="w-7 h-7 -mr-1 rounded-full text-zinc-400 hover:text-zinc-200 flex items-center justify-center text-[12px] shrink-0 active:scale-90 transition-transform"
-                      >
-                        ✕
-                      </button>
+                        {/* Space-reserved clear button: toggles opacity rather than mounting/unmounting */}
+                        <button
+                          type="button"
+                          tabIndex={searchQuery ? 0 : -1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            triggerHaptic('light');
+                            setSearchQuery('');
+                            setIsSearchExpanded(false);
+                          }}
+                          className={`w-6 h-6 rounded-full text-zinc-400 hover:text-zinc-200 flex items-center justify-center text-[11px] shrink-0 active:scale-90 transition-opacity ${
+                            searchQuery ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                          }`}
+                        >
+                          ✕
+                        </button>
+                      </div>
                     )}
                   </div>
 
-                  <div className="relative shrink-0">
+                  <div className="relative shrink-0 w-8 h-8">
                     <button
                       type="button"
                       onClick={() => { triggerHaptic('light'); setIsFilterDropdownOpen(!isFilterDropdownOpen); }}
@@ -4036,11 +4237,11 @@
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 h-8">
                   {isPaidUser && isSelectMode && (
                     <button
                       onClick={() => { triggerHaptic('light'); setIsAddGroupModalOpen(true); }}
-                      className={`text-[12px] px-2.5 py-1 rounded-full font-bold shadow-xs ${
+                      className={`h-8 text-[12px] px-2.5 rounded-full font-bold shadow-xs flex items-center justify-center ${
                         isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-black/[0.04] text-zinc-900'
                       }`}
                     >
@@ -4054,7 +4255,7 @@
                       setSelectedIds([]); 
                       setSwipeOffsets({}); 
                     }}
-                    className={`text-[12px] px-3 py-1 rounded-full font-bold transition-all shadow-xs active:scale-95 ${
+                    className={`h-8 text-[12px] px-3.5 rounded-full font-bold transition-all shadow-xs active:scale-95 flex items-center justify-center ${
                       isSelectMode ? `${UI_ACCENT.solid}` : (isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-black/[0.04] hover:bg-black/[0.07] text-zinc-900')
                     }`}
                   >
@@ -4073,12 +4274,19 @@
                   return (
                     <div
                       key={unit.id}
-                      className={`rounded-[22px] overflow-hidden ${
-                        isDark ? 'bg-zinc-950/60' : 'apple-group-card-light'
+                      className={`relative rounded-[22px] overflow-hidden border transition-all ${
+                        isDark 
+                          ? 'bg-zinc-950/60 border-white/[0.12] shadow-[0_2px_12px_-2px_rgba(0,0,0,0.5)]' 
+                          : 'apple-group-card-light border-black/[0.08] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]'
                       }`}
                     >
-                      <div className={`pl-[14px] pr-2 py-2.5 flex items-center justify-between ${
-                        isDark ? 'bg-zinc-900/70' : 'bg-white'
+                      {/* Concept 1: Ambient Corner Hearth Bloom (Radiates softly from top-right) */}
+                      {!unit.collapsed && unitAppliances.length > 0 && (
+                        <div className="apple-corner-bloom" />
+                      )}
+
+                      <div className={`relative z-10 pl-[14px] pr-2 py-2.5 flex items-center justify-between ${
+                        isDark ? 'bg-zinc-900/80' : 'bg-white/90 backdrop-blur-md'
                       }`}>
                         <div
                           onClick={() => {
@@ -4163,10 +4371,17 @@
                       {!unit.collapsed && (
                         <div className="p-2 space-y-2">
                           {unitAppliances.length > 0 ? (
-                            unitAppliances.map((item, idx) => renderApplianceCard(item, idx, unitAppliances.length))
+                            <div key={`appliances_${searchQuery ? 'filtered' : 'all'}`} className="space-y-2 apple-card-swap">
+                              {unitAppliances.map((item, idx) => renderApplianceCard(item, idx, unitAppliances.length))}
+                            </div>
                           ) : (
                             searchQuery.trim() ? (
-                              <div className={`p-4 text-center rounded-2xl ${isDark ? 'text-zinc-400 bg-zinc-900/60' : 'text-zinc-600 bg-[#FAFAFC]'}`}>
+                              <div 
+                                key="search_no_match"
+                                className={`apple-card-swap p-4 text-center rounded-2xl ${
+                                  isDark ? 'text-zinc-300 bg-zinc-900/60' : 'text-zinc-700 bg-[#FAFAFC]'
+                                }`}
+                              >
                                 <p className="text-xs font-semibold mb-2">
                                   {activeCategoryFilter !== 'All' 
                                     ? `No ${activeCategoryFilter} appliances matching "${searchQuery}"`
@@ -4199,33 +4414,45 @@
                                 </div>
                               </div>
                             ) : (
-                              <div className={`p-4 text-center rounded-2xl ${isDark ? 'bg-zinc-900/40' : 'bg-[#FAFAFC]'}`}>
-                                <p className="text-xs font-bold text-zinc-400 mb-2.5">No appliances cataloged in {unit.name}</p>
-                                <div className="flex flex-wrap items-center justify-center gap-1.5 animate-starter-chip">
-                                  {starterChipSet.map((chipLabel) => (
-                                    <button
-                                      key={chipLabel}
-                                      type="button"
-                                      onClick={() => {
-                                        closeEditMode();
-                                        triggerHaptic('light');
-                                        setAddForm(prev => ({
-                                          ...prev,
-                                          selectedUnitId: unit.id,
-                                          name: chipLabel.replace('+ ', '').trim()
-                                        }));
-                                        setIsAddOpen(true);
-                                      }}
-                                      className={`text-xs font-bold px-3 py-1.5 rounded-full transition-transform active:scale-95 ${
-                                        isDark 
-                                          ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-750' 
-                                          : 'bg-white text-zinc-800 hover:bg-zinc-50 shadow-xs'
-                                      }`}
-                                    >
-                                      {chipLabel}
-                                    </button>
-                                  ))}
+                              <div 
+                                key="empty_property_state"
+                                onClick={() => {
+                                  closeEditMode();
+                                  triggerHaptic('light');
+                                  setAddForm(prev => ({ ...prev, selectedUnitId: unit.id, name: '' }));
+                                  setIsAddOpen(true);
+                                }}
+                                className={`apple-card-swap relative overflow-hidden pt-8 pb-6 px-4 rounded-[22px] flex flex-col items-center justify-center text-center border border-dashed transition-all cursor-pointer group active:scale-[0.98] ${
+                                  isDark 
+                                    ? 'border-white/15 bg-zinc-950/30 hover:border-white/25' 
+                                    : 'border-black/15 bg-black/[0.02] hover:border-black/25'
+                                }`}
+                              >
+                                {/* Dual Liquid Water Caustic Centerpiece */}
+                                <div className="relative w-11 h-11 flex items-center justify-center shrink-0 mb-5">
+                                  {/* Expanded Bleed Layers with Enhanced Motion Churn */}
+                                  <div className="absolute w-[92px] h-[92px] apple-undertow-layer opacity-50 dark:opacity-60 pointer-events-none" />
+                                  <div className="absolute w-[92px] h-[92px] apple-surface-layer opacity-45 dark:opacity-55 pointer-events-none" />
+
+                                  {/* Deep Frosted Diffusing Lens */}
+                                  <div className={`relative w-11 h-11 rounded-full flex items-center justify-center apple-frosted-lens transition-transform duration-300 group-hover:scale-105 ${
+                                    isDark 
+                                      ? 'bg-zinc-950/50 border border-white/25 text-zinc-100' 
+                                      : 'bg-white/65 border border-white/80 text-zinc-800'
+                                  }`}>
+                                    <svg className="w-4 h-4 stroke-[1.8] stroke-linecap-round stroke-linejoin-round opacity-90 drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                  </div>
                                 </div>
+
+                                <p className={`relative z-10 text-[13px] font-bold tracking-tight ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+                                  No Equipment in {unit.name}
+                                </p>
+                                <p className={`relative z-10 text-[11.5px] font-semibold tracking-normal mt-1 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                                  Tap to add an appliance
+                                </p>
                               </div>
                             )
                           )}
@@ -4237,6 +4464,10 @@
               </div>
             </main>
           </div>
+
+          {/* BULK ACTION BAR */}
+
+
 
           {/* BULK ACTION BAR */}
           {isSelectMode && (
@@ -4986,9 +5217,6 @@
             </div>
           )}
 
-    /* === END OF PART 4 / READY FOR PART 5 === */
-    /* === START OF PART 5 === */
-
           {/* 3. ADD APPLIANCE MODAL */}
           {isAddOpen && (
             <div onClick={closeAddModal} className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-50 cursor-pointer">
@@ -5436,7 +5664,8 @@
                         <AppleCloseButton isDark={isDark} onClick={() => setIsSettingsOpen(false)} />
                       </div>
                     </div>
-                    {/* CARD 1: PLAN TIER (Single-Row Streamlined Without "Using") */}
+
+         {/* CARD 1: PLAN TIER (Single-Row Streamlined Without "Using") */}
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
                       <div>
                         <div className="flex items-center gap-2">
@@ -5450,10 +5679,16 @@
                           </span>
                         </div>
 
-                        <p className={`text-[11.5px] font-semibold leading-normal mt-1.5 whitespace-nowrap overflow-hidden text-ellipsis ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                          {isPaidUser 
-                            ? `${totalItemsUsed}/${maxItems} Appliances • ${totalGroupsUsed}/${maxGroups} Properties • ${aiUsed} Advanced Inquiries`
-                            : `${totalItemsUsed}/${maxItems} Appliances • ${totalGroupsUsed}/${maxGroups} Properties • ${aiQuotaStatus.isLocked ? 'Standard Diagnostics' : `${aiUsed}/${FREE_TOTAL_QUOTA} Complimentary Inquiries`}`}
+                        <p className={`text-[11.5px] font-semibold tracking-tight leading-normal mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${
+                          isDark ? 'text-zinc-400' : 'text-zinc-500'
+                        }`}>
+                          {(() => {
+                            const totalAppliances = appliances.lenght;
+
+                            return isPaidUser 
+                              ? `${totalAppliances}/50 Appliances • ${units.length}/10 Properties • Advanced Diagnostics`
+                              : `${totalAppliances}/5 Appliances • ${units.length}/1 Properties • Standard Diagnostics`;
+                          })()}
                         </p>
                       </div>
 
@@ -5470,16 +5705,16 @@
                       </button>
                     </div>
 
-							                    {/* CARD 2: PASSPORT (11.5px Typography, Single-Row Fit & Rightward Shifted Badge) */}
+							                    		{/* CARD 2: PASSPORT (11.5px Typography, Single-Row Fit & Rightward Shifted Badge) */}
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'bg-zinc-800/60' : 'apple-card-light'}`}>
-                      <div className="flex items-center justify-between gap-1">
+                                            <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-black tracking-tight truncate">Home Appliance Passport (PDF &amp; CSV)</p>
                           <p className={`text-[11.5px] font-semibold tracking-tight leading-normal mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
                             Verified Home Appliance &amp; Maintenance Ledger
                           </p>
                         </div>
-                        <div className="flex justify-end items-center shrink-0 pl-1.5 mr-1">
+                        <div className="flex justify-end items-center shrink-0 pl-2 mr-2.5">
                           {isPassportUnlocked() ? (
                             <span className="text-[15px] font-black tracking-tight text-emerald-500 leading-none">
                               Active
@@ -5491,6 +5726,7 @@
                           )}
                         </div>
                       </div>
+
 
                       <button
                         onClick={(e) => {
@@ -6355,9 +6591,6 @@
             </div>
           )}
 
-    /* === END OF PART 5 / READY FOR PART 6 === */
-    /* === START OF PART 6 === */
-
           {/* NOTIFICATION CENTER DRAWER */}
           {isNotificationsOpen && (
             <div 
@@ -7197,25 +7430,43 @@
                     </div>
                   ))}
 
-                  {isThinking && (
-                    <div className={`h-7 px-3.5 rounded-full inline-flex items-center justify-center gap-1.5 mr-auto shadow-xs ${
-                      isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-[#E5E5EA] text-zinc-600'
+                    {isThinking && (
+                    <div className={`apple-bubble-enter relative overflow-hidden rounded-[20px] rounded-bl-sm py-2 px-3.5 mr-auto backdrop-blur-xl border transition-all shadow-xs ${
+                      isDark 
+                        ? 'bg-zinc-900/60 border-white/10 text-zinc-200' 
+                        : 'bg-white/80 border-black/5 text-zinc-800'
                     }`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] imessage-dot"></span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] imessage-dot"></span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF9500] imessage-dot"></span>
+                      {/* Fluid Apple Intelligence Top Ribbon */}
+                      <div className="absolute top-0 left-0 right-0 h-[2px] apple-chat-thinking-ribbon" />
+
+                      <div className="flex items-center gap-2.5">
+                        {/* Ambient Sunset Resonating Orb */}
+                        <div className="relative w-4 h-4 rounded-full flex items-center justify-center shrink-0">
+                          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500/35 via-rose-500/30 to-amber-400/20 apple-thinking-orb" />
+                          <div className={`relative w-3.5 h-3.5 rounded-full flex items-center justify-center backdrop-blur-md border ${
+                            isDark ? 'bg-zinc-800/80 border-white/20' : 'bg-white/90 border-black/5'
+                          }`}>
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#FF9500]" />
+                          </div>
+                        </div>
+
+                        <span className={`text-[12px] font-semibold tracking-tight ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                          Analyzing equipment...
+                        </span>
+                      </div>
                     </div>
                   )}
 
                   {streamingText && (
-                    <div className={`py-2.5 px-4 rounded-[20px] w-fit max-w-[85%] mr-auto whitespace-pre-line leading-relaxed ${
+                    <div className={`apple-bubble-enter py-2.5 px-4 rounded-[20px] rounded-bl-sm w-fit max-w-[85%] mr-auto whitespace-pre-line leading-relaxed backdrop-blur-xl border transition-all ${
                       isDark 
-                        ? 'bg-zinc-800 text-zinc-100 font-medium shadow-xs' 
-                        : 'bg-[#E5E5EA] text-[#000000] font-medium shadow-2xs'
+                        ? 'bg-zinc-900/50 border-white/10 text-zinc-100 font-medium shadow-xs' 
+                        : 'bg-white/85 border-black/5 text-zinc-900 font-medium shadow-xs'
                     }`}>
                       {streamingText}
                     </div>
                   )}
+
 
                   {needsPlacardVerification && (
                     <div className={`p-3.5 rounded-2xl space-y-2 mt-2 ${
