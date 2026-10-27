@@ -30,19 +30,25 @@
        IOS 27 LIQUID GLASS DESIGN SYSTEM & CORE FOUNDATIONS
        ========================================================================== */
 
-    html {
+      html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+      html {
       font-size: 17px;
       background-color: #000000;
     }
 
-    body {
+      body {
       margin: 0;
+
       padding: 0;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
       -webkit-user-select: none;
       font-feature-settings: "tnum";
-      overscroll-behavior-y: none;
+      overscroll-behavior-y: auto;
       background-color: #000000;
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
     }
@@ -2131,36 +2137,38 @@
       const [selectedIds, setSelectedIds] = useState([]);
       const searchInputRef = useRef(null);
 
-      // Direction-Aware Quick-Return Header Scroll Effect
-      useEffect(() => {
-        const handleWindowScroll = () => {
-          const currentY = window.scrollY;
-          const delta = currentY - lastScrollYRef.current;
+        // Direction-Aware Quick-Return Header Scroll Effect
+      const handleFeedScroll = (e) => {
+        const currentY = e.currentTarget.scrollTop;
+        const delta = currentY - lastScrollYRef.current;
 
-          if (currentY <= 15) {
-            setIsHeaderVisible(true);
-            lastScrollYRef.current = currentY;
-            return;
-          }
-
-          if (isSearchExpanded || searchQuery.trim() || isSelectMode) {
-            setIsHeaderVisible(true);
-            lastScrollYRef.current = currentY;
-            return;
-          }
-
-          if (delta > 12) {
-            setIsHeaderVisible(false);
-          } else if (delta < -14) {
-            setIsHeaderVisible(true);
-          }
-
+        if (currentY <= 15) {
+          setIsHeaderVisible(true);
           lastScrollYRef.current = currentY;
-        };
+          return;
+        }
 
-        window.addEventListener('scroll', handleWindowScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleWindowScroll);
+        if (isSearchExpanded || searchQuery.trim() || isSelectMode) {
+          setIsHeaderVisible(true);
+          lastScrollYRef.current = currentY;
+          return;
+        }
+
+        if (delta > 12) {
+          setIsHeaderVisible(false);
+        } else if (delta < -14) {
+          setIsHeaderVisible(true);
+        }
+
+        lastScrollYRef.current = currentY;
+      };
+
+      useEffect(() => {
+        if (isSearchExpanded || searchQuery.trim() || isSelectMode) {
+          setIsHeaderVisible(true);
+        }
       }, [isSearchExpanded, searchQuery, isSelectMode]);
+
 
       const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
       const [acknowledgedAlertKeys, setAcknowledgedAlertKeys] = useState(() => {
@@ -4251,10 +4259,11 @@
 
       const greetingInfo = getDynamicGreetingInfo(userDisplayName);
 
-      return (
-        <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
+        return (
+        <div className={`h-[100dvh] h-screen overflow-hidden flex flex-col transition-colors duration-200 ${
           isDark ? 'bg-black text-white' : 'bg-[#F7F7F9] text-[#111827]'
         }`}>
+
 
           {/* Global Ambient Caustic Canvas */}
           <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -4292,8 +4301,13 @@
             </div>
           )}
 
-                    {/* Dashboard Feed Wrapper */}
-          <div className={activeAppliance ? "hidden" : "contents"}>
+    {/* Dashboard Feed Wrapper */}
+          <div 
+            onScroll={handleFeedScroll}
+            style={{ WebkitOverflowScrolling: 'touch' }}
+            className={activeAppliance ? "hidden" : `flex-1 flex flex-col ${isAnyModalActive ? 'overflow-hidden' : 'overflow-y-scroll'} overscroll-y-auto scrollbar-none relative`}
+          >
+
             {/* Global full-screen backdrop to dismiss filter dropdown from anywhere */}
             {isFilterDropdownOpen && (
               <div 
@@ -4561,8 +4575,12 @@
 		    	</header>
 
 
-            {/* MAIN FEED: PROPERTY GROUPS & CARDS (Living Glass Planes) */}
-            <main className="flex-1 px-2.5 space-y-3.5 pb-28 pt-2">
+           {/* MAIN FEED: PROPERTY GROUPS & CARDS (Living Glass Planes) */}
+            <main 
+              style={{ minHeight: 'calc(100dvh - 60px)' }}
+              className="flex-1 px-2.5 space-y-3.5 pb-20 pt-1"
+            >
+
               <div className="space-y-4">
                 {units.map((unit, unitIdx) => {
                   const unitAppliances = filteredAppliancesMap.filter(a => a.unitId === unit.id);
