@@ -4486,11 +4486,11 @@
                   </div>
 
                   {/* 3. Filter Button */}
-                    <div className="relative shrink-0 w-9 h-9">
+                    <div className="relative shrink-0 w-8 h-8">
                     <button
                       type="button"
                       onClick={() => { triggerHaptic('light'); setIsFilterDropdownOpen(!isFilterDropdownOpen); }}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
                         activeCategoryFilter !== 'All'
                           ? UI_ACCENT.badge
                           : (isDark ? 'apple-glass-button-dark text-zinc-300' : 'apple-glass-button-light text-zinc-700')
