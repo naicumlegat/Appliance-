@@ -4286,9 +4286,9 @@
             )}
 
             {/* LIVING FROSTED LENS HEADER with Optimized Ceiling, Spatial Gap & Scaled Controls */}
-            <header 
-              style={{ paddingTop: 'max(36px, calc(env(safe-area-inset-top, 44px) + 8px))' }}
-              className={`px-3 pb-3.5 sticky top-0 ${isFilterDropdownOpen ? 'z-40' : 'z-20'} will-change-transform transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                         <header 
+              style={{ paddingTop: 'max(33px, calc(env(safe-area-inset-top, 44px) + 0px))' }}
+              className={`px-3 pb-3 sticky top-0 ${isFilterDropdownOpen ? 'z-40' : 'z-20'} will-change-transform transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 isDark ? 'apple-liquid-header-dark' : 'apple-liquid-header-light'
               } ${
                 isHeaderVisible 
@@ -4296,6 +4296,8 @@
                   : '-translate-y-full opacity-0 pointer-events-none'
               }`}
             >
+
+
               {/* Row 1: Brand Title, Celestial Greeting & Quick Actions (Scaled to 42px) */}
               <div className="pl-1 pr-1 flex justify-between items-center">
                 <div>
