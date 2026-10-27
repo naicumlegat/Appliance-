@@ -289,6 +289,21 @@
         0 2px 6px 0 rgba(0, 0, 0, 0.02),
         0 6px 18px -2px rgba(0, 0, 0, 0.04) !important;
     }
+		
+	  .apple-consumable-pill-dark {
+      background: rgba(45, 45, 50, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      -webkit-tap-highlight-color: transparent !important;
+    }
+
+    .apple-consumable-pill-light {
+      background: rgba(246, 246, 250, 0.88);
+      border: 1px solid rgba(0, 0, 0, 0.04);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 1),
+        0 1px 3px 0 rgba(0, 0, 0, 0.02);
+      -webkit-tap-highlight-color: transparent !important;
+    }
 
 
     /* 5. Spatial Bottom Drawers & Floating Modal Windows */
@@ -2391,7 +2406,8 @@
         }
       };
 
-      const isAnyModalActive = Boolean(
+        const isAnyModalActive = Boolean(
+        isAuthModalOpen ||
         isSettingsOpen ||
         isAddOpen ||
         isCapacityModalOpen ||
@@ -2411,6 +2427,7 @@
         pendingDeleteReceiptApplianceId ||
         pendingDeleteWarrantyApplianceId
       );
+
 
       useEffect(() => {
         if (isAnyModalActive) {
@@ -3629,9 +3646,9 @@
                               setIsIntervalPopoverOpen(false);
                               setActiveConsumableSheet({ appliance: item, consumable: cons, index: cIdx, openedFromNotifications: false });
                             }}
-                            className={`w-full rounded-xl px-3 py-1.5 cursor-pointer active:scale-[0.98] transition-all ${
-                              isDark ? 'apple-consumable-pill-dark hover:bg-zinc-800' : 'apple-consumable-pill-light hover:bg-white'
-                            }`}
+                            className={`w-full rounded-xl px-3 py-1.5 cursor-pointer active:scale-[0.98] transition-transform ${
+  isDark ? 'apple-consumable-pill-dark' : 'apple-consumable-pill-light'
+									}`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <p className={`text-[13px] font-semibold truncate flex-1 leading-normal ${isDark ? 'text-zinc-100' : 'text-zinc-800'}`}>
@@ -4286,10 +4303,10 @@
             )}
 
             {/* LIVING FROSTED LENS HEADER with Optimized Ceiling, Spatial Gap & Scaled Controls */}
-                        <header 
-  style={{ paddingTop: 'max(16px, env(safe-area-inset-top, 20px))' }}
-  className={`px-3 pb-2 sticky top-0
- ${isFilterDropdownOpen ? 'z-40' : 'z-20'} will-change-transform transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                       
+				  <header 
+              style={{ paddingTop: 'max(22px, calc(env(safe-area-inset-top, 20px) + 4px))' }}
+              className={`px-3 pb-2.5 sticky top-0 ${isFilterDropdownOpen ? 'z-40' : 'z-20'} will-change-transform transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 isDark ? 'apple-liquid-header-dark' : 'apple-liquid-header-light'
               } ${
                 isHeaderVisible 
@@ -4297,7 +4314,6 @@
                   : '-translate-y-full opacity-0 pointer-events-none'
               }`}
             >
-
 
               {/* Row 1: Brand Title, Celestial Greeting & Quick Actions (Scaled to 42px) */}
               <div className="pl-1 pr-1 flex justify-between items-center">
@@ -4456,17 +4472,18 @@
                   </div>
 
                   {/* 3. Filter Button */}
-                  <div className="relative shrink-0 w-8 h-8">
+                    <div className="relative shrink-0 w-9 h-9">
                     <button
                       type="button"
                       onClick={() => { triggerHaptic('light'); setIsFilterDropdownOpen(!isFilterDropdownOpen); }}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
                         activeCategoryFilter !== 'All'
                           ? UI_ACCENT.badge
-                          : (isDark ? 'apple-glass-button-dark text-zinc-300 hover:bg-zinc-800' : 'apple-glass-button-light text-zinc-700 hover:bg-zinc-50')
+                          : (isDark ? 'apple-glass-button-dark text-zinc-300' : 'apple-glass-button-light text-zinc-700')
                       }`}
                       title="Filter Categories"
                     >
+
                       <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <line x1="4" y1="21" x2="4" y2="14"></line>
                         <line x1="4" y1="10" x2="4" y2="3"></line>
@@ -7366,7 +7383,7 @@
             </div>
           )}
 
-          {/* 10. AUTHENTICATION MODAL */}
+    {/* 10. AUTHENTICATION MODAL (Locked Floating Center - No Scroll) */}
           {isAuthModalOpen && (
             <div 
               onClick={() => {
@@ -7374,14 +7391,27 @@
                 setIsAuthModalOpen(false);
                 setIsSettingsOpen(true);
               }} 
-              className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[95] cursor-pointer animate-in fade-in duration-200"
+              onTouchMove={(e) => {
+                // Prevent rubber-banding or background pull
+                if (e.cancelable) e.preventDefault();
+              }}
+              style={{
+                touchAction: 'none',
+                overscrollBehavior: 'none'
+              }}
+              className="fixed inset-0 z-[95] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 pb-28 sm:pb-32 cursor-pointer overflow-hidden select-none"
             >
               <div 
                 onClick={(e) => e.stopPropagation()} 
-                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl cursor-default animate-sheet-spring ${
+                style={{
+                  touchAction: 'none',
+                  overscrollBehavior: 'none'
+                }}
+                className={`w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl cursor-default animate-in fade-in zoom-in-95 duration-200 -translate-y-4 sm:-translate-y-6 ${
                   isDark ? 'apple-drawer-dark text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
+
                 <div className="relative flex items-center justify-center pb-0.5">
                   <h3 className="text-base font-black tracking-tight">Account Login</h3>
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 -mr-1">
@@ -7406,9 +7436,11 @@
 
                     <input
                       type="email"
+                      inputMode="email"
+                      autoComplete="email"
                       style={{ colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-2xl p-3 text-xs font-semibold focus:outline-none text-center ${
-                        isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
+                        isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-zinc-900 shadow-xs'
                       }`}
                       placeholder="your@email.com"
                       value={authEmailInput}
@@ -7434,10 +7466,13 @@
 
                     <input
                       type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       maxLength="6"
+                      autoComplete="one-time-code"
                       style={{ colorScheme: isDark ? 'dark' : 'light' }}
                       className={`w-full rounded-2xl p-3 text-center text-lg tracking-widest font-mono font-black focus:outline-none ${
-                        isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-black shadow-xs'
+                        isDark ? 'bg-zinc-800 text-white' : 'bg-white border border-black/10 text-zinc-900 shadow-xs'
                       }`}
                       placeholder="000000"
                       value={authPinInput}
@@ -7472,6 +7507,7 @@
               </div>
             </div>
           )}
+
 
           {/* 11. DIAGNOSTIC ASSISTANT BOTTOM-SHEET (Apple Intelligence Fluid Aura & Spatial Response) */}
           {activeAppliance && (
