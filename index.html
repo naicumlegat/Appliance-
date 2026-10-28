@@ -30,19 +30,18 @@
        IOS 27 LIQUID GLASS DESIGN SYSTEM & CORE FOUNDATIONS
        ========================================================================== */
 
-      html, body {
+    html, body {
       height: 100%;
       overflow: hidden;
     }
 
-      html {
+    html {
       font-size: 17px;
       background-color: #000000;
     }
 
-      body {
+    body {
       margin: 0;
-
       padding: 0;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
@@ -53,7 +52,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
     }
 
-      /* Input Typography Normalization: Sleek, proportionate iOS baseline */
+    /* Input Typography Normalization: iOS Native Baseline */
     input, textarea, select {
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif !important;
       font-size: 13.5px !important;
@@ -163,7 +162,7 @@
       will-change: transform, opacity;
     }
 
-          html.dark .apple-global-caustic-1 {
+    html.dark .apple-global-caustic-1 {
       mix-blend-mode: screen;
       background: radial-gradient(
         circle,
@@ -182,7 +181,6 @@
       );
     }
 
-    /* Vibrant Luminous Amber & Coral Ambient Caustics (Visible in Light Mode) */
     html:not(.dark) body {
       background-color: #F6F6F9 !important;
     }
@@ -208,19 +206,19 @@
       ) !important;
     }
 
-    /* ==========================================================================
-       LIQUID GLASS MATERIAL LAYER (iOS 27 Spatial Light & Shadow Physics)
+        /* ==========================================================================
+       STREAMLINED APPLE LIQUID GLASS MATERIAL LAYER (iOS 18/27 Optical Precision)
        ========================================================================== */
 
-       /* 1. Light Mode Scrim Normalization: Clean background dimming for floating modals */
+    /* Modal Scrim Backdrop */
     html:not(.dark) .fixed.inset-0.bg-black\/80,
     html:not(.dark) .fixed.inset-0.bg-black\/85 {
-      background-color: rgba(15, 23, 42, 0.35) !important;
-      backdrop-filter: blur(28px) saturate(190%) !important;
-      -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+      background-color: rgba(15, 23, 42, 0.38) !important;
+      backdrop-filter: blur(24px) saturate(180%) !important;
+      -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
     }
 
-    /* 2. Frosted Lens Header with Refractive Scroll Bleed */
+    /* 1. Frosted Lens Header (Preserved exact target transparency) */
     .apple-liquid-header-dark {
       background: rgba(10, 10, 12, 0.56);
       backdrop-filter: blur(36px) saturate(210%);
@@ -241,138 +239,113 @@
         0 4px 16px -2px rgba(0, 0, 0, 0.04);
     }
 
-        /* 3. Balanced Liquid Glass Cards (Shared Physical Geometry & Specular Depth) */
+    /* 2. Standalone Cards (Settings & Modal Content Blocks) */
     .apple-card-dark {
-      background: rgba(28, 28, 33, 0.78) !important;
-      backdrop-filter: blur(28px) saturate(190%);
-      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      background: rgba(26, 26, 30, 0.88) !important;
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
       border: 1px solid rgba(255, 255, 255, 0.08) !important;
       box-shadow: 
         inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
-        0 2px 6px 0 rgba(0, 0, 0, 0.25),
-        0 8px 24px -3px rgba(0, 0, 0, 0.40) !important;
+        0 4px 16px -2px rgba(0, 0, 0, 0.35) !important;
     }
 
     .apple-card-light {
-      background: rgba(255, 255, 255, 0.88) !important;
-      backdrop-filter: blur(28px) saturate(190%);
-      -webkit-backdrop-filter: blur(28px) saturate(190%);
-      border: 1px solid rgba(0, 0, 0, 0.06) !important;
-      box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.95),
-        0 2px 6px 0 rgba(0, 0, 0, 0.03),
-        0 8px 24px -3px rgba(0, 0, 0, 0.05) !important;
-    }
-
-
-    /* 4. Spatial Content Groups & Feed Cards (Defined Edges & Layer Separation) */
-    .apple-group-card-dark {
-      background: rgba(24, 24, 27, 0.65) !important;
+      background: rgba(255, 255, 255, 0.94) !important;
       backdrop-filter: blur(28px) saturate(180%);
       -webkit-backdrop-filter: blur(28px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.10);
-      box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
-        0 4px 20px -2px rgba(0, 0, 0, 0.45);
-    }
-
-    .apple-group-card-light {
-      background: rgba(255, 255, 255, 0.68) !important;
-      backdrop-filter: blur(32px) saturate(190%);
-      -webkit-backdrop-filter: blur(32px) saturate(190%);
-      border: 1px solid rgba(0, 0, 0, 0.06) !important;
-      box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.9),
-        0 2px 8px -2px rgba(0, 0, 0, 0.04),
-        0 12px 32px -4px rgba(0, 0, 0, 0.06) !important;
-    }
-
-    .apple-appliance-card-dark {
-      background: rgba(32, 32, 36, 0.72) !important;
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
-        0 2px 8px rgba(0, 0, 0, 0.35);
-    }
-
-    .apple-appliance-card-light {
-      background: rgba(255, 255, 255, 0.90) !important;
-      backdrop-filter: blur(26px) saturate(190%);
-      -webkit-backdrop-filter: blur(26px) saturate(190%);
       border: 1px solid rgba(0, 0, 0, 0.06) !important;
       box-shadow: 
         inset 0 1px 0 0 rgba(255, 255, 255, 1),
-        0 2px 6px 0 rgba(0, 0, 0, 0.03),
-        0 6px 16px -2px rgba(0, 0, 0, 0.05) !important;
+        0 2px 8px -1px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    /* 3. Group Carrier Planes (Grounds children so inner cards don't clash) */
+    .apple-group-card-dark {
+      background: rgba(18, 18, 22, 0.75) !important;
+      backdrop-filter: blur(30px) saturate(170%);
+      -webkit-backdrop-filter: blur(30px) saturate(170%);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+        0 8px 32px -4px rgba(0, 0, 0, 0.45);
+    }
+
+    .apple-group-card-light {
+      background: rgba(255, 255, 255, 0.82) !important;
+      backdrop-filter: blur(30px) saturate(180%);
+      -webkit-backdrop-filter: blur(30px) saturate(180%);
+      border: 1px solid rgba(0, 0, 0, 0.05) !important;
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.9),
+        0 8px 28px -4px rgba(0, 0, 0, 0.05) !important;
+    }
+
+    /* 4. Streamlined Appliance Rows (Clean, solid contrast over group backing) */
+    .apple-appliance-card-dark {
+      background: rgba(30, 30, 35, 0.85) !important;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
+        0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+
+    .apple-appliance-card-light {
+      background: #FFFFFF !important;
+      border: 1px solid rgba(0, 0, 0, 0.06) !important;
+      box-shadow: 
+        0 1px 3px 0 rgba(0, 0, 0, 0.03),
+        0 4px 12px -2px rgba(0, 0, 0, 0.04) !important;
     }
 		
+    /* 5. Consumables Secondary Trays */
     .apple-consumable-pill-dark {
-      background: rgba(45, 45, 50, 0.68);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(22, 22, 26, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.05);
       -webkit-tap-highlight-color: transparent !important;
     }
 
     .apple-consumable-pill-light {
-      background: rgba(242, 242, 247, 0.92) !important;
-      border: 1px solid rgba(0, 0, 0, 0.05) !important;
-      box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.8),
-        0 1px 2px 0 rgba(0, 0, 0, 0.03);
+      background: rgba(246, 246, 249, 0.85) !important;
+      border: 1px solid rgba(0, 0, 0, 0.04) !important;
       -webkit-tap-highlight-color: transparent !important;
     }
 
-    /* 5. Spatial Bottom Drawers & Floating Modal Windows */
+    /* 6. Bottom Drawers & Modal Sheets */
     .apple-drawer-dark {
-      background: rgba(20, 20, 24, 0.88);
-      backdrop-filter: blur(40px) saturate(200%);
-      -webkit-backdrop-filter: blur(40px) saturate(200%);
-      border-top: 1px solid rgba(255, 255, 255, 0.12);
-      box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.65);
+      background: rgba(20, 20, 24, 0.94);
+      backdrop-filter: blur(40px) saturate(190%);
+      -webkit-backdrop-filter: blur(40px) saturate(190%);
+      border-top: 1px solid rgba(255, 255, 255, 0.10);
+      box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.70);
     }
 
     .apple-drawer-light {
-      background: rgba(255, 255, 255, 0.96) !important;
-      backdrop-filter: blur(44px) saturate(210%) !important;
-      -webkit-backdrop-filter: blur(44px) saturate(210%) !important;
+      background: rgba(255, 255, 255, 0.97) !important;
+      backdrop-filter: blur(40px) saturate(200%) !important;
+      -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
       border: 1px solid rgba(0, 0, 0, 0.07) !important;
       box-shadow: 
         inset 0 1px 0 0 rgba(255, 255, 255, 1),
-        0 -4px 16px -2px rgba(0, 0, 0, 0.06),
-        0 -20px 52px 0 rgba(0, 0, 0, 0.12) !important;
+        0 -8px 36px 0 rgba(0, 0, 0, 0.08) !important;
     }
 
-
-    /* 6. Sub-containers inside Modals */
-    html:not(.dark) .bg-\[\#FAFAFC\] {
-      background: rgba(247, 247, 250, 0.82) !important;
-      border: 1px solid rgba(0, 0, 0, 0.04) !important;
-      box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.95),
-        0 1px 3px 0 rgba(0, 0, 0, 0.02) !important;
-    }
-
-        /* 7. Tactile Floating Glass Buttons (Directional Specular Depth) */
+    /* 7. Precision Tactile Buttons */
     .apple-glass-button-dark {
-      background: rgba(34, 34, 38, 0.80);
-      backdrop-filter: blur(20px) saturate(160%);
-      -webkit-backdrop-filter: blur(20px) saturate(160%);
-      /* Softened perimeter boundary so it doesn't glow white */
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      /* Top specular highlight + ambient bottom drop shadow */
+      background: rgba(36, 36, 42, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       box-shadow: 
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
         0 2px 6px -1px rgba(0, 0, 0, 0.35);
     }
 
     .apple-glass-button-light {
       background: rgba(255, 255, 255, 0.90);
-      backdrop-filter: blur(20px) saturate(160%);
-      -webkit-backdrop-filter: blur(20px) saturate(160%);
-      /* Subtle dark hairline so light mode has clear perimeter definition */
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(0, 0, 0, 0.07);
-      /* Crisp top bevel reflection + soft ground shadow */
       box-shadow: 
         inset 0 1px 0 0 rgba(255, 255, 255, 1),
         0 1px 3px 0 rgba(0, 0, 0, 0.03),
@@ -380,7 +353,7 @@
     }
 
 
-        /* 8. Fluid Apple 3-Dot Typing Indicator (Calibrated 1.5s Slow Wave) */
+    /* 8. Fluid Typing Indicator */
     @keyframes apple-fluid-dot {
       0%, 60%, 100% {
         transform: translateY(0) scale(0.88);
@@ -395,10 +368,7 @@
     .dot-fluid-2, .dot-bounce-2 { animation: apple-fluid-dot 1.5s infinite ease-in-out 0.22s; }
     .dot-fluid-3, .dot-bounce-3 { animation: apple-fluid-dot 1.5s infinite ease-in-out 0.44s; }
 
-    /* ==========================================================================
-       DEDUPLICATED ANIMATION SHADERS (Liquid Swell & Message Bubbles)
-       ========================================================================== */
-
+    /* Animations & Physics */
     @keyframes apple-card-swap {
       0% {
         opacity: 0;
@@ -414,7 +384,6 @@
       will-change: transform, opacity;
     }
 
-    /* Dual Liquid Aura Layers (Empty State & Add Appliance Centerpiece) */
     @keyframes apple-water-undertow {
       0% {
         transform: rotate(0deg) scale(0.92);
@@ -491,7 +460,6 @@
         0 6px 18px -4px rgba(234, 88, 12, 0.16);
     }
 
-    /* Message Spring Entrance */
     @keyframes apple-bubble-spring {
       0% {
         opacity: 0;
@@ -507,8 +475,6 @@
       will-change: transform, opacity;
     }
 
-
-    /* Reflow Row Collapsing (Destructive Deletion) */
     .row-collapsing {
       transition: height 0.3s cubic-bezier(0.16, 1, 0.3, 1), 
                   margin 0.3s cubic-bezier(0.16, 1, 0.3, 1), 
@@ -523,7 +489,6 @@
       overflow: hidden !important;
     }
 
-    /* SVG Ambient Celestial Animations */
     .animate-solar-rays,
     .animate-ambient-sun,
     .animate-twinkle-a,
@@ -567,7 +532,6 @@
       animation: greeting-entrance 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
-    /* Native Bottom Sheet Spring Entrance */
     @keyframes sheet-spring-up {
       from { transform: translateY(100%); opacity: 0.85; }
       to { transform: translateY(0); opacity: 1; }
@@ -576,7 +540,6 @@
       animation: sheet-spring-up 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
-    /* Dictation Pulse */
     @keyframes mic-listen-pulse {
       0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 149, 0, 0.45); }
       50% { transform: scale(1.08); box-shadow: 0 0 0 8px rgba(255, 149, 0, 0); }
@@ -633,17 +596,15 @@
     const PRO_MAX_PER_GROUP = 15;
 
     // =========================================================================
-    // PLATFORM & HARDWARE ABSTRACTION BRIDGE (Decoupled for iOS / Android Porting)
+    // PLATFORM & HARDWARE ABSTRACTION BRIDGE (Decoupled for iOS / Android)
     // =========================================================================
 
     const PlatformBridge = {
-      // Haptics abstraction: Routes to Web Navigator or Native WKScriptMessageHandler
       haptics: {
         trigger(type = 'light') {
           const isEnabled = localStorage.getItem('app_notif_haptics') !== 'false';
           if (!isEnabled) return;
 
-          // Native Mobile Bridge Hook (Swift/Kotlin WKWebView injection)
           if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.hapticFeedback) {
             window.webkit.messageHandlers.hapticFeedback.postMessage({ type });
             return;
@@ -794,7 +755,7 @@
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          setTimeout(() => URL.revokeObjectURL(url), 1200);
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
         }
       },
 
@@ -856,7 +817,7 @@
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          setTimeout(() => URL.revokeObjectURL(url), 1500);
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
         }
       }
     };
@@ -957,7 +918,7 @@
       });
     }
 
-    // QR/Barcode Placard Parser
+    // QR / Barcode Placard Parser
     function extractBarcodeOrQrFromImage(dataUrl) {
       return new Promise((resolve) => {
         if (!window.jsQR) return resolve(null);
@@ -977,7 +938,6 @@
       });
     }
 
-    // Strips bulky base64 data before saving to localStorage to prevent quota exhaustion
     function sanitizeForLocalStorage(list) {
       return list.map(item => {
         const clean = { ...item };
@@ -999,11 +959,11 @@
         return clean;
       });
     }
-       // =========================================================================
+
+    // =========================================================================
     // SECTION 2: VERIFICATION, RECALL, AUDIT & DIAGNOSTIC ENGINES
     // =========================================================================
 
-    // Federal CPSC Safety Recall Verifier & Local Cache
     async function verifyCpscRecallCached(brand, modelNumber) {
       if (!modelNumber || !modelNumber.trim()) return null;
       const cleanBrand = (brand || '').trim().toLowerCase();
@@ -1247,10 +1207,6 @@
       };
     }
 
-    /**
-     * STRICT ZERO-ASSUMPTION WARRANTY CALCULATOR
-     * Never assumes coverage unless user manually entered a purchase date or uploaded a warranty card.
-     */
     function calculateApplianceWarrantyStatus(appliance) {
       if (!appliance) {
         return { status: 'unrecorded', label: 'Unrecorded Warranty', isExpired: false, daysRemaining: null, isVerified: false };
@@ -1260,7 +1216,6 @@
         return { status: 'active', label: 'Warranty Verified (OEM Active)', isExpired: false, daysRemaining: null, isVerified: true };
       }
 
-      // If purchase date was not provided manually by the user, assume NOTHING
       if (!appliance.purchaseDate || !appliance.purchaseDate.trim()) {
         return { status: 'unrecorded', label: 'No Purchase Date Logged', isExpired: false, daysRemaining: null, isVerified: false };
       }
@@ -1270,7 +1225,6 @@
         return { status: 'unrecorded', label: 'Unrecorded Warranty', isExpired: false, daysRemaining: null, isVerified: false };
       }
 
-      // Calculate strictly based on explicit user purchase date
       const months = appliance.warrantyMonths || 12;
       const spanMs = months * 30.4375 * 24 * 60 * 60 * 1000;
       const expireMs = purchaseMs + spanMs;
@@ -1413,7 +1367,6 @@
       return html2pdfLoadingPromise;
     }
 
-    // Institutional Passport Audit PDF HTML Builder
     function buildInstitutionalPassportHtml(meta, items, includeMaintenanceLog = true, includeValuation = false) {
       const totalCount = items.length;
       let totalEstValue = 0;
@@ -1595,10 +1548,6 @@
       }
     };
 
-    /**
-     * SMARTER OFFLINE & LOCAL EXPERT DIAGNOSTIC ENGINE
-     * Grounded in strict physical checks, negative/affirmative branching, zero-assumption warranty guard.
-     */
     const ExpertDiagnosticEngine = {
       diagnosticTrees: {
         "air_quality_sensor": [
@@ -1715,7 +1664,6 @@
 
         const lastAssistantMsg = [...history].reverse().find(m => m.sender === 'assistant')?.text || '';
 
-        // Emergency Electrical or Gas Hazard Check
         const hazardKeywords = ['smoke', 'burning smell', 'spark', 'sparks', 'fire', 'shock', 'arcing', 'gas smell', 'sulfur'];
         if (hazardKeywords.some(k => q.includes(k))) {
           return `⚠️ **CRITICAL ELECTRICAL OR GAS HAZARD DETECTED**\n\n` +
@@ -1734,13 +1682,11 @@
           }
         }
 
-        // Affirmative Resolution Detection
         if (this.isAffirmativeFeedback(q) && history.length > 1) {
           return `✓ Issue resolved! Normal operation confirmed for your ${cleanTitle}.\n\n` +
                  `Preventive Note: To keep equipment running efficiently, check that intake paths remain unobstructed and clean wear surfaces periodically. Let me know if you need any other diagnostics!`;
         }
 
-        // Conversational Branching (Negative Feedback Progression)
         const activeTreeKey = this.identifyActiveTree(history);
         if (activeTreeKey && this.isNegativeFeedback(q)) {
           const nextIdx = this.findNextStepIndex(activeTreeKey, history);
@@ -1751,19 +1697,16 @@
           }
         }
 
-        // Consumable Maintenance Overdue Intercept
         const overdue = this.checkOverdueConsumables(appliance);
         if (overdue && (q.includes('smell') || q.includes('odor') || q.includes('air') || q.includes('flow') || q.includes('not cooling')) && history.filter(m => m.sender === 'user').length <= 1) {
           return `Quick check: Your ${overdue.name} is currently ${overdue.timeRemainingText}.\n\nA saturated filter restricts normal airflow and can cause these exact symptoms.\n\n1. Inspect or replace the overdue filter first before opening access panels.\n2. Is the filter housing clean and seated flush?`;
         }
 
-        // Fault Code Matrix Lookup
         const errMatch = await this.lookupErrorCode(category, rawQuery);
         if (errMatch) {
           return `Fault code **${errMatch.code}** confirmed for this equipment platform: ${errMatch.desc}\n\nBefore ordering replacement sensors, inspect the wiring harness plug for loose pins or corrosion.`;
         }
 
-        // Intent Mapping by Appliance Category
         if (category === 'Air Quality' || cleanTitle.toLowerCase().includes('purifier')) {
           if (q.includes('red') || q.includes('orange') || q.includes('sensor') || q.includes('ring')) {
             return this.diagnosticTrees['air_quality_sensor'][0];
@@ -1798,7 +1741,6 @@
           return this.diagnosticTrees['drain_general'][0];
         }
 
-        // General Baseline Protocol
         return `Safe inspection protocol for your ${cleanTitle}:\n\n` +
                `1. Power Reset: Disconnect power at the breaker or plug for 60 seconds to allow internal microprocessors to reset.\n` +
                `2. Safety Latches: Ensure all access panels, filters, and doors close completely flush.\n` +
@@ -1816,7 +1758,6 @@
       return cleaned.replace(/\s{2,}/g, ' ').replace(/\(\s*\)/g, '').trim();
     }
 
-    // Step-Specific Quick Action Diagnostic Chips
     function getAdaptiveChips(appliance, activeTreeKey = null, lastMessageText = '') {
       if (lastMessageText.includes('Did cleaning the optical window')) {
         return ['Yes, light cleared', 'No, still red', 'Go Deeper'];
@@ -1854,7 +1795,6 @@
       return ['Routine power reset', 'Inspect wear parts', 'Clear error code', 'Go Deeper'];
     }
 
-    // iOS 27 Liquid Glass Tactile Components
     function AppleCloseButton({ onClick, isDark }) {
       return (
         <button
@@ -1898,12 +1838,12 @@
       );
     }
 
-    function CategorySilhouette({ category = '', isDark }) {
+        function CategorySilhouette({ category = '', isDark }) {
       const cat = (category || '').toLowerCase();
       const strokeClass = "stroke-[1.8] stroke-linecap-round stroke-linejoin-round";
       
-      const containerClass = `w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
-        isDark ? 'bg-zinc-800/80 border border-white/10 text-zinc-200' : 'bg-black/[0.04] border border-black/5 text-zinc-700'
+      const containerClass = `w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0 transition-colors ${
+        isDark ? 'bg-white/[0.06] text-zinc-200' : 'bg-black/[0.04] text-zinc-700'
       }`;
 
       if (cat.includes('refrigerat') || cat.includes('fridge') || cat.includes('freezer')) {
@@ -1998,6 +1938,7 @@
       );
     }
 
+
     class ErrorBoundary extends React.Component {
       constructor(props) {
         super(props);
@@ -2030,9 +1971,8 @@
         return this.props.children;
       }
     }
-   
     // =========================================================================
-    // SECTION 3: REACT STATE STORE, GESTURE ENGINES & PRESENTATION LAYER (1/2)
+    // SECTION 3: REACT STATE STORE, HARDENED GESTURES & BUSINESS LOGIC
     // =========================================================================
 
     let isDirtySync = false;
@@ -2154,7 +2094,7 @@
       const [selectedIds, setSelectedIds] = useState([]);
       const searchInputRef = useRef(null);
 
-        // Direction-Aware Quick-Return Header Scroll Effect
+      // Direction-Aware Quick-Return Header Scroll Effect
       const handleFeedScroll = (e) => {
         const currentY = e.currentTarget.scrollTop;
         const delta = currentY - lastScrollYRef.current;
@@ -2185,7 +2125,6 @@
           setIsHeaderVisible(true);
         }
       }, [isSearchExpanded, searchQuery, isSelectMode]);
-
 
       const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
       const [acknowledgedAlertKeys, setAcknowledgedAlertKeys] = useState(() => {
@@ -2351,7 +2290,7 @@
       const streamingIntervalRef = useRef(null);
       const isKeyboardActive = viewportHeight > 0 && viewportHeight < (window.innerHeight - 80);
 
-      // Speech Dictation Hook
+      // Hardened Speech Dictation Hook (Strict cleanup to prevent double-mount crashes)
       const [isListeningDictation, setIsListeningDictation] = useState(false);
       const recognitionRef = useRef(null);
 
@@ -2380,6 +2319,13 @@
           rec.onend = () => setIsListeningDictation(false);
           recognitionRef.current = rec;
         }
+
+        return () => {
+          if (recognitionRef.current) {
+            try { recognitionRef.current.abort(); } catch(e) {}
+            recognitionRef.current = null;
+          }
+        };
       }, []);
 
       useEffect(() => {
@@ -2395,13 +2341,14 @@
           return;
         }
         if (isListeningDictation) {
-          recognitionRef.current.stop();
+          try { recognitionRef.current.stop(); } catch(e) {}
           setIsListeningDictation(false);
         } else {
           try {
             recognitionRef.current.start();
           } catch(e) {
-            recognitionRef.current.stop();
+            try { recognitionRef.current.stop(); } catch(err) {}
+            setIsListeningDictation(false);
           }
         }
       };
@@ -2409,7 +2356,7 @@
       const chatContainerRef = useRef(null);
       const placardFileInputRef = useRef(null);
 
-      // iOS 27 Master Swipe Gesture State & Reflow Tracking
+      // Master Swipe Gesture State & Reflow Tracking
       const [swipeOffsets, setSwipeOffsets] = useState({});
       const [collapsingApplianceId, setCollapsingApplianceId] = useState(null);
       const touchStartPosRef = useRef({ x: 0, y: 0 });
@@ -2431,7 +2378,14 @@
         }
       };
 
-        const isAnyModalActive = Boolean(
+      const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+      const [authStep, setAuthStep] = useState('email');
+      const [authEmailInput, setAuthEmailInput] = useState('');
+      const [authPinInput, setAuthPinInput] = useState('');
+      const [authLoading, setAuthLoading] = useState(false);
+      const [otpCooldownSeconds, setOtpCooldownSeconds] = useState(0);
+
+      const isAnyModalActive = Boolean(
         isAuthModalOpen ||
         isSettingsOpen ||
         isAddOpen ||
@@ -2453,7 +2407,7 @@
         pendingDeleteWarrantyApplianceId
       );
 
-
+      // Safe Lock-Scroll Layer (Ensures no unnecessary feed scrolling while modals/drawers are open)
       useEffect(() => {
         if (isAnyModalActive) {
           if (!isAddGroupModalOpen && !deleteTargetGroup && !isBulkDeleteModalOpen) {
@@ -2532,6 +2486,36 @@
         }
       }, [isAddOpen]);
 
+      const openAssistant = useCallback((item) => {
+        closeEditMode();
+        dismissActiveKeyboard();
+        triggerHaptic('light');
+        setActiveAppliance(item);
+        setDynamicAiChips([]);
+        setNeedsPlacardVerification(false);
+        const cleanTitle = formatApplianceTitle(item.brand, item.name);
+        const storedChat = localStorage.getItem(`chat_history_${item.id}`);
+        const maxRetention = isPaidUser ? (7 * 86400000) : (24 * 86400000);
+        const now = Date.now();
+
+        if (storedChat) {
+          try {
+            const parsed = JSON.parse(storedChat);
+            const fresh = (parsed.messages || []).filter(m => (now - (Number(m.id) || parsed.timestamp)) < maxRetention);
+            if (fresh.length > 0) {
+              setMessages(fresh);
+              return;
+            }
+          } catch (err) {}
+        }
+
+        setMessages([{
+          id: Date.now().toString(),
+          sender: 'assistant',
+          text: `Diagnostic ready for ${cleanTitle}. What symptoms, error codes, or noises are you seeing?`
+        }]);
+      }, [isPaidUser]);
+
       const scrollToChatBottom = (smooth = true) => {
         if (!chatContainerRef.current) return;
         requestAnimationFrame(() => {
@@ -2555,13 +2539,6 @@
       const [isAnalyzing, setIsAnalyzing] = useState(false);
       const [lookupStatus, setLookupStatus] = useState('');
       const debounceAbortRef = useRef(null);
-
-      const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-      const [authStep, setAuthStep] = useState('email');
-      const [authEmailInput, setAuthEmailInput] = useState('');
-      const [authPinInput, setAuthPinInput] = useState('');
-      const [authLoading, setAuthLoading] = useState(false);
-      const [otpCooldownSeconds, setOtpCooldownSeconds] = useState(0);
 
       useEffect(() => {
         if (!window.matchMedia) return;
@@ -2897,7 +2874,7 @@
         showToast("Appliance specifications updated");
       };
 
-      // Replacement Logs & Live 5-Second Countdown
+      // Synchronized Replacement Logs with Live 5-Second Countdown
       const handleTriggerMarkReplacedWithLiveCountdown = (applianceId, consumableIndex) => {
         triggerHaptic('success');
         const targetAppliance = appliances.find(a => a.id === applianceId);
@@ -2924,9 +2901,12 @@
 
         setAppliances(updated);
 
+        // Keep active sheet in lockstep with the root data model
         if (activeConsumableSheet && activeConsumableSheet.appliance.id === applianceId && updatedConsumableInstance) {
+          const freshAppliance = updated.find(a => a.id === applianceId);
           setActiveConsumableSheet(prev => ({
             ...prev,
+            appliance: freshAppliance,
             consumable: updatedConsumableInstance
           }));
         }
@@ -2978,8 +2958,10 @@
         setAppliances(reverted);
 
         if (activeConsumableSheet && activeConsumableSheet.appliance.id === applianceId && revertedConsumableInstance) {
+          const freshAppliance = reverted.find(a => a.id === applianceId);
           setActiveConsumableSheet(prev => ({
             ...prev,
+            appliance: freshAppliance,
             consumable: revertedConsumableInstance
           }));
         }
@@ -3291,7 +3273,7 @@
         showToast("Appliance registered");
       };
 
-      // iOS 27 Fluid Reflow Deletion Routine
+      // Fluid Reflow Deletion Routine
       const handleDeleteSingleAppliance = async (id) => {
         triggerHaptic('warn');
         setCollapsingApplianceId(id);
@@ -3369,7 +3351,6 @@
         showToast("All alerts cleared");
       };
 
-      // Performance Memoized Filter Computation
       const filteredAppliancesMap = useMemo(() => {
         const q = searchQuery.toLowerCase().trim();
         return appliances.filter(item => {
@@ -3397,7 +3378,7 @@
         return ['All', 'Filter Due', ...Array.from(new Set(appliances.map(a => a.category || 'Appliance')))];
       }, [appliances]);
 
-      // MASTER-CLASS IOS 27 VECTOR-DISCRIMINATED APPLIANCE CARD
+      // MASTER VECTOR-DISCRIMINATED APPLIANCE CARD RENDERER
       const renderApplianceCard = (item, itemIndex, totalInGroup) => {
         const isSelected = selectedIds.includes(item.id);
         const currentOffset = swipeOffsets[item.id] || 0;
@@ -3412,7 +3393,7 @@
               isCollapsing ? 'row-collapsing' : ''
             }`}
           >
-            {/* Destructive Action Underlay (Clipped strictly within curved corners) */}
+            {/* Destructive Action Underlay */}
             <div 
               className={`absolute inset-y-0 right-0 w-28 bg-gradient-to-r from-rose-600 to-rose-700 flex items-center justify-center rounded-r-[20px] z-0 transition-opacity duration-150 overflow-hidden ${
                 currentOffset === 0 ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
@@ -3461,7 +3442,6 @@
                 const absX = Math.abs(deltaX);
                 const absY = Math.abs(deltaY);
 
-                // Vector Discriminator: 8px deadzone and strict 2.5:1 ratio ensures zero vertical scroll interference
                 if (touchIsHorizontalRef.current === null) {
                   if (absX > 8 && absX > absY * 2.5) {
                     touchIsHorizontalRef.current = true;
@@ -3472,14 +3452,12 @@
 
                 if (!touchIsHorizontalRef.current) return;
 
-                // Rubber-Band Spring Damping Physics
                 let damped = deltaX;
                 if (deltaX < 0) {
                   if (deltaX < -92) {
                     damped = -92 - Math.pow(Math.abs(deltaX + 92), 0.65);
                   }
                 } else {
-                  // Rigid resistance against right drag
                   damped = Math.min(14, Math.sign(deltaX) * Math.pow(absX, 0.55));
                 }
 
@@ -3496,15 +3474,12 @@
                 const swipeDuration = Date.now() - swipeStartTimeRef.current;
                 const cardWidth = window.innerWidth || 360;
 
-                // Full Swipe-Through Detection: Past 55% width executes immediate delete
                 if (finalOffset < -(cardWidth * 0.55)) {
                   handleDeleteSingleAppliance(item.id);
                 } else if (finalOffset < -48 || (finalOffset < -30 && swipeDuration < 200)) {
-                  // Snap open to action button
                   setSwipeOffsets({ [item.id]: -92 });
                   triggerHaptic('warn');
                 } else {
-                  // Snap closed
                   setSwipeOffsets(prev => ({ ...prev, [item.id]: 0 }));
                 }
 
@@ -3609,12 +3584,12 @@
                 )}
               </div>
 
-              {!isSelectMode && (
-                <div className={`px-2.5 pt-2 pb-2 ${
-                  isDark ? 'bg-black/20 border-t border-white/5' : 'bg-black/[0.015] border-t border-black/[0.02]'
+                            {!isSelectMode && (
+                <div className={`px-3 pt-2 pb-2.5 ${
+                  isDark ? 'bg-black/20 border-t border-white/[0.04]' : 'bg-black/[0.015] border-t border-black/[0.03]'
                 }`}>
-                  <div className="flex justify-between items-center pb-1">
-                    <span className={`text-[12px] font-bold tracking-wider uppercase pl-2 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  <div className="flex justify-between items-center pb-1.5 px-0.5">
+                    <span className={`text-[11px] font-bold tracking-wider uppercase ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
                       Consumables
                     </span>
                     <button
@@ -3649,7 +3624,7 @@
                           text: `Diagnostic ready for ${cleanTitle}. What symptoms, error codes, or noises are you seeing?`
                         }]);
                       }}
-                      className={`text-[12px] font-bold ${UI_ACCENT.text} hover:opacity-80 cursor-pointer flex items-center gap-1 active:scale-95 transition-transform pr-1 py-1 px-2 -mr-1 rounded-lg`}
+                      className={`text-[11.5px] font-bold ${UI_ACCENT.text} hover:opacity-80 cursor-pointer flex items-center gap-1 active:scale-95 transition-transform py-0.5 px-1.5 -mr-1 rounded-lg`}
                     >
                       <span>Ask Manual</span>
                       <span className="text-[12px]">💬</span>
@@ -3657,7 +3632,7 @@
                   </div>
 
                   {consumablesList.length > 0 ? (
-                    <div className="space-y-1.5 pt-0.5">
+                    <div className="space-y-1.5">
                       {consumablesList.map((cons, cIdx) => {
                         const status = calculateConsumableStatus(cons, item);
                         return (
@@ -3671,18 +3646,18 @@
                               setIsIntervalPopoverOpen(false);
                               setActiveConsumableSheet({ appliance: item, consumable: cons, index: cIdx, openedFromNotifications: false });
                             }}
-                            className={`w-full rounded-xl px-3 py-1.5 cursor-pointer active:scale-[0.98] transition-transform ${
-  isDark ? 'apple-consumable-pill-dark' : 'apple-consumable-pill-light'
-									}`}
+                            className={`w-full rounded-[14px] px-3 py-2 cursor-pointer active:scale-[0.99] transition-transform ${
+                              isDark ? 'apple-consumable-pill-dark' : 'apple-consumable-pill-light'
+                            }`}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <p className={`text-[13px] font-semibold truncate flex-1 leading-normal ${isDark ? 'text-zinc-100' : 'text-zinc-800'}`}>
+                              <p className={`text-[13px] font-medium truncate flex-1 leading-normal ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
                                 {cons.name}
                               </p>
 
                               {status.badgeType && (
-                                <span className={`h-5 px-2 rounded-full inline-flex items-center gap-1 text-[11px] font-bold tracking-tight ${
-                                  isDark ? 'bg-zinc-800 text-zinc-200' : 'bg-black/[0.04] text-zinc-700'
+                                <span className={`h-[18px] px-2 rounded-full inline-flex items-center gap-1 text-[10.5px] font-bold tracking-tight ${
+                                  isDark ? 'bg-white/[0.08] text-zinc-200' : 'bg-black/[0.04] text-zinc-700'
                                 }`}>
                                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                                     status.badgeType === 'past_due' ? 'bg-[#E11D48]' :
@@ -3696,7 +3671,7 @@
                               )}
                             </div>
 
-                            <div className={`mt-1.5 mb-1 w-full h-[4px] rounded-full overflow-hidden ${isDark ? 'bg-zinc-700/50' : 'bg-black/5'}`}>
+                            <div className={`mt-2 w-full h-[3.5px] rounded-full overflow-hidden ${isDark ? 'bg-white/[0.08]' : 'bg-black/[0.06]'}`}>
                               <div
                                 style={{
                                   width: `${status.displayPercent}%`,
@@ -3710,17 +3685,17 @@
                       })}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between text-xs py-1 text-zinc-400 pl-2">
+                    <div className="flex items-center justify-between text-xs py-1 text-zinc-400 pl-1">
                       <span>No periodic consumables cataloged.</span>
                     </div>
                   )}
                 </div>
               )}
+
             </div>
           </div>
         );
       };
-
       // =======================================================================
       // FLOW, DIAGNOSTIC & MODAL HANDLERS
       // =======================================================================
@@ -4090,7 +4065,7 @@
         a.href = url;
         a.download = filename;
         a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
       };
 
       const handleLogout = () => {
@@ -4273,14 +4248,12 @@
         }, 1100);
       };
 
-
       const greetingInfo = getDynamicGreetingInfo(userDisplayName);
 
-        return (
+      return (
         <div className={`h-[100dvh] h-screen overflow-hidden flex flex-col transition-colors duration-200 ${
           isDark ? 'bg-black text-white' : 'bg-[#F7F7F9] text-[#111827]'
         }`}>
-
 
           {/* Global Ambient Caustic Canvas */}
           <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -4311,14 +4284,14 @@
 
           {toastMessage && (
             <div className="fixed top-5 inset-x-0 z-[100] flex justify-center pointer-events-none px-4 animate-in fade-in slide-in-from-top-4 duration-200">
-              <div className="pointer-events-auto px-4 py-2 rounded-full backdrop-blur-2xl shadow-xl border border-white/10 bg-zinc-900/90 text-white text-xs font-bold flex items-center gap-2">
+              <div className="pointer-events-auto px-4 py-2 rounded-full backdrop-blur-2xl shadow-xl border border-white/10 bg-zinc-900/95 text-white text-xs font-bold flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                 <span>{toastMessage}</span>
               </div>
             </div>
           )}
 
-    {/* Dashboard Feed Wrapper */}
+          {/* Dashboard Feed Wrapper with Locked Mobile Viewport */}
           <div 
             onScroll={handleFeedScroll}
             style={{ WebkitOverflowScrolling: 'touch' }}
@@ -4333,9 +4306,8 @@
               />
             )}
 
-            {/* LIVING FROSTED LENS HEADER with Optimized Ceiling, Spatial Gap & Scaled Controls */}
-                       
-				  <header 
+            {/* LIVING FROSTED LENS HEADER (Original Target Translucency Level Preserved) */}
+            <header 
               style={{ paddingTop: 'max(22px, calc(env(safe-area-inset-top, 20px) + 4px))' }}
               className={`px-3 pb-2.5 sticky top-0 ${isFilterDropdownOpen ? 'z-40' : 'z-20'} will-change-transform transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                 isDark ? 'apple-liquid-header-dark' : 'apple-liquid-header-light'
@@ -4346,7 +4318,7 @@
               }`}
             >
 
-              {/* Row 1: Brand Title, Celestial Greeting & Quick Actions (Scaled to 42px) */}
+              {/* Row 1: Brand Title, Celestial Greeting & Quick Actions */}
               <div className="pl-1 pr-1 flex justify-between items-center">
                 <div>
                   <p className="text-[17px] font-black uppercase tracking-wider text-[#FF9500] leading-none">
@@ -4433,17 +4405,16 @@
                 </div>
               </div>
 
-                           {/* Row 2: Compact Utility Dock (32px / h-8) */}
+              {/* Row 2: Compact Utility Dock (32px / h-8) */}
               <div className="pl-1 pr-1 mt-4 flex items-center justify-between gap-2 h-8">
                 <div className="flex items-center gap-1.5 min-w-0 flex-1 h-8">
-                  {/* 1. X Appliances Label */}
                   <span className={`text-[11.5px] font-black tracking-wide uppercase shrink-0 whitespace-nowrap h-8 flex items-center transition-opacity duration-200 ${
                     isSearchExpanded ? 'opacity-40' : 'opacity-100'
                   } ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                     {appliances.length} {appliances.length === 1 ? 'Appliance' : 'Appliances'}
                   </span>
 
-                  {/* 2. Search Button / Pill */}
+                  {/* Search Button / Pill */}
                   <div
                     className={`relative h-8 flex items-center rounded-full transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                       isSearchExpanded
@@ -4502,8 +4473,8 @@
                     )}
                   </div>
 
-                  {/* 3. Filter Button */}
-                    <div className="relative shrink-0 w-8 h-8">
+                  {/* Filter Button */}
+                  <div className="relative shrink-0 w-8 h-8">
                     <button
                       type="button"
                       onClick={() => { triggerHaptic('light'); setIsFilterDropdownOpen(!isFilterDropdownOpen); }}
@@ -4514,7 +4485,6 @@
                       }`}
                       title="Filter Categories"
                     >
-
                       <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <line x1="4" y1="21" x2="4" y2="14"></line>
                         <line x1="4" y1="10" x2="4" y2="3"></line>
@@ -4559,7 +4529,7 @@
                   </div>
                 </div>
 
-                {/* 4. Edit & Add Property Buttons */}
+                {/* Edit & Add Property Buttons */}
                 <div className="flex items-center gap-1.5 shrink-0 h-8">
                   {isPaidUser && isSelectMode && (
                     <button
@@ -4588,16 +4558,13 @@
                   </button>
                 </div>
               </div>
+            </header>
 
-		    	</header>
-
-
-           {/* MAIN FEED: PROPERTY GROUPS & CARDS (Living Glass Planes) */}
+            {/* MAIN FEED: PROPERTY GROUPS & CARDS */}
             <main 
               style={{ minHeight: 'calc(100dvh - 60px)' }}
               className="flex-1 px-2.5 space-y-3.5 pb-20 pt-1"
             >
-
               <div className="space-y-4">
                 {units.map((unit, unitIdx) => {
                   const unitAppliances = filteredAppliancesMap.filter(a => a.unitId === unit.id);
@@ -4610,7 +4577,7 @@
                       }`}
                     >
                       <div className={`relative z-10 pl-3.5 pr-2.5 py-2.5 flex items-center justify-between border-b ${
-                        isDark ? 'bg-zinc-900/40 border-white/5' : 'bg-white/40 border-black/5'
+                        isDark ? 'bg-zinc-900/60 border-white/5' : 'bg-white/60 border-black/5'
                       }`}>
                         <div
                           onClick={() => {
@@ -4624,7 +4591,7 @@
                           </span>
                           <h3 className="text-sm font-black tracking-tight truncate">{unit.name}</h3>
                           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                            isDark ? 'bg-zinc-800/80 text-zinc-300' : 'bg-black/[0.04] text-zinc-800'
+                            isDark ? 'bg-zinc-800/90 text-zinc-300' : 'bg-black/[0.04] text-zinc-800'
                           }`}>
                             {unitAppliances.length} / {isPaidUser ? PRO_MAX_PER_GROUP : FREE_MAX_PER_GROUP}
                           </span>
@@ -4703,7 +4670,7 @@
                               <div 
                                 key="search_no_match"
                                 className={`apple-card-swap p-4 text-center rounded-2xl ${
-                                  isDark ? 'text-zinc-300 bg-zinc-900/60' : 'text-zinc-700 bg-[#FAFAFC]'
+                                  isDark ? 'text-zinc-300 bg-zinc-900/80' : 'text-zinc-700 bg-[#FAFAFC]'
                                 }`}
                               >
                                 <p className="text-xs font-semibold mb-2">
@@ -4748,7 +4715,7 @@
                                 }}
                                 className={`apple-card-swap relative overflow-hidden pt-8 pb-6 px-4 rounded-[22px] flex flex-col items-center justify-center text-center border border-dashed transition-all cursor-pointer group active:scale-[0.98] ${
                                   isDark 
-                                    ? 'border-white/15 bg-zinc-950/30 hover:border-white/25' 
+                                    ? 'border-white/15 bg-zinc-950/40 hover:border-white/25' 
                                     : 'border-black/15 bg-black/[0.02] hover:border-black/25'
                                 }`}
                               >
@@ -4758,8 +4725,8 @@
 
                                   <div className={`relative w-11 h-11 rounded-full flex items-center justify-center apple-frosted-lens transition-transform duration-300 group-hover:scale-105 ${
                                     isDark 
-                                      ? 'bg-zinc-950/50 border border-white/25 text-zinc-100' 
-                                      : 'bg-white/65 border border-white/80 text-zinc-800'
+                                      ? 'bg-zinc-950/60 border border-white/25 text-zinc-100' 
+                                      : 'bg-white/75 border border-white/80 text-zinc-800'
                                   }`}>
                                     <svg className="w-4 h-4 stroke-[1.8] stroke-linecap-round stroke-linejoin-round opacity-90 drop-shadow-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                       <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -4862,7 +4829,7 @@
                   </div>
 
                   <div className={`p-4 rounded-2xl text-xs space-y-3 text-center ${
-                    isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC]'
+                    isDark ? 'bg-zinc-800/80' : 'bg-[#FAFAFC]'
                   }`}>
                     <div className="space-y-1">
                       <span className={`text-[12.5px] font-bold block ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
@@ -5024,7 +4991,7 @@
                   }`}
                 >
                   <div className={`sticky top-0 z-20 backdrop-blur-xl px-6 pt-4 pb-3 grid grid-cols-[64px_1fr_64px] items-center shrink-0 border-b ${
-                    isDark ? 'bg-zinc-900/90 border-zinc-800/80' : 'bg-white/90 border-black/[0.03]'
+                    isDark ? 'bg-zinc-900/95 border-zinc-800/80' : 'bg-white/95 border-black/[0.04]'
                   }`}>
                     <div className="flex justify-start">
                       {isEditingApplianceSpecs ? (
@@ -5078,9 +5045,9 @@
                   <div className="px-6 pt-3.5 pb-2 shrink-0">
                     {isEditingApplianceSpecs ? (
                       <div className="space-y-3 animate-in fade-in duration-150">
-                                               <div>
+                        <div>
                           <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                               									Appliance Name
+                            Appliance Name
                           </label>
                           <input
                             style={{ colorScheme: isDark ? 'dark' : 'light' }}
@@ -5206,7 +5173,7 @@
                   </div>
 
                   <div className="px-6 pt-1 shrink-0">
-                    <div className={`p-1 rounded-xl flex gap-1 ${isDark ? 'bg-zinc-800/70' : 'bg-black/[0.04]'}`}>
+                    <div className={`p-1 rounded-xl flex gap-1 ${isDark ? 'bg-zinc-800/80' : 'bg-black/[0.04]'}`}>
                       {[{ id: 'parts', label: 'Mechanical Parts' }, { id: 'docs', label: 'Warranty & Receipt' }].map(tab => (
                         <button
                           key={tab.id}
@@ -5300,7 +5267,7 @@
 
                     {detailTab === 'docs' && (
                       <div className="space-y-3">
-                        <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC]'}`}>
+                        <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/80' : 'bg-[#FAFAFC]'}`}>
                           <div className="flex justify-between items-start">
                             <div>
                               <p className="text-xs font-black">Manufacturer Warranty</p>
@@ -5407,7 +5374,7 @@
                           </div>
                         </div>
 
-                        <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/60' : 'bg-[#FAFAFC]'}`}>
+                        <div className={`p-4 rounded-2xl space-y-2.5 ${isDark ? 'bg-zinc-800/80' : 'bg-[#FAFAFC]'}`}>
                           <div className="flex justify-between items-center">
                             <div>
                               <p className="text-xs font-black">Purchase Receipt</p>
@@ -5546,7 +5513,6 @@
               </div>
             </div>
           )}
-    
 
           {/* 3. ADD APPLIANCE MODAL */}
           {isAddOpen && (
@@ -5566,7 +5532,7 @@
                   </div>
                 </div>
 
-                <div className={`p-1 rounded-xl flex gap-1 ${isDark ? 'bg-zinc-800/70' : 'bg-black/[0.04]'}`}>
+                <div className={`p-1 rounded-xl flex gap-1 ${isDark ? 'bg-zinc-800/80' : 'bg-black/[0.04]'}`}>
                   <button
                     type="button"
                     onClick={() => { triggerHaptic('light'); setAddForm(prev => ({ ...prev, inputMode: 'manual' })); }}
@@ -5666,7 +5632,7 @@
 
                   <div className="pt-1">
                     <label className={`text-[12.5px] font-bold tracking-tight block pl-3.5 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}>
-                    Property Group
+                      Property Group
                     </label>
                     {addForm.isAddingNewUnitInline ? (
                       <div className="flex items-center gap-2 mt-1">
@@ -5693,7 +5659,6 @@
                           className="w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-xs active:scale-95 transition-transform shrink-0"
                           title="Save Property"
                         >
-
                           ✓
                         </button>
                         <button
@@ -5886,7 +5851,6 @@
               </div>
             </div>
           )}
-
           {/* 4. SETTINGS BOTTOM-SHEET */}
           {isSettingsOpen && (
             <div 
@@ -5970,19 +5934,19 @@
                             {currentUser?.email ? 'Active' : 'Not active'}
                           </span>
 
-                         <span className="relative flex h-2 w-2 shrink-0 mx-0.5">
-  {!currentUser?.email ? (
-    <span className="relative inline-flex rounded-full h-2 w-2 bg-zinc-400 dark:bg-zinc-600" title="Local storage only" />
-  ) : !isOnline ? (
-    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500" title="Device Offline" />
-  ) : hasSyncFailed ? (
-    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 animate-pulse" title="Sync connection failed" />
-  ) : isActivelySyncing ? (
-    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 animate-pulse" title="Synchronizing..." />
-  ) : (
-    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" title="Synchronized" />
-  )}
-									</span>
+                          <span className="relative flex h-2 w-2 shrink-0 mx-0.5">
+                            {!currentUser?.email ? (
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-zinc-400 dark:bg-zinc-600" title="Local storage only" />
+                            ) : !isOnline ? (
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500" title="Device Offline" />
+                            ) : hasSyncFailed ? (
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 animate-pulse" title="Sync connection failed" />
+                            ) : isActivelySyncing ? (
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 animate-pulse" title="Synchronizing..." />
+                            ) : (
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" title="Synchronized" />
+                            )}
+                          </span>
 
                           <p className={`text-[11px] font-medium truncate max-w-[190px] ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
                             {currentUser?.email ? currentUser.email : 'Local device storage'}
@@ -6008,7 +5972,7 @@
                       </div>
                     </div>
 
-                                        		                    {/* CARD 1: PLAN TIER */}
+                    {/* CARD 1: PLAN TIER */}
                     <div className={`px-4 py-3.5 rounded-2xl space-y-3 ${isDark ? 'apple-card-dark' : 'apple-card-light'}`}>
                       <div>
                         <div className="flex items-center gap-2">
@@ -6136,13 +6100,12 @@
                     <div 
                       onClick={(e) => { e.stopPropagation(); triggerHaptic('light'); setSettingsSubView('privacy_help'); }}
                       className={`px-4 py-3.5 rounded-2xl cursor-pointer active:scale-[0.99] transition-transform ${isDark ? 'apple-card-dark hover:bg-zinc-800/80' : 'apple-card-light hover:bg-zinc-50'}`}
-							>
+                    >
                       <div className="flex justify-between items-center">
                         <p className="text-xs font-black tracking-tight">Privacy &amp; Help</p>
                         <span className="text-zinc-400 font-bold text-xs">➔</span>
                       </div>
                     </div>
-
 
                     <div className="mt-2 text-center">
                       <p className={`text-[10px] font-mono tracking-tight leading-none ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
@@ -6216,7 +6179,8 @@
                           <span className="font-bold">{isPaidUser ? '65 / 2 hours' : '5 complimentary'}</span>
                         </div>
                       </div>
-                                                      			                                 <div className="pt-2">
+
+                      <div className="pt-2">
                         {isPaidUser ? (
                           <button
                             type="button"
@@ -6907,7 +6871,7 @@
                       {savedPassports.map((item) => (
                         <div
                           key={item.id}
-             className={`p-3.5 rounded-2xl flex items-center justify-between ${isDark ? 'apple-card-dark' : 'apple-card-light'}`}
+                          className={`p-3.5 rounded-2xl flex items-center justify-between ${isDark ? 'apple-card-dark' : 'apple-card-light'}`}
                         >
                           <div className="min-w-0 flex-1 pr-2">
                             <p className="text-xs font-bold truncate">{item.unitName}</p>
@@ -7046,7 +7010,7 @@
                               setActiveConsumableSheet({ appliance: notif.appliance, consumable: notif.consumable, index: notif.index, openedFromNotifications: true });
                             }}
                             className={`relative z-10 py-2.5 px-3.5 rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-between ${
-                              isDark ? 'bg-zinc-800/80 hover:bg-zinc-800' : 'apple-card-light hover:bg-zinc-50'
+                              isDark ? 'bg-zinc-800/90 hover:bg-zinc-800' : 'apple-card-light hover:bg-zinc-50'
                             }`}
                           >
                             <div className="min-w-0 flex-1 pr-2">
@@ -7077,7 +7041,7 @@
                                 title="Dismiss Alert"
                               >
                                 <svg className="w-3.5 h-3.5 stroke-[1.8] stroke-linecap-round stroke-linejoin-round" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                  <line x1="18" y1="6" x2="18" y2="6"></line>
+                                  <line x1="18" y1="6" x2="6" y2="18"></line>
                                   <line x1="6" y1="6" x2="18" y2="18"></line>
                                 </svg>
                               </button>
@@ -7418,7 +7382,7 @@
             </div>
           )}
 
-    {/* 10. AUTHENTICATION MODAL (Locked Floating Center - No Scroll) */}
+          {/* 10. AUTHENTICATION MODAL */}
           {isAuthModalOpen && (
             <div 
               onClick={() => {
@@ -7427,7 +7391,6 @@
                 setIsSettingsOpen(true);
               }} 
               onTouchMove={(e) => {
-                // Prevent rubber-banding or background pull
                 if (e.cancelable) e.preventDefault();
               }}
               style={{
@@ -7446,7 +7409,6 @@
                   isDark ? 'apple-drawer-dark text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
-
                 <div className="relative flex items-center justify-center pb-0.5">
                   <h3 className="text-base font-black tracking-tight">Account Login</h3>
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 -mr-1">
@@ -7543,8 +7505,7 @@
             </div>
           )}
 
-
-          {/* 11. DIAGNOSTIC ASSISTANT BOTTOM-SHEET (Apple Intelligence Fluid Aura & Spatial Response) */}
+          {/* 11. DIAGNOSTIC ASSISTANT BOTTOM-SHEET */}
           {activeAppliance && (
             <div 
               onClick={() => {
@@ -7578,7 +7539,6 @@
                   isDark ? 'apple-drawer-dark text-white' : 'apple-drawer-light text-zinc-900'
                 }`}
               >
-
                 {/* Top Navigation Anchor */}
                 <div 
                   style={{ touchAction: 'none' }}
@@ -7615,7 +7575,7 @@
                   </div>
                 </div>
 
-                       {/* Dynamic Contextual Action Chips */}
+                {/* Dynamic Contextual Action Chips */}
                 <div 
                   style={{ 
                     touchAction: 'pan-x',
@@ -7645,7 +7605,6 @@
                     ))}
                   </div>
                 </div>
-
 
                 {/* Message Stream */}
                 <div 
@@ -7812,7 +7771,7 @@
                     </div>
                   ))}
 
-                                                      {isThinking && (
+                  {isThinking && (
                     <div className={`apple-bubble-enter py-2.5 px-3.5 rounded-[18px] rounded-bl-sm mr-auto w-fit flex items-center gap-1.5 shadow-2xs ${
                       isDark 
                         ? 'bg-zinc-800 text-zinc-400' 
@@ -7823,7 +7782,6 @@
                       <span className="w-[5px] h-[5px] rounded-full bg-current dot-fluid-3" />
                     </div>
                   )}
-
 
                   {streamingText && (
                     <div className={`apple-bubble-enter py-2.5 px-4 rounded-[20px] rounded-bl-sm w-fit max-w-[85%] mr-auto whitespace-pre-line leading-relaxed backdrop-blur-xl border transition-all ${
@@ -7881,7 +7839,6 @@
                       </div>
                     </div>
                   )}
-
 
                   {isLoading && <p className={`text-xs animate-pulse px-2 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>Analyzing...</p>}
                 </div>
